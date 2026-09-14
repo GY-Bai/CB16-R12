@@ -4,11 +4,11 @@
   "read_only": {
     "binance_um_1m_klines_10pairs": {
       "path": "/cb16/raw/klines_1m",
-      "description": "PRIMARY market data. 10 Binance USDM pairs (BTC ETH BNB XRP ADA DOGE DOT LINK LTC SOL), 1m klines as monthly zips with .CHECKSUM files, 2020-01..2026-08. Later listings start later (DOGE 2020-07, DOT 2020-08, SOL 2020-09). Verified: a monthly zip holds exactly the minutes of that month."
+      "description": "PRIMARY market data. 10 Binance USDM pairs (BTC ETH BNB XRP ADA DOGE DOT LINK LTC SOL), 1m klines as monthly zips with .CHECKSUM files, 2020-01..2026-08. Later listings start later (DOGE 2020-07, DOT 2020-08, SOL 2020-09). Verified: a monthly zip holds exactly the minutes of that month. Always pair it with binance_um_funding_rates_10pairs: the two share an identical per-symbol month coverage (verified 1:1, 72-80 months per symbol), so they align row-for-row by symbol and month."
     },
     "binance_um_funding_rates_10pairs": {
       "path": "/cb16/raw/fundingRate",
-      "description": "Funding-rate history for the same 10 pairs, monthly."
+      "description": "Funding-rate history for the same 10 pairs, monthly. Same symbols and identical per-symbol month coverage as binance_um_1m_klines_10pairs (verified 1:1), so funding joins the klines directly on symbol + month. Columns: calc_time, funding_interval_hours, last_funding_rate; BTCUSDT 2020-01 holds 94 rows (31 days x 3 eight-hourly settlements + header)."
     },
     "cb16_raw_download_manifest": {
       "path": "/cb16/raw/DOWNLOAD_MANIFEST.json",
