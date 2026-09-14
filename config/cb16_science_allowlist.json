@@ -48,6 +48,38 @@
         "REPORT.md"
       ],
       "diagnostic_only": true
+    },
+    "cb16.runtime-preflight@v1": {
+      "description": "Runtime preflight for the Science lane. Reports the CPU Python/NumPy/PyTorch runtime (PyTorch and CUDA are diagnostics only), existence/readability booleans for the canonical /cb16/raw, /cb16/frozen and /cb16/brain_assets inputs advertised by the repository data manifest, the discovered BTCUSDT 2020-01..2020-03 archive count and basenames, and whether one archive opens with a valid OHLCV row. Writes RESULT.json and REPORT.md, emits no environment or credential values, trains nothing.",
+      "argv": [
+        "python3",
+        "-m",
+        "cb16_science.runtime_preflight"
+      ],
+      "env": {
+        "PYTHONPATH": "science"
+      },
+      "produces": [
+        "RESULT.json",
+        "REPORT.md"
+      ],
+      "diagnostic_only": true
+    },
+    "cb16.normalization-ablation@v1": {
+      "description": "R12 Normalization Ablation R0. Compares five fixed K-line normalization families (N0 endpoint-anchored log ratios, N1 per-bar log-return geometry, N2 causal window z-score with shared close statistics, N3 RevIN-style per-channel instance normalization, N4 volatility-normalized return geometry) on identical BTCUSDT 1m 2020-01..2020-03 windows, measures the contract invariant probes and one frozen linear sensory projection, and writes experiment_spec.json, RESULT.json and REPORT.md. Trains nothing, performs no Central Brain or Account Physics work, and promotes no winner.",
+      "argv": [
+        "python3",
+        "-m",
+        "cb16_science.normalization"
+      ],
+      "env": {
+        "PYTHONPATH": "science"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
