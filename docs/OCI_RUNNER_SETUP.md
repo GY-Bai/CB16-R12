@@ -90,6 +90,37 @@ and, when a branch is checked out in a worktree, recreates the whole repository
 instead — which orphans worktree registrations. Keeping task branches out of
 the checkout repository removes that interaction entirely.
 
+## 1e. Action versions and the runner floor
+
+The dispatch workflows use `actions/checkout@v7` and
+`actions/upload-artifact@v7`. Both run on `node24`, which imposes a **minimum
+Actions runner version of 2.327.1** on self-hosted runners. The R12 runner
+reports `2.337.0`, so the floor is satisfied.
+
+Pinning v4 was a real defect: those releases run on Node 20, and the runner
+already emits
+
+```text
+Node 20 is being deprecated. This workflow is running with Node 24 by default.
+If you need to temporarily use Node 20, set
+ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true
+```
+
+which means the platform forces a newer Node onto an action that was not built
+for it. Check the runner version before upgrading either action:
+
+```bash
+grep -ohE "Runner version: [0-9.]+" ~/cb16-r12-runner/_diag/*.log | tail -n 1
+```
+
+Inputs used by these workflows were verified against the `v7.0.1` manifests:
+checkout uses `ref`, `fetch-depth`, `persist-credentials`; upload-artifact uses
+`name`, `path`, `if-no-files-found`, `retention-days`. All still exist.
+
+Artifact uploads are immutable from v4 onwards, so both workflows include
+`github.run_attempt` in the artifact name; without it a re-run of the same run
+id is rejected with "an artifact with this name already exists".
+
 ## 2. Repository variables
 
 Set these as repository Actions **variables** (not secrets) — they are paths,
