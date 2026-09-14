@@ -5,9 +5,13 @@ import unittest
 
 import torch
 
+from cb16_science.vslice import controlled_tasks as tasks
 from cb16_science.vslice import qualification as q
 from cb16_science.vslice import task_a_variance_r1 as r1
-from cb16_science.vslice import controlled_tasks as tasks
+from cb16_science.vslice.contracts import ContractError
+
+
+PREREGISTERED_SPEC_SHA256 = "4150ca184e0ee0a4a308018d531ceab9e08b7205ff09a06ef6ed568c25b7b5d6"
 
 
 class TaskAVarianceR1Tests(unittest.TestCase):
@@ -16,8 +20,9 @@ class TaskAVarianceR1Tests(unittest.TestCase):
         cls.spec = r1.load_spec()
         q.configure_deterministic_runtime()
 
-    def test_committed_spec_validates(self) -> None:
+    def test_committed_spec_validates_and_matches_preregistered_hash(self) -> None:
         r1.validate_spec(self.spec)
+        self.assertEqual(r1.spec_sha256(self.spec), PREREGISTERED_SPEC_SHA256)
         self.assertEqual(r1.arm_definition(self.spec, r1.BASELINE_ARM).batch_trajectories, 90)
         self.assertEqual(r1.arm_definition(self.spec, r1.HIGH_BATCH_ARM).batch_trajectories, 900)
         self.assertEqual(r1.paired_seeds(self.spec), tuple(range(1201, 1209)))
@@ -29,9 +34,10 @@ class TaskAVarianceR1Tests(unittest.TestCase):
         self.assertEqual(len(baseline_env.control_schedule), 90)
         self.assertEqual(len(high_env.positive_schedule), 900)
         self.assertEqual(len(high_env.control_schedule), 900)
-        self.assertEqual(set(baseline_env.control_schedule), {(a, b) for a in range(3) for b in range(3)})
-        self.assertEqual(set(high_env.control_schedule), {(a, b) for a in range(3) for b in range(3)})
-        for pair in {(a, b) for a in range(3) for b in range(3)}:
+        pairs = {(a, b) for a in range(3) for b in range(3)}
+        self.assertEqual(set(baseline_env.control_schedule), pairs)
+        self.assertEqual(set(high_env.control_schedule), pairs)
+        for pair in pairs:
             self.assertEqual(baseline_env.control_schedule.count(pair), 10)
             self.assertEqual(high_env.control_schedule.count(pair), 100)
 
@@ -97,7 +103,7 @@ class TaskAVarianceR1Tests(unittest.TestCase):
     def test_formal_validation_rejects_entropy_rescue(self) -> None:
         changed = copy.deepcopy(self.spec)
         changed["optimizer"]["entropy_bonus"] = 0.01
-        with self.assertRaises(Exception):
+        with self.assertRaises(ContractError):
             r1.validate_spec(changed)
 
 
