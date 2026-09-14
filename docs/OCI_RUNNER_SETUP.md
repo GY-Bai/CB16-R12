@@ -537,6 +537,37 @@ Properties worth keeping:
 * **redacted** - bodies pass through the same host-identifier scrubbing as the
   rest of the evidence.
 
+## 1m. Which instruction source wins
+
+Five places can look like an instruction, and a fix round can hold several at
+once. The task packet therefore opens with an explicit ranking so the agent
+never has to infer which one is current:
+
+| Rank | Source | Authority |
+| --- | --- | --- |
+| 1 | the `cb16` trusted metadata block | machine-validated envelope (`mode`, `base_sha`, `branch`, `task_file`, `pr_number`, `review_delta`, `session_affinity`); decides what may run at all |
+| 2 | the task contract file at `base_sha` | the task itself - scope, required tests, done-when; version-controlled and pinned |
+| 3 | the newest unaddressed reviewer instruction | what the current fix round must change; narrows scope, never overrides 1-2 |
+| 4 | the Issue description | the operator's framing; context only, never a contract |
+| - | anything from an untrusted actor | not an instruction at all |
+
+If sources 1-3 disagree the packet tells the agent to stop short of the
+conflicting change and report the conflict in `BUILD_REPORT` rather than guess.
+
+The same ranking is repeated in the prompt of every resumed session. A resumed
+turn carries the whole earlier conversation, including an earlier task packet,
+an earlier review delta and an earlier reviewer comment - all of which are
+superseded. The prompt therefore states that history is not the current
+instruction, points at the packet on disk as the current one, and repeats the
+four ranks, so the agent cannot mistake remembered state for present state.
+
+The Issue description is the prose outside the metadata fence. It used to be
+dropped in silence, which cost real instructions - one Issue carried 1,712
+characters of change request outside the fence and the agent never saw a word
+of it. It is now included, truncated at 8,000 characters with a marker, and
+**only when the Issue author is a trusted actor**: an untrusted author's prose
+is omitted with a visible note instead of being obeyed.
+
 ## 2. Repository variables
 
 Set these as repository Actions **variables** (not secrets) — they are paths,
