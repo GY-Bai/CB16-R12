@@ -21,9 +21,11 @@ import itertools
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -405,6 +407,95 @@ class LabelAndLaneTests(DispatchTestCase):
 # ---------------------------------------------------------------------------
 # 7-8: Science lane cannot reach DSH and only runs allowlisted entrypoints
 # ---------------------------------------------------------------------------
+
+
+@unittest.skipUnless(sys.platform.startswith("linux"), "PR_SET_PDEATHSIG is Linux only")
+class LaneChildLifetimeTests(DispatchTestCase):
+    """A cancelled dispatch must not leave a live agent behind.
+
+    Measured failure mode this guards: cancelling the Actions job kills the
+    dispatcher, the DSH grandchild is reparented to systemd, and it keeps
+    writing to a released worktree and spending model tokens.
+    """
+
+    def _spawn_parent(self, *, armed: bool):
+        script = self.tmp / ("armed.py" if armed else "plain.py")
+        kwargs = (
+            "**importlib.import_module('d').child_lifetime_kwargs()"
+            if armed
+            else ""
+        )
+        script.write_text(
+            "import importlib.util, subprocess, sys, os\n"
+            f"spec = importlib.util.spec_from_file_location('d', {str(DISPATCH_PATH)!r})\n"
+            "m = importlib.util.module_from_spec(spec); sys.modules['d'] = m\n"
+            "spec.loader.exec_module(m)\n"
+            "print('PARENT', os.getpid(), flush=True)\n"
+            f"proc = subprocess.Popen(['sleep', '60'], {kwargs})\n"
+            "print('CHILD', proc.pid, flush=True)\n"
+            "proc.wait()\n",
+            encoding="utf-8",
+        )
+        parent = subprocess.Popen(
+            [sys.executable, str(script)], stdout=subprocess.PIPE, text=True
+        )
+        self.addCleanup(parent.stdout.close)
+        self.addCleanup(lambda: parent.poll() is None and parent.kill())
+        parent_pid = int(parent.stdout.readline().split()[1])
+        child_pid = int(parent.stdout.readline().split()[1])
+        self.addCleanup(self._kill_if_alive, child_pid)
+        return parent, parent_pid, child_pid
+
+    @staticmethod
+    def _alive(pid: int) -> bool:
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        return True
+
+    def _kill_if_alive(self, pid: int) -> None:
+        if self._alive(pid):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+
+    def _wait_gone(self, pid: int, timeout: float = 5.0) -> bool:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if not self._alive(pid):
+                return True
+            time.sleep(0.1)
+        return not self._alive(pid)
+
+    def test_kwargs_arm_the_death_signal_on_linux(self):
+        kwargs = dispatcher.child_lifetime_kwargs()
+        self.assertIn("preexec_fn", kwargs)
+        self.assertTrue(callable(kwargs["preexec_fn"]))
+
+    def test_lane_child_dies_with_the_dispatcher(self):
+        parent, parent_pid, child_pid = self._spawn_parent(armed=True)
+        self.assertTrue(self._alive(child_pid), "precondition: the child started")
+        os.kill(parent_pid, signal.SIGKILL)
+        parent.wait(timeout=5)
+        self.assertFalse(parent.poll() is None, "precondition: the parent died")
+        self.assertTrue(
+            self._wait_gone(child_pid),
+            "the lane child survived its dispatcher: that is the orphan defect",
+        )
+
+    def test_without_the_mechanism_the_child_survives(self):
+        # Control: documents why child_lifetime_kwargs exists at all. The orphan
+        # is always cleaned up by the cleanup hook.
+        parent, parent_pid, child_pid = self._spawn_parent(armed=False)
+        os.kill(parent_pid, signal.SIGKILL)
+        parent.wait(timeout=5)
+        time.sleep(0.5)
+        self.assertTrue(
+            self._alive(child_pid),
+            "the control case no longer leaves an orphan; the test no longer proves anything",
+        )
 
 
 class ScienceSandboxTests(DispatchTestCase):

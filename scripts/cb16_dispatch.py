@@ -26,11 +26,13 @@ from __future__ import annotations
 
 import argparse
 import base64
+import ctypes
 import fcntl
 import json
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -163,6 +165,48 @@ class BuilderImplementationFail(DispatchError):
 # --------------------------------------------------------------------------
 # Small shared helpers
 # --------------------------------------------------------------------------
+
+
+#: Linux `prctl` request that asks the kernel to signal a child when its parent
+#: dies.  It fires even when the parent is SIGKILLed, which is exactly the case
+#: that matters here: cancelling a dispatch kills the dispatcher, and without
+#: this the DSH grandchild survives as an orphan that keeps calling the model.
+_PR_SET_PDEATHSIG = 1
+
+if sys.platform.startswith("linux"):
+    try:
+        _LIBC = ctypes.CDLL("libc.so.6", use_errno=True)
+    except OSError:  # pragma: no cover - exotic libc
+        _LIBC = None
+else:  # pragma: no cover - the dispatch host is Linux
+    _LIBC = None
+
+
+def _arm_parent_death_signal() -> None:
+    """Child side of :func:`child_lifetime_kwargs`; runs between fork and exec."""
+
+    parent = os.getppid()
+    if _LIBC is not None:
+        _LIBC.prctl(_PR_SET_PDEATHSIG, int(signal.SIGTERM), 0, 0, 0)
+    # If the parent died between fork and prctl the kernel had nobody to signal,
+    # so refuse to continue as an orphan rather than relying on the race.
+    if os.getppid() != parent:
+        os._exit(1)
+
+
+def child_lifetime_kwargs() -> Dict[str, Any]:
+    """Tie a spawned lane child's lifetime to this dispatcher.
+
+    A cancelled dispatch kills the dispatcher, not the agent it spawned.  The
+    result is an orphaned DSH session that keeps writing to a released worktree
+    and keeps spending model tokens.  On Linux ``PR_SET_PDEATHSIG`` removes that
+    whole class of orphan, including the SIGKILL case where no signal handler
+    here could run.
+    """
+
+    if _LIBC is None:
+        return {}
+    return {"preexec_fn": _arm_parent_death_signal}
 
 
 def run(
@@ -1038,6 +1082,7 @@ def invoke_dsh(
             capture_output=True,
             text=True,
             timeout=timeout,
+            **child_lifetime_kwargs(),
         )
     except FileNotFoundError as exc:
         raise ExecutionBlocked("DSH executable not found", detail=str(exc))
@@ -1177,6 +1222,7 @@ def run_science_entrypoint(
             capture_output=True,
             text=True,
             timeout=timeout,
+            **child_lifetime_kwargs(),
         )
     except FileNotFoundError as exc:
         raise ExecutionBlocked("science entrypoint not found", detail=str(exc))
@@ -1241,7 +1287,13 @@ def run_repo_tests(worktree: Path, *, env: Mapping[str, str], timeout: float = 9
         return RunResult(exit_code=0, stdout="no tests directory present\n", note="tests skipped")
     try:
         proc = subprocess.run(
-            argv, cwd=str(worktree), env=dict(env), capture_output=True, text=True, timeout=timeout
+            argv,
+            cwd=str(worktree),
+            env=dict(env),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            **child_lifetime_kwargs(),
         )
     except subprocess.TimeoutExpired as exc:
         return RunResult(exit_code=124, stdout=exc.stdout or "", stderr=exc.stderr or "", timed_out=True)
