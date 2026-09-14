@@ -660,6 +660,15 @@ class DryRunTests(DispatchTestCase):
 # ---------------------------------------------------------------------------
 
 
+class PublishEnvironmentTests(DispatchTestCase):
+    def test_publish_env_isolates_host_git_configuration(self):
+        env = dispatcher.publish_env(self.base_env)
+        self.assertEqual(env["GIT_CONFIG_GLOBAL"], "/dev/null")
+        self.assertEqual(env["GIT_CONFIG_NOSYSTEM"], "1")
+        self.assertEqual(env["GIT_TERMINAL_PROMPT"], "0")
+        self.assertEqual(env["HOME"], str(self.home))
+
+
 class PublishingTests(DispatchTestCase):
     def test_existing_open_pr_is_updated_instead_of_failing(self):
         calls = []
@@ -734,6 +743,63 @@ class WorktreeTests(DispatchTestCase):
         text = packet.read_text(encoding="utf-8")
         self.assertIn("Task branch: ds/test-task", text)
         self.assertIn("Base SHA", text)
+
+    def test_commit_excludes_the_task_packet(self):
+        worktree = self.repo
+        packet_dir = worktree / ".cb16"
+        packet_dir.mkdir(parents=True, exist_ok=True)
+        (packet_dir / "TASK_PACKET.md").write_text("# packet\n", encoding="utf-8")
+        (worktree / "docs" / "REAL_CHANGE.md").write_text("# change\n", encoding="utf-8")
+        sha = dispatcher.commit_worktree(worktree, message="test commit", env=dict(self.base_env))
+        self.assertIsNotNone(sha)
+        tracked = git(worktree, "ls-tree", "-r", "--name-only", "HEAD").splitlines()
+        self.assertIn("docs/REAL_CHANGE.md", tracked)
+        self.assertFalse([path for path in tracked if path.startswith(".cb16")])
+        # The runtime directory must be gone, not merely ignored.
+        self.assertFalse((worktree / ".cb16").exists())
+
+    def test_commit_excludes_the_packet_even_without_a_gitignore_entry(self):
+        (self.repo / ".gitignore").write_text("# no .cb16 entry here\n", encoding="utf-8")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "drop ignore entry")
+        packet_dir = self.repo / ".cb16"
+        packet_dir.mkdir(parents=True, exist_ok=True)
+        (packet_dir / "TASK_PACKET.md").write_text("# packet\n", encoding="utf-8")
+        (self.repo / "docs" / "REAL_CHANGE.md").write_text("# change\n", encoding="utf-8")
+        sha = dispatcher.commit_worktree(self.repo, message="commit without ignore", env=dict(self.base_env))
+        self.assertIsNotNone(sha)
+        tracked = git(self.repo, "ls-tree", "-r", "--name-only", "HEAD").splitlines()
+        self.assertFalse([path for path in tracked if path.startswith(".cb16")])
+
+    def test_commit_returns_none_when_nothing_changed(self):
+        self.assertIsNone(
+            dispatcher.commit_worktree(self.repo, message="empty", env=dict(self.base_env))
+        )
+
+    def test_existing_local_branch_is_reused(self):
+        git(self.repo, "branch", "ds/existing-task")
+        meta = self.builder_meta(branch="ds/existing-task")
+        spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# fixture\n"})
+        outcome = self.dispatch(meta=meta, dsh_invoker=spy)
+        worktree = Path(outcome.summary["worktree"])
+        self.assertEqual(git(worktree, "rev-parse", "--abbrev-ref", "HEAD"), "ds/existing-task")
+
+    def test_remote_only_branch_is_checked_out(self):
+        # Simulate a fix cycle where the task branch exists only on the remote.
+        git(self.repo, "update-ref", "refs/remotes/origin/ds/remote-task", self.sha)
+        meta = self.builder_meta(branch="ds/remote-task")
+        spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# fixture\n"})
+        outcome = self.dispatch(meta=meta, dsh_invoker=spy)
+        worktree = Path(outcome.summary["worktree"])
+        self.assertEqual(git(worktree, "rev-parse", "--abbrev-ref", "HEAD"), "ds/remote-task")
+
+    def test_allowlist_argv_rejects_absolute_and_parent_paths(self):
+        for argv in ([["/bin/sh"]], [["python3", "../../evil.py"]], [["python3", "-c", "x"]])[0:2]:
+            with self.subTest(argv=argv):
+                with self.assertRaises(dispatcher.ContractMismatch):
+                    dispatcher.resolve_allowlisted_argv({"argv": argv}, self.repo)
+        with self.assertRaises(dispatcher.ContractMismatch):
+            dispatcher.resolve_allowlisted_argv({"argv": "not-a-list"}, self.repo)
 
     def test_main_branch_is_never_the_task_branch(self):
         with self.assertRaises(dispatcher.ContractMismatch):

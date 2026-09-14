@@ -30,6 +30,7 @@ import fcntl
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -744,6 +745,23 @@ def scrubbed_env(base: Mapping[str, str], *, allow_extra: Sequence[str] = ()) ->
     return env
 
 
+def publish_env(base: Mapping[str, str]) -> Dict[str, str]:
+    """Environment for the credentialed publish steps.
+
+    Publishing must use exactly the token the dispatcher was handed.  The host
+    may carry its own git credential helper (for example `gh auth
+    git-credential`), so global/system git config is disabled here and the push
+    additionally clears `credential.helper` on the command line.
+    """
+
+    env = dict(base)
+    env["GIT_CONFIG_GLOBAL"] = "/dev/null"
+    env["GIT_CONFIG_NOSYSTEM"] = "1"
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    env["GIT_ASKPASS"] = "/bin/true"
+    return env
+
+
 def credential_warnings(home: Path) -> List[str]:
     """Host-provisioning warnings; never blocks, but always surfaces in evidence."""
 
@@ -1067,9 +1085,13 @@ def commit_worktree(
     changed = collect_changed_files(worktree)
     if not changed:
         return None
-    # `.cb16` holds the transient task packet and must never be committed.
-    git(worktree, "add", "-A", "--", ".", ":(exclude).cb16", env=env, check=True)
-    child_env = dict(env or os.environ)
+    # `.cb16` holds the transient task packet.  Remove it before staging so it
+    # cannot be committed even if `.gitignore` is missing the entry or the agent
+    # dropped extra files in there.  Note that `git add -A -- .` would abort on
+    # the ignored directory, so no pathspec is passed here.
+    shutil.rmtree(worktree / ".cb16", ignore_errors=True)
+    child_env = publish_env(env or os.environ)
+    git(worktree, "add", "-A", env=child_env, check=True)
     child_env.update(
         {
             "GIT_AUTHOR_NAME": author_name,
@@ -1090,12 +1112,16 @@ def push_branch(worktree: Path, *, branch: str, token: str, slug: str, env: Mapp
     basic = base64.b64encode(f"x-access-token:{token}".encode("utf-8")).decode("ascii")
     proc = git(
         worktree,
+        # Clear any inherited helper so the ephemeral dispatch token is the only
+        # credential that can be used for this push.
+        "-c",
+        "credential.helper=",
         "-c",
         f"http.https://github.com/.extraheader=AUTHORIZATION: basic {basic}",
         "push",
         f"https://github.com/{slug}.git",
         f"HEAD:refs/heads/{branch}",
-        env=env,
+        env=publish_env(env),
         timeout=300,
     )
     if proc.returncode != 0:
