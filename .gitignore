@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# CB16 dispatch runtime artifacts (task packet, evidence, locks)
+.cb16/
