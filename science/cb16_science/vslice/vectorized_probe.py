@@ -37,12 +37,16 @@ def result_dir() -> Path:
 
 def _physics_equivalence(spec: Dict[str, Any]) -> Dict[str, Any]:
     env = tasks.task_a_environment(spec)
+    # risk=1.0 forces the kappa=0.1 R0 Physics through cost-aware Permission
+    # clipping/bisection, so this probe covers both interior and boundary cases.
     actions = (
         NominalAction(Direction.SHORT, 0.2),
         NominalAction(Direction.SHORT, 0.8),
+        NominalAction(Direction.SHORT, 1.0),
         NominalAction(Direction.FLAT, 0.0),
         NominalAction(Direction.LONG, 0.2),
         NominalAction(Direction.LONG, 0.8),
+        NominalAction(Direction.LONG, 1.0),
     )
     actual = []
     indices = []
@@ -62,7 +66,10 @@ def _physics_equivalence(spec: Dict[str, Any]) -> Dict[str, Any]:
         env,
         torch.tensor(actual, dtype=torch.long),
         torch.tensor(indices, dtype=torch.long),
-        torch.tensor(risks, dtype=torch.float32),
+        # Fixed fixture actions are Python-float authority values. float64 here
+        # makes this an equation-equivalence test rather than a float32 input
+        # quantization test. Runtime Actor samples remain float32 by design.
+        torch.tensor(risks, dtype=torch.float64),
     ).tolist()
     errors = [abs(a - b) for a, b in zip(scalar, vector)]
     return {
