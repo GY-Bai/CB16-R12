@@ -1146,9 +1146,17 @@ def run_science_entrypoint(
         )
 
     argv = resolve_allowlisted_argv(entrypoint, worktree)
+
+    # The sandbox wrapper refuses to emit the Science profile unless the result
+    # directory already exists: that directory is the profile's only writable
+    # exception, so it must be established before the profile is requested.
+    result_dir.mkdir(parents=True, exist_ok=True)
+
     wrapped = sandbox_runner is not None
     if wrapped:
-        profile = query_sandbox_profile(sandbox_runner, worktree)
+        # Science runs under the wrapper's read-only profile: source worktree and
+        # /cb16/store read-only, only result_dir writable.
+        profile = query_sandbox_profile(sandbox_runner, worktree, mode="read-only")
         argv = science_sandbox_argv(
             argv, worktree, sandbox_runner=sandbox_runner, profile=profile
         )
@@ -1160,7 +1168,6 @@ def run_science_entrypoint(
     child_env["CB16_RESULT_DIR"] = str(result_dir)
     child_env["CB16_RESULT_COMMAND"] = spec.result_command or ""
     child_env["CB16_COMMIT_SHA"] = spec.sha
-    result_dir.mkdir(parents=True, exist_ok=True)
 
     try:
         proc = subprocess.run(
