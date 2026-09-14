@@ -11,6 +11,8 @@ Authority:
 The runner implements the preregistered protocol literally:
 
 ```text
+run the full implementation test suite against a byte-identical copy of this commit
+fail closed (CONTRACT_MISMATCH) unless that exact-commit test gate is green
 torch.manual_seed(seed) before each positive/control learner construction
 paired learners share bitwise-identical initial Actor/Critic parameters
 deterministic collection streams derived only from seed/task/arm/generation
@@ -19,6 +21,15 @@ exactly ``generations`` on-policy updates, one generation per update
 POST deterministic-adapter evaluation after the final generation
 mechanical gate evaluation from the committed JSON thresholds
 ```
+
+The implementation test gate is what makes the contract's Global PASS condition
+("the full implementation test suite is green") a measured fact rather than a
+recorded promise: the runner executes the repository-owned suite
+(``python -m unittest discover -s tests -t .``) against an exact-content copy of
+the worktree it will qualify, binds the evidence to ``CB16_COMMIT_SHA`` and to a
+SHA-256 digest of the implementation surface, and refuses to produce any
+scientific verdict unless the suite is green, the copy is byte-identical to the
+source, and the source is unchanged by the test run.
 
 It writes only the three preregistered artifacts (``experiment_spec.json``,
 ``RESULT.json``, ``REPORT.md``) under ``CB16_RESULT_DIR``.  It never writes to
@@ -32,8 +43,12 @@ import hashlib
 import json
 import os
 import platform
+import re
+import shutil
 import statistics
+import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Sequence, Tuple
@@ -69,6 +84,46 @@ EXIT_CONTRACT_MISMATCH = 4
 
 _ARM_ID = {tasks.ARM_POSITIVE: 0, tasks.ARM_CONTROL: 1}
 _TASK_ID = {"task_a": tasks.TASK_A_ID, "task_b": tasks.TASK_B_ID}
+
+# ---------------------------------------------------------------------------
+# Exact-commit implementation test gate
+# ---------------------------------------------------------------------------
+
+#: The repository-owned implementation suite, run exactly as the dispatcher runs it.
+IMPLEMENTATION_TEST_ARGV: Tuple[str, ...] = (
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests",
+    "-t",
+    ".",
+)
+#: Hard upper bound for the implementation suite inside the formal run.
+IMPLEMENTATION_TEST_TIMEOUT_SECONDS = 1800.0
+
+#: Directories whose code/config content defines the implementation under test.
+IMPLEMENTATION_SURFACE_DIRECTORIES: Tuple[str, ...] = ("science", "tests", "config", "scripts")
+#: Root files that also define the implementation under test.
+IMPLEMENTATION_SURFACE_FILES: Tuple[str, ...] = ("pyproject.toml", "uv.lock")
+#: Only source-like files enter the implementation digest.
+IMPLEMENTATION_SURFACE_SUFFIXES = frozenset({".py", ".json"})
+#: Tree members never copied and never hashed.
+IMPLEMENTATION_TREE_EXCLUDES = frozenset(
+    {
+        ".git",
+        ".venv",
+        ".pip-cache",
+        ".uv-cache",
+        ".cb16",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+    }
+)
+#: Bounded tails of suite output retained as evidence.
+IMPLEMENTATION_TEST_TAIL_CHARS = 4000
 
 
 # ---------------------------------------------------------------------------
@@ -818,33 +873,336 @@ def runtime_record() -> Dict[str, Any]:
     }
 
 
-def implementation_test_record(spec: Mapping[str, Any]) -> Dict[str, Any]:
-    global_gate = tasks.spec_mapping(spec["global_gate"], "global_gate")
+def implementation_surface_files(root: Path = REPO_ROOT) -> Tuple[Path, ...]:
+    """The exact files whose content defines the implementation under test.
+
+    The surface is the repository code and configuration the formal run and its
+    tests execute: every ``.py`` under ``science``/``tests``/``scripts``, every
+    ``.json`` under ``config`` (the preregistered spec and the Science
+    allowlist), plus the dependency lock metadata.  Caches and git state are
+    excluded, so the digest is a pure content identity.
+    """
+
+    root = Path(root)
+    files: List[Path] = []
+    for directory in IMPLEMENTATION_SURFACE_DIRECTORIES:
+        base = root / directory
+        if not base.is_dir():
+            continue
+        for path in sorted(base.rglob("*")):
+            if not path.is_file():
+                continue
+            if path.suffix not in IMPLEMENTATION_SURFACE_SUFFIXES:
+                continue
+            if any(part in IMPLEMENTATION_TREE_EXCLUDES for part in path.parts):
+                continue
+            files.append(path)
+    for name in IMPLEMENTATION_SURFACE_FILES:
+        path = root / name
+        if path.is_file():
+            files.append(path)
+    return tuple(sorted(files, key=lambda item: item.relative_to(root).as_posix()))
+
+
+def implementation_source_sha256(root: Path = REPO_ROOT) -> str:
+    """SHA-256 over the implementation surface content of ``root``."""
+
+    root = Path(root)
+    digest = hashlib.sha256()
+    for path in implementation_surface_files(root):
+        digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def copy_implementation_tree(source: Path, destination: Path) -> int:
+    """Copy the worktree (minus git/caches) into ``destination``; return file count.
+
+    The implementation suite is executed against this copy instead of the
+    read-only Science worktree, so no test can write into the immutable source
+    tree; :func:`implementation_source_sha256` proves the copy is
+    byte-identical for every file that defines the implementation.
+    """
+
+    source = Path(source)
+    destination = Path(destination)
+    copied = 0
+    for path in sorted(source.rglob("*")):
+        relative = path.relative_to(source)
+        if any(part in IMPLEMENTATION_TREE_EXCLUDES for part in relative.parts):
+            continue
+        if path.is_dir():
+            (destination / relative).mkdir(parents=True, exist_ok=True)
+        elif path.is_file():
+            target = destination / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, target)
+            copied += 1
+    return copied
+
+
+def snapshot_git_repository(root: Path, *, timeout: float = 180.0) -> bool:
+    """Best-effort git snapshot of a copied tree.
+
+    A few repository tests assert git tracking of plugin sources and skip when
+    the tree is not a checkout; a fresh single-commit snapshot lets them run in
+    the copy.  Failure is recorded, never fatal: the content digest, not git,
+    is what binds the evidence to the exact commit.
+    """
+
+    commands = (
+        ("git", "init", "-q", "-b", "main"),
+        ("git", "add", "-A"),
+        (
+            "git",
+            "-c",
+            "user.email=cb16@example.invalid",
+            "-c",
+            "user.name=CB16",
+            "commit",
+            "-q",
+            "-m",
+            "exact-content implementation snapshot",
+        ),
+    )
+    for argv in commands:
+        try:
+            proc = subprocess.run(
+                list(argv), cwd=str(root), capture_output=True, text=True, timeout=timeout
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        if proc.returncode != 0:
+            return False
+    return True
+
+
+def repository_head(root: Path = REPO_ROOT, *, timeout: float = 60.0) -> "str | None":
+    """Best-effort HEAD SHA of the worktree.
+
+    Recorded as evidence only: the gate binds the run to the exact commit by the
+    recorded ``CB16_COMMIT_SHA`` and by the implementation-surface digest, so a
+    sandbox that cannot read git state must not block a qualification run.
+    """
+
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    value = (proc.stdout or "").strip()
+    return value or None
+
+
+def parse_unittest_summary(stdout: str) -> Dict[str, Any]:
+    """Extract the unittest summary facts from captured suite output."""
+
+    text = stdout or ""
+    run_match = re.search(r"^Ran (\d+) tests? in ", text, re.MULTILINE)
+    skip_match = re.search(r"skipped=(\d+)", text)
     return {
-        "status": "PREREGISTERED_REQUIREMENT",
-        "required_by_global_gate": bool(global_gate["implementation_tests_must_pass"]),
-        "runner_executed_suite": False,
+        "tests_run": int(run_match.group(1)) if run_match else None,
+        "skipped": int(skip_match.group(1)) if skip_match else None,
+        "unittest_ok": bool(re.search(r"^OK(\s|\(|$)", text, re.MULTILINE)),
+    }
+
+
+def summarise_unittest_run(exit_code: int, stdout: str, stderr: str) -> Dict[str, Any]:
+    """Status facts for one unittest invocation.
+
+    ``unittest`` writes its progress and summary to stderr, so both streams are
+    read; an exit code of zero alone is never treated as green.
+    """
+
+    summary = parse_unittest_summary(f"{stdout or ''}\n{stderr or ''}")
+    summary["exit_code"] = int(exit_code)
+    summary["status"] = (
+        "PASS" if summary["exit_code"] == 0 and summary["unittest_ok"] else "FAIL"
+    )
+    return summary
+
+
+def _bounded_tail(text: str, limit: int = IMPLEMENTATION_TEST_TAIL_CHARS) -> str:
+    value = text or ""
+    return value if len(value) <= limit else value[-limit:]
+
+
+def _science_first_pythonpath(existing: str, root: Path) -> str:
+    science = str(Path(root) / "science")
+    parts = [part for part in (existing or "").split(os.pathsep) if part]
+    if science in parts:
+        parts.remove(science)
+    return os.pathsep.join([science, *parts])
+
+
+def run_implementation_test_suite(
+    *, timeout: float = IMPLEMENTATION_TEST_TIMEOUT_SECONDS
+) -> Dict[str, Any]:
+    """Run the repository implementation suite for this exact commit.
+
+    The suite runs in a disposable copy of the worktree under the per-run
+    writable tmp area, with the same interpreter that runs the formal
+    entrypoint.  The returned evidence is exact-commit-bound by the recorded
+    ``commit_sha`` and by the implementation-surface digest of the source tree
+    before the run, of the copy that was tested, and of the source tree after
+    the run.
+    """
+
+    source_before = implementation_source_sha256(REPO_ROOT)
+    argv = [sys.executable, *IMPLEMENTATION_TEST_ARGV]
+    evidence: Dict[str, Any] = {
+        "status": "FAIL",
+        "passed": False,
+        "runner_executed_suite": True,
+        "required_by_global_gate": True,
+        "commit_sha": commit_sha(),
+        "git_head": repository_head(),
+        "command": argv,
+        "exit_code": None,
+        "tests_run": None,
+        "skipped": None,
+        "source_sha256": source_before,
+        "copy_sha256": None,
+        "source_unchanged": False,
+        "copy_matches_source": False,
+        "copied_file_count": 0,
+        "git_snapshot": False,
+        "stdout_tail": "",
+        "stderr_tail": "",
         "preregistered_requirement": (
-            "the merged implementation test suite must be green at the exact commit before "
-            "the formal qualification run"
+            "global_gate.implementation_tests_must_pass: the full implementation test suite "
+            "must be green at the exact commit"
         ),
         "note": (
-            "The Science lane is read-only and artifact-only; it does not execute the repository "
-            "test suite and does not self-certify.  Test status is supplied by the review/merge "
-            "pipeline and recorded here as the preregistered requirement it is."
+            "The suite is executed by this runner against a byte-identical copy of the exact "
+            "commit's implementation surface; a non-green suite is CONTRACT_MISMATCH and no "
+            "scientific verdict is produced."
         ),
+    }
+
+    with tempfile.TemporaryDirectory(prefix="cb16-vs-c-tests-") as tmp:
+        copy_root = Path(tmp) / "repo"
+        copy_root.mkdir(parents=True, exist_ok=True)
+        evidence["copied_file_count"] = copy_implementation_tree(REPO_ROOT, copy_root)
+        copy_digest = implementation_source_sha256(copy_root)
+        evidence["copy_sha256"] = copy_digest
+        evidence["copy_matches_source"] = copy_digest == source_before
+
+        stdout = ""
+        stderr = ""
+        if evidence["copy_matches_source"]:
+            evidence["git_snapshot"] = snapshot_git_repository(copy_root)
+            env = dict(os.environ)
+            env["PYTHONDONTWRITEBYTECODE"] = "1"
+            env["PYTHONPATH"] = _science_first_pythonpath(env.get("PYTHONPATH", ""), copy_root)
+            try:
+                proc = subprocess.run(
+                    argv,
+                    cwd=str(copy_root),
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+            except subprocess.TimeoutExpired as exc:
+                evidence["status"] = "TIMEOUT"
+                evidence["exit_code"] = 124
+                stdout = _as_text(exc.stdout)
+                stderr = _as_text(exc.stderr)
+            except OSError as exc:
+                evidence["status"] = "NOT_EXECUTABLE"
+                evidence["exit_code"] = 126
+                stderr = f"{type(exc).__name__}: {exc}"
+            else:
+                evidence["exit_code"] = proc.returncode
+                stdout = proc.stdout or ""
+                stderr = proc.stderr or ""
+                # unittest reports on stderr; both streams are summarised.
+                evidence.update(
+                    summarise_unittest_run(proc.returncode, stdout, stderr)
+                )
+        evidence["stdout_tail"] = _bounded_tail(stdout)
+        evidence["stderr_tail"] = _bounded_tail(stderr)
+
+    source_after = implementation_source_sha256(REPO_ROOT)
+    evidence["source_unchanged"] = source_after == source_before
+    evidence["passed"] = bool(
+        evidence["status"] == "PASS"
+        and evidence["copy_matches_source"]
+        and evidence["source_unchanged"]
+    )
+    return evidence
+
+
+def _as_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def implementation_test_gate(evidence: Mapping[str, Any], *, commit: str) -> Dict[str, Any]:
+    """The exact-commit implementation test gate.
+
+    Global PASS requires every condition: the suite is green, the evidence was
+    produced for the exact commit of this run, the tested copy was
+    byte-identical to the source, the source tree was unchanged by the test run,
+    and the recorded digest still matches the current tree.
+    """
+
+    conditions = {
+        "suite_green": evidence.get("status") == "PASS",
+        "exact_commit": evidence.get("commit_sha") == commit,
+        "copy_matches_source": bool(evidence.get("copy_matches_source")),
+        "source_unchanged": bool(evidence.get("source_unchanged")),
+        "source_sha256_matches_current_tree": (
+            evidence.get("source_sha256") == implementation_source_sha256(REPO_ROOT)
+        ),
+    }
+    return {
+        "components": {
+            "status": evidence.get("status"),
+            "commit_sha": evidence.get("commit_sha"),
+            "git_head": evidence.get("git_head"),
+            "git_head_matches_declared_commit": (
+                None
+                if evidence.get("git_head") is None
+                else evidence.get("git_head") == commit
+            ),
+            "command": list(evidence.get("command") or []),
+            "exit_code": evidence.get("exit_code"),
+            "tests_run": evidence.get("tests_run"),
+            "skipped": evidence.get("skipped"),
+            "source_sha256": evidence.get("source_sha256"),
+            "copy_sha256": evidence.get("copy_sha256"),
+            "copied_file_count": evidence.get("copied_file_count"),
+            "git_snapshot": evidence.get("git_snapshot"),
+        },
+        "conditions": conditions,
+        "passed": all(conditions.values()),
     }
 
 
 def run_experiment(
-    spec: Mapping[str, Any], *, seeds: Sequence[int]
+    spec: Mapping[str, Any], *, seeds: Sequence[int], implementation_tests: Mapping[str, Any]
 ) -> QualificationOutcome:
     """Run the full preregistered protocol over ``seeds``.
 
-    ``seeds`` is passed explicitly so reduced-budget implementation tests can
-    iterate over a subset; the formal entrypoint always passes the
-    preregistered ``paired_seeds`` list, and no CLI or environment input can
-    change any scientific parameter.
+    ``seeds`` and ``implementation_tests`` are evidence inputs, never scientific
+    parameters: the formal entrypoint always passes the preregistered
+    ``paired_seeds`` list and the exact-commit implementation-test evidence it
+    produced itself.  A non-green, unbound or non-exact-commit test gate is
+    rejected before any learner is constructed.
     """
 
     configure_deterministic_runtime()
@@ -852,6 +1210,19 @@ def run_experiment(
     seed_list = tuple(seeds)
     if not seed_list:
         raise ContractError("run_experiment requires at least one paired seed")
+    gate = implementation_test_gate(implementation_tests, commit=commit_sha())
+    if not gate["passed"]:
+        raise ContractError(
+            "the exact-commit implementation test gate is not green; no scientific result "
+            "may be produced"
+        )
+    global_gate = tasks.spec_mapping(spec["global_gate"], "global_gate")
+    implementation = {
+        **dict(implementation_tests),
+        "gate": gate,
+        "required_by_global_gate": bool(global_gate["implementation_tests_must_pass"]),
+        "runner_executed_suite": True,
+    }
     authority = parse_authority(spec)
     optimizer = parse_optimizer(spec)
     env_a = tasks.task_a_environment(spec)
@@ -865,9 +1236,11 @@ def run_experiment(
 
     verdict_a = "PASS" if aggregate_a["passed"] else "FAIL"
     verdict_b = "PASS" if aggregate_b["passed"] else "FAIL"
-    implementation = implementation_test_record(spec)
     global_pass = bool(
-        aggregate_a["passed"] and aggregate_b["passed"] and implementation["required_by_global_gate"]
+        aggregate_a["passed"]
+        and aggregate_b["passed"]
+        and implementation["gate"]["passed"]
+        and implementation["required_by_global_gate"]
     )
     classification = "PASS" if global_pass else "SCIENTIFIC_FAIL"
 
@@ -1025,8 +1398,16 @@ def render_report(result: Mapping[str, Any]) -> str:
         "- PRE evaluation happens before any learner update and POST only after exactly "
         "the preregistered generation count; every update consumes exactly one "
         "current-generation batch and advances the generation counter once.",
-        f"- implementation tests: {result['implementation_tests']['status']} "
-        f"({result['implementation_tests']['note']})",
+        f"- exact-commit implementation tests: "
+        f"**{result['implementation_tests']['status']}** "
+        f"({result['implementation_tests']['tests_run']} tests, exit "
+        f"{result['implementation_tests']['exit_code']}, skipped "
+        f"{result['implementation_tests']['skipped']}, source sha256 "
+        f"`{(result['implementation_tests'].get('source_sha256') or '')[:16]}`) "
+        f"for commit `{result['commit_sha']}`",
+        "- The repository suite ran against a byte-identical copy of this exact "
+        "commit's implementation surface; the gate requires a green suite, an "
+        "identity copy and an unchanged source tree, and Global PASS includes it.",
         f"- artifacts: `{SPEC_FILENAME}`, `{RESULT_FILENAME}`, `{REPORT_FILENAME}`; "
         "loss values are diagnostics only and no gate is derived from them.",
         "",
@@ -1081,6 +1462,8 @@ def render_report(result: Mapping[str, Any]) -> str:
         "",
         f"- Task A aggregate verdict: **{result['verdicts']['task_a']}**",
         f"- Task B aggregate verdict: **{result['verdicts']['task_b']}**",
+        f"- exact-commit implementation test gate: "
+        f"**{'PASS' if result['implementation_tests']['gate']['passed'] else 'FAIL'}**",
         f"- global verdict: **{result['verdicts']['global']}**",
         f"- classification: **{result['classification']}**",
         "",
@@ -1097,9 +1480,9 @@ def render_report(result: Mapping[str, Any]) -> str:
         "- Only eight preregistered seeds and two tasks are qualified; the aggregate "
         "gates are about controlled separation from the matched controls, not about "
         "population-level generalization.",
-        "- The read-only Science lane records the implementation-test requirement but "
-        "does not execute the repository suite; that status is supplied by the "
-        "review/merge pipeline.",
+        "- The exact-commit implementation test gate proves the repository suite was green "
+        "for this commit's content; it cannot prove the controlled task specification "
+        "itself is free of error.",
         "",
     ]
     return "\n".join(lines)
@@ -1135,17 +1518,160 @@ def required_environment() -> Tuple[Path, str]:
 
 
 def run_qualification(*, result_dir: Path) -> QualificationOutcome:
-    """Formal path: committed spec, preregistered seeds, three artifacts.
+    """Formal path: exact-commit test gate, committed spec, preregistered seeds, artifacts.
 
-    There is deliberately no spec path, seed list, budget or threshold
-    parameter here: the formal run is defined entirely by
-    ``config/experiments/r12_vs_c_r0.json``.
+    There is deliberately no spec path, seed list, budget, threshold or test
+    status parameter here: the formal run is defined entirely by
+    ``config/experiments/r12_vs_c_r0.json`` plus implementation-test evidence
+    this runner produces itself for the exact commit ``CB16_COMMIT_SHA``.
     """
 
     spec = load_spec()
-    outcome = run_experiment(spec, seeds=paired_seeds(spec))
+    implementation_tests = run_implementation_test_suite()
+    gate = implementation_test_gate(implementation_tests, commit=commit_sha())
+    if not gate["passed"]:
+        outcome = implementation_failure_outcome(spec, implementation_tests, gate)
+        write_artifacts(result_dir, outcome)
+        return outcome
+    outcome = run_experiment(
+        spec, seeds=paired_seeds(spec), implementation_tests=implementation_tests
+    )
     write_artifacts(result_dir, outcome)
     return outcome
+
+
+def render_failure_report(
+    *,
+    classification: str,
+    commit: str,
+    detail: str,
+    implementation_tests: Mapping[str, Any] | None = None,
+    gate: Mapping[str, Any] | None = None,
+) -> str:
+    """REPORT.md for a run that produced no scientific verdict."""
+
+    if implementation_tests is None:
+        implementation_lines = ["No implementation-test evidence was recorded for this run."]
+    else:
+        implementation_lines = [
+            f"- exact-commit implementation test status: "
+            f"**{implementation_tests.get('status')}** "
+            f"(exit {implementation_tests.get('exit_code')}, "
+            f"{implementation_tests.get('tests_run')} tests, "
+            f"skipped {implementation_tests.get('skipped')}, "
+            f"commit `{implementation_tests.get('commit_sha')}`)",
+            f"- implementation source sha256 `{implementation_tests.get('source_sha256')}`; "
+            f"tested copy `{implementation_tests.get('copy_sha256')}`; "
+            f"copied files {implementation_tests.get('copied_file_count')}; "
+            f"source unchanged by the test run: "
+            f"{implementation_tests.get('source_unchanged')}",
+        ]
+        if gate is not None:
+            unmet = sorted(name for name, ok in gate["conditions"].items() if not ok)
+            implementation_lines.append(
+                f"- implementation test gate: {'PASS' if gate['passed'] else 'FAIL'}"
+                + (f" (unmet conditions: {', '.join(unmet)})" if unmet else "")
+            )
+    lines = [
+        "# R12 VS-C Controlled Learnability R0 — REPORT",
+        "",
+        f"- classification: **{classification}**",
+        f"- commit: `{commit}`",
+        "",
+        "## Implementation correctness",
+        "",
+        *implementation_lines,
+        "",
+        "No scientific result was produced.",
+        "",
+        "## Task A controlled learnability",
+        "",
+        "NOT EVALUATED",
+        "",
+        "## Task B delayed-credit learnability",
+        "",
+        "NOT EVALUATED",
+        "",
+        "## Negative controls",
+        "",
+        "NOT EVALUATED",
+        "",
+        "## Scientific verdict",
+        "",
+        f"`{classification}`: {detail}",
+        "",
+        "## Limitations",
+        "",
+        "The run did not complete, so no scientific gate component is reported.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def implementation_failure_outcome(
+    spec: Mapping[str, Any], evidence: Mapping[str, Any], gate: Mapping[str, Any]
+) -> QualificationOutcome:
+    """Artifacts for a run blocked by the exact-commit implementation test gate."""
+
+    detail = (
+        "the exact-commit implementation test gate did not pass "
+        f"(status={evidence.get('status')!r}, exit_code={evidence.get('exit_code')!r}, "
+        f"commit={evidence.get('commit_sha')!r}); no scientific result was produced"
+    )
+    global_gate = spec.get("global_gate")
+    required_by_global_gate = (
+        bool(global_gate.get("implementation_tests_must_pass"))
+        if isinstance(global_gate, Mapping)
+        else True
+    )
+    implementation = {
+        **dict(evidence),
+        "gate": dict(gate),
+        "required_by_global_gate": required_by_global_gate,
+        "runner_executed_suite": True,
+    }
+    result = {
+        "schema": "cb16.result.v1",
+        "experiment_id": EXPERIMENT_ID,
+        "result_command": os.environ.get("CB16_RESULT_COMMAND", RESULT_COMMAND),
+        "commit_sha": commit_sha(),
+        "classification": "CONTRACT_MISMATCH",
+        "runtime": runtime_record(),
+        "implementation_tests": implementation,
+        "preregistered_spec": {
+            "path": str(CONFIG_PATH.relative_to(REPO_ROOT)),
+            "canonical_sha256": spec_sha256(spec),
+            "matches_committed_spec": matches_committed_spec(spec),
+            "paired_seeds": list(paired_seeds(spec)),
+            "declared_status": spec.get("status"),
+        },
+        "seeds": [],
+        "aggregate_gates": {},
+        "verdicts": {
+            "task_a": "NOT_EVALUATED",
+            "task_b": "NOT_EVALUATED",
+            "global": "CONTRACT_MISMATCH",
+        },
+        "error": {"type": "CONTRACT_MISMATCH", "detail": detail},
+    }
+    report = render_failure_report(
+        classification="CONTRACT_MISMATCH",
+        commit=result["commit_sha"],
+        detail=detail,
+        implementation_tests=implementation,
+        gate=gate,
+    )
+    return QualificationOutcome(
+        spec=dict(spec),
+        result=result,
+        report=report,
+        classification="CONTRACT_MISMATCH",
+        exit_code=EXIT_CONTRACT_MISMATCH,
+        summary_line=(
+            f"{RESULT_COMMAND}: classification=CONTRACT_MISMATCH "
+            f"implementation_tests={evidence.get('status')}; no scientific verdict produced"
+        ),
+    )
 
 
 def _write_failure_artifacts(result_dir: Path, classification: str, detail: str, exit_code: int) -> int:
@@ -1163,38 +1689,8 @@ def _write_failure_artifacts(result_dir: Path, classification: str, detail: str,
         "aggregate_gates": {},
         "verdicts": {"task_a": "NOT_EVALUATED", "task_b": "NOT_EVALUATED", "global": classification},
     }
-    report = "\n".join(
-        [
-            "# R12 VS-C Controlled Learnability R0 — REPORT",
-            "",
-            f"- classification: **{classification}**",
-            f"- commit: `{result['commit_sha']}`",
-            "",
-            "## Implementation correctness",
-            "",
-            "No scientific result was produced.",
-            "",
-            "## Task A controlled learnability",
-            "",
-            "NOT EVALUATED",
-            "",
-            "## Task B delayed-credit learnability",
-            "",
-            "NOT EVALUATED",
-            "",
-            "## Negative controls",
-            "",
-            "NOT EVALUATED",
-            "",
-            "## Scientific verdict",
-            "",
-            f"`{classification}`: {detail}",
-            "",
-            "## Limitations",
-            "",
-            "The run did not complete, so no gate component is reported.",
-            "",
-        ]
+    report = render_failure_report(
+        classification=classification, commit=result["commit_sha"], detail=detail
     )
     try:
         directory = Path(result_dir)
@@ -1264,6 +1760,8 @@ __all__ = [
     "EXIT_PASS",
     "EXIT_SCIENTIFIC_FAIL",
     "EXPERIMENT_ID",
+    "IMPLEMENTATION_TEST_ARGV",
+    "IMPLEMENTATION_TEST_TIMEOUT_SECONDS",
     "REPORT_FILENAME",
     "RESULT_COMMAND",
     "RESULT_FILENAME",
@@ -1274,23 +1772,33 @@ __all__ = [
     "build_learner",
     "commit_sha",
     "configure_deterministic_runtime",
+    "copy_implementation_tree",
     "gate_section",
-    "implementation_test_record",
+    "implementation_failure_outcome",
+    "implementation_source_sha256",
+    "implementation_surface_files",
+    "implementation_test_gate",
     "load_spec",
     "main",
     "matches_committed_spec",
     "paired_seeds",
     "parse_authority",
     "parse_optimizer",
+    "parse_unittest_summary",
+    "render_failure_report",
     "render_report",
+    "repository_head",
     "require_identical_parameters",
     "required_environment",
     "result_dir_from_environment",
     "run_experiment",
+    "run_implementation_test_suite",
     "run_paired_seed",
     "run_qualification",
     "runtime_record",
+    "snapshot_git_repository",
     "spec_sha256",
+    "summarise_unittest_run",
     "task_a_aggregate_gate",
     "task_a_seed_gate",
     "task_b_aggregate_gate",

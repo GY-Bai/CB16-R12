@@ -20,8 +20,15 @@ Required by ``docs/tasks/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md`` section
 20. allowlist resolves to the frozen UV command and keeps the venv/cache under
     ``/tmp``, never in the read-only Science worktree.
 
-The suite deliberately runs only reduced-budget smoke configurations; it never
-executes the formal preregistered eight-seed qualification.
+The suite also covers the review delta ``exact_commit_implementation_test_gate``:
+the formal runner must execute the repository suite for the exact commit, bind
+the evidence to that commit and to the implementation-surface digest, and refuse
+to produce a scientific verdict unless that gate is green.
+
+The suite deliberately runs only reduced-budget smoke configurations and never
+executes the formal preregistered eight-seed qualification; it also never runs
+the repository suite from inside itself (the formal gate is exercised with
+synthetic evidence).
 
     .venv/bin/python -m unittest tests.test_vslice_qualification -v
 """
@@ -107,6 +114,41 @@ def seed_record(
     }
 
 
+def green_implementation_tests(**overrides) -> dict:
+    """Synthetic green exact-commit implementation-test evidence.
+
+    Unit tests must never execute the repository suite from inside itself, so
+    the gate is exercised with evidence carrying the same exact commit and
+    implementation-surface digest the real runner records.
+    """
+
+    digest = qualification.implementation_source_sha256()
+    evidence = {
+        "status": "PASS",
+        "passed": True,
+        "runner_executed_suite": True,
+        "required_by_global_gate": True,
+        "commit_sha": qualification.commit_sha(),
+        "git_head": qualification.repository_head(),
+        "command": [sys.executable, *qualification.IMPLEMENTATION_TEST_ARGV],
+        "exit_code": 0,
+        "tests_run": 401,
+        "skipped": None,
+        "source_sha256": digest,
+        "copy_sha256": digest,
+        "source_unchanged": True,
+        "copy_matches_source": True,
+        "copied_file_count": 25,
+        "git_snapshot": True,
+        "stdout_tail": "Ran 401 tests in 60.000s\n\nOK\n",
+        "stderr_tail": "",
+        "preregistered_requirement": "synthetic evidence for implementation tests",
+        "note": "synthetic evidence for implementation tests",
+    }
+    evidence.update(overrides)
+    return evidence
+
+
 class ProtocolTests(unittest.TestCase):
     def test_pre_and_post_bracket_exactly_the_preregistered_updates(self):
         """Requirements 13 and 15."""
@@ -154,7 +196,9 @@ class ProtocolTests(unittest.TestCase):
         with mock.patch.object(OnPolicyLearner, "update", update_spy), mock.patch.object(
             controlled, "evaluate_task_a", evaluate_a_spy
         ), mock.patch.object(controlled, "evaluate_task_b", evaluate_b_spy):
-            qualification.run_experiment(spec, seeds=(1201,))
+            qualification.run_experiment(
+                spec, seeds=(1201,), implementation_tests=green_implementation_tests()
+            )
 
         updates = [event for event in events if event["kind"] == "update"]
         evaluations = [event for event in events if event["kind"].startswith("eval")]
@@ -460,6 +504,136 @@ class GateEvaluatorTests(unittest.TestCase):
         )
 
 
+class ImplementationTestGateTests(unittest.TestCase):
+    """Review delta ``exact_commit_implementation_test_gate``."""
+
+    def test_unittest_summary_parsing(self):
+        green = qualification.parse_unittest_summary(
+            "....\n----------------------------------------------------------------------\n"
+            "Ran 401 tests in 66.072s\n\nOK\n"
+        )
+        self.assertEqual(green["tests_run"], 401)
+        self.assertIsNone(green["skipped"])
+        self.assertTrue(green["unittest_ok"])
+
+        skipped = qualification.parse_unittest_summary("Ran 5 tests in 0.100s\n\nOK (skipped=1)\n")
+        self.assertEqual(skipped["tests_run"], 5)
+        self.assertEqual(skipped["skipped"], 1)
+        self.assertTrue(skipped["unittest_ok"])
+
+        failed = qualification.parse_unittest_summary(
+            "Ran 5 tests in 0.100s\n\nFAILED (errors=1, skipped=2)\n"
+        )
+        self.assertEqual(failed["tests_run"], 5)
+        self.assertEqual(failed["skipped"], 2)
+        self.assertFalse(failed["unittest_ok"])
+
+        self.assertIsNone(qualification.parse_unittest_summary("")["tests_run"])
+
+    def test_unittest_run_status_reads_both_streams(self):
+        """unittest reports on stderr; a zero exit code alone is not green."""
+
+        stderr_only = qualification.summarise_unittest_run(
+            0, "", "...\nRan 408 tests in 65.066s\n\nOK\n"
+        )
+        self.assertEqual(stderr_only["status"], "PASS")
+        self.assertEqual(stderr_only["tests_run"], 408)
+        self.assertTrue(stderr_only["unittest_ok"])
+
+        stdout_only = qualification.summarise_unittest_run(
+            0, "....\nRan 3 tests in 0.100s\n\nOK\n", ""
+        )
+        self.assertEqual(stdout_only["status"], "PASS")
+
+        no_summary = qualification.summarise_unittest_run(0, "", "")
+        self.assertEqual(no_summary["status"], "FAIL")
+        self.assertFalse(no_summary["unittest_ok"])
+
+        failed = qualification.summarise_unittest_run(
+            1, "", "Ran 3 tests in 0.100s\n\nFAILED (failures=1)\n"
+        )
+        self.assertEqual(failed["status"], "FAIL")
+        self.assertEqual(failed["exit_code"], 1)
+
+    def test_implementation_copy_is_byte_identical_and_excludes_caches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            root.mkdir()
+            copied = qualification.copy_implementation_tree(qualification.REPO_ROOT, root)
+            self.assertGreater(copied, 0)
+            for excluded in (".git", ".venv", ".cb16", ".pip-cache", ".uv-cache"):
+                self.assertFalse((root / excluded).exists(), excluded)
+            self.assertFalse(any(path.name == "__pycache__" for path in root.rglob("*")))
+            self.assertEqual(
+                qualification.implementation_source_sha256(root),
+                qualification.implementation_source_sha256(qualification.REPO_ROOT),
+            )
+
+    def test_repository_head_is_recorded_as_best_effort_evidence(self):
+        head = qualification.repository_head()
+        self.assertTrue(head is None or (len(head) == 40 and set(head) <= set("0123456789abcdef")))
+
+    def test_implementation_surface_covers_code_config_and_spec(self):
+        files = {
+            path.relative_to(qualification.REPO_ROOT).as_posix()
+            for path in qualification.implementation_surface_files(qualification.REPO_ROOT)
+        }
+        self.assertIn("science/cb16_science/vslice/qualification.py", files)
+        self.assertIn("tests/test_vslice_qualification.py", files)
+        self.assertIn("scripts/cb16_dispatch.py", files)
+        self.assertIn("config/experiments/r12_vs_c_r0.json", files)
+        self.assertIn("config/cb16_science_allowlist.json", files)
+        self.assertFalse(any("__pycache__" in name for name in files))
+        self.assertFalse(any(name.endswith(".pyc") for name in files))
+
+    def test_implementation_test_gate_requires_a_green_exact_commit_suite(self):
+        commit = qualification.commit_sha()
+        gate = qualification.implementation_test_gate(
+            green_implementation_tests(commit_sha=commit), commit=commit
+        )
+        self.assertTrue(gate["passed"])
+        self.assertTrue(all(gate["conditions"].values()))
+        self.assertEqual(gate["components"]["tests_run"], 401)
+
+        variants = {
+            "suite_green": green_implementation_tests(commit_sha=commit, status="FAIL"),
+            "exact_commit": green_implementation_tests(commit_sha="0" * 40),
+            "copy_matches_source": green_implementation_tests(
+                commit_sha=commit, copy_matches_source=False
+            ),
+            "source_unchanged": green_implementation_tests(
+                commit_sha=commit, source_unchanged=False
+            ),
+            "source_sha256_matches_current_tree": green_implementation_tests(
+                commit_sha=commit, source_sha256="0" * 64
+            ),
+        }
+        for unmet, variant in variants.items():
+            with self.subTest(unmet=unmet):
+                result = qualification.implementation_test_gate(variant, commit=commit)
+                self.assertFalse(result["passed"])
+                self.assertFalse(result["conditions"][unmet])
+                self.assertTrue(
+                    all(value for key, value in result["conditions"].items() if key != unmet)
+                )
+
+    def test_run_experiment_refuses_unverified_implementation_tests(self):
+        spec = reduced_spec(seeds=(1201,), generations=1)
+        red_variants = (
+            green_implementation_tests(status="FAIL"),
+            green_implementation_tests(commit_sha="0" * 40),
+            green_implementation_tests(source_unchanged=False),
+            green_implementation_tests(copy_matches_source=False),
+            green_implementation_tests(source_sha256="0" * 64),
+        )
+        for evidence in red_variants:
+            with self.subTest(unmet=evidence):
+                with self.assertRaises(ContractError):
+                    qualification.run_experiment(
+                        spec, seeds=(1201,), implementation_tests=evidence
+                    )
+
+
 class RunnerTests(unittest.TestCase):
     def test_formal_runner_has_no_parameter_override_path(self):
         """Requirement 17."""
@@ -499,6 +673,104 @@ class RunnerTests(unittest.TestCase):
             with self.assertRaises(ContractError):
                 qualification.required_environment()
 
+    def test_formal_runner_fails_closed_when_the_exact_commit_suite_is_red(self):
+        """The exact-commit implementation test gate blocks the science run."""
+
+        red = green_implementation_tests(
+            status="FAIL", passed=False, exit_code=1, tests_run=401
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            result_dir = Path(tmp) / "result"
+            with mock.patch.dict(
+                os.environ, {"CB16_COMMIT_SHA": "0" * 40}, clear=False
+            ), mock.patch.object(
+                qualification, "run_implementation_test_suite", return_value=red
+            ), mock.patch.object(
+                qualification,
+                "run_experiment",
+                side_effect=AssertionError("science must not run on a red suite"),
+            ) as experiment:
+                outcome = qualification.run_qualification(result_dir=result_dir)
+            experiment.assert_not_called()
+
+            self.assertEqual(outcome.classification, "CONTRACT_MISMATCH")
+            self.assertEqual(outcome.exit_code, qualification.EXIT_CONTRACT_MISMATCH)
+            for name in (
+                qualification.SPEC_FILENAME,
+                qualification.RESULT_FILENAME,
+                qualification.REPORT_FILENAME,
+            ):
+                self.assertTrue((result_dir / name).is_file(), name)
+            result = json.loads(
+                (result_dir / qualification.RESULT_FILENAME).read_text(encoding="utf-8")
+            )
+            written_spec = json.loads(
+                (result_dir / qualification.SPEC_FILENAME).read_text(encoding="utf-8")
+            )
+            report = (result_dir / qualification.REPORT_FILENAME).read_text(encoding="utf-8")
+
+        self.assertEqual(result["classification"], "CONTRACT_MISMATCH")
+        self.assertEqual(result["implementation_tests"]["status"], "FAIL")
+        self.assertFalse(result["implementation_tests"]["gate"]["passed"])
+        self.assertEqual(
+            result["verdicts"],
+            {
+                "task_a": "NOT_EVALUATED",
+                "task_b": "NOT_EVALUATED",
+                "global": "CONTRACT_MISMATCH",
+            },
+        )
+        self.assertEqual(result["seeds"], [])
+        self.assertEqual(result["aggregate_gates"], {})
+        self.assertEqual(written_spec, committed_spec())
+        self.assertIn("CONTRACT_MISMATCH", report)
+        for section in (
+            "## Implementation correctness",
+            "## Task A controlled learnability",
+            "## Task B delayed-credit learnability",
+            "## Negative controls",
+            "## Scientific verdict",
+            "## Limitations",
+        ):
+            self.assertIn(section, report)
+
+    def test_formal_runner_passes_its_own_test_evidence_into_the_experiment(self):
+        """The runner produces the evidence itself; the experiment receives it."""
+
+        commit = qualification.commit_sha()
+        evidence = green_implementation_tests(commit_sha=commit)
+        captured = {}
+
+        def fake_experiment(spec, *, seeds, implementation_tests):
+            captured["spec"] = spec
+            captured["seeds"] = tuple(seeds)
+            captured["implementation_tests"] = implementation_tests
+            return qualification.QualificationOutcome(
+                spec=dict(spec),
+                result={"schema": "cb16.result.v1", "classification": "PASS"},
+                report="# stub\n",
+                classification="PASS",
+                exit_code=0,
+                summary_line="stub",
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            result_dir = Path(tmp) / "result"
+            with mock.patch.object(
+                qualification, "run_implementation_test_suite", return_value=evidence
+            ), mock.patch.object(
+                qualification, "run_experiment", side_effect=fake_experiment
+            ):
+                outcome = qualification.run_qualification(result_dir=result_dir)
+            self.assertTrue((result_dir / qualification.RESULT_FILENAME).is_file())
+
+        self.assertEqual(outcome.classification, "PASS")
+        self.assertIs(captured["implementation_tests"], evidence)
+        self.assertEqual(captured["spec"], committed_spec())
+        self.assertEqual(
+            captured["seeds"], tuple(qualification.paired_seeds(committed_spec()))
+        )
+
     def test_experiment_spec_artifact_matches_the_committed_spec(self):
         """Requirement 19."""
 
@@ -522,8 +794,12 @@ class RunnerTests(unittest.TestCase):
         """No wall-clock or process entropy may change a controlled run."""
 
         spec = reduced_spec(seeds=(1201,), generations=2)
-        first = qualification.run_experiment(spec, seeds=(1201,))
-        second = qualification.run_experiment(spec, seeds=(1201,))
+        first = qualification.run_experiment(
+            spec, seeds=(1201,), implementation_tests=green_implementation_tests()
+        )
+        second = qualification.run_experiment(
+            spec, seeds=(1201,), implementation_tests=green_implementation_tests()
+        )
         self.assertEqual(
             json.dumps(first.result["seeds"], sort_keys=True),
             json.dumps(second.result["seeds"], sort_keys=True),
@@ -538,7 +814,9 @@ class RunnerTests(unittest.TestCase):
         """Requirement 18 (with requirement 13's PRE/POST protocol)."""
 
         spec = reduced_spec(seeds=(1201, 1202), generations=2)
-        outcome = qualification.run_experiment(spec, seeds=(1201, 1202))
+        outcome = qualification.run_experiment(
+            spec, seeds=(1201, 1202), implementation_tests=green_implementation_tests()
+        )
         self.assertIn(outcome.classification, {"PASS", "SCIENTIFIC_FAIL"})
         self.assertEqual(outcome.exit_code, 0 if outcome.classification == "PASS" else 1)
 
@@ -565,7 +843,19 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(result["runtime"]["device"], "cpu")
         self.assertEqual(result["runtime"]["torch_num_threads"], 1)
         self.assertTrue(result["runtime"]["deterministic_algorithms"])
-        self.assertEqual(result["implementation_tests"]["status"], "PREREGISTERED_REQUIREMENT")
+        self.assertEqual(result["implementation_tests"]["status"], "PASS")
+        self.assertTrue(result["implementation_tests"]["runner_executed_suite"])
+        self.assertTrue(result["implementation_tests"]["gate"]["passed"])
+        self.assertEqual(
+            set(result["implementation_tests"]["gate"]["conditions"]),
+            {
+                "suite_green",
+                "exact_commit",
+                "copy_matches_source",
+                "source_unchanged",
+                "source_sha256_matches_current_tree",
+            },
+        )
         self.assertEqual(result["preregistered_spec"]["paired_seeds"], [1201, 1202])
         self.assertFalse(result["preregistered_spec"]["matches_committed_spec"])
         self.assertEqual(len(result["seeds"]), 2)
