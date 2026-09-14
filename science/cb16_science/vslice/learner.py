@@ -20,6 +20,13 @@ There is no replay: a consumed batch can never be updated twice, stale
 generations and mixed-generation batches are rejected, and a truncated or
 incomplete trajectory is never converted into a terminal sample.
 
+Generation ``g`` is guarded by an *exact* snapshot of the actor parameters:
+detached clones compared tensor-by-tensor with ``torch.equal`` (never with a
+reduced aggregate statistic).  Any mutation between collection and update --
+including a balanced in-place edit that preserves every tensor sum and absolute
+sum -- is rejected before an optimizer step, and the snapshot is refreshed only
+by a successful learner-owned update.
+
 Losses are the preregistered on-policy Monte-Carlo objectives:
 
 ```text
@@ -38,7 +45,7 @@ import math
 import weakref
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, List, Tuple
+from typing import Any, Tuple
 
 import torch
 from torch import nn
@@ -158,7 +165,9 @@ class OnPolicyLearner:
         # A consumption ledger keyed by trajectory identity.  Weak references
         # keep no transition data alive, so this is not a replay buffer.
         self._consumed: "weakref.WeakSet[Trajectory]" = weakref.WeakSet()
-        self._actor_fingerprint = self._current_actor_fingerprint()
+        # Exact frozen generation snapshot theta_g: detached clones of every
+        # actor parameter tensor, refreshed only by a learner-owned update.
+        self._actor_snapshot = self._snapshot_actor_parameters()
 
     # -- read-only surface -------------------------------------------------
 
@@ -209,7 +218,7 @@ class OnPolicyLearner:
         by any number of calls.
         """
 
-        self._require_generation_fingerprint()
+        self._require_generation_snapshot()
         return self._actor.sample(state)
 
     # -- objectives --------------------------------------------------------
@@ -258,7 +267,9 @@ class OnPolicyLearner:
             self._consumed.add(trajectory)
         updated_generation = self._generation_id
         self._generation_id += 1
-        self._actor_fingerprint = self._current_actor_fingerprint()
+        # The exact generation snapshot advances only here, after both
+        # learner-owned optimizer steps succeeded.
+        self._actor_snapshot = self._snapshot_actor_parameters()
 
         return UpdateReport(
             generation_id=updated_generation,
@@ -311,7 +322,7 @@ class OnPolicyLearner:
                 f"trajectory generation_id {batch_generation} does not match the current learner "
                 f"generation {self._generation_id}"
             )
-        self._require_generation_fingerprint()
+        self._require_generation_snapshot()
         for trajectory in batch:
             validate_trajectory(trajectory)
             if trajectory.truncated:
@@ -377,21 +388,36 @@ class OnPolicyLearner:
             if not bool(torch.isfinite(tensor).all()):
                 raise LearnerContractError(f"non-finite {name}; refusing to update")
 
-    def _current_actor_fingerprint(self) -> Tuple[Tuple[int, float, float], ...]:
-        entries: List[Tuple[int, float, float]] = []
-        with torch.no_grad():
-            for parameter in self._actor.parameters():
-                values = parameter.detach().to(torch.float64)
-                entries.append(
-                    (int(values.numel()), float(values.sum()), float(values.abs().sum()))
-                )
-        return tuple(entries)
+    def _snapshot_actor_parameters(self) -> Tuple[torch.Tensor, ...]:
+        """Exact detached clone of every actor parameter tensor (theta_g).
 
-    def _require_generation_fingerprint(self) -> None:
-        if self._current_actor_fingerprint() != self._actor_fingerprint:
+        The snapshot is compared with :func:`torch.equal` element by element, so
+        no reduced statistic (sum, absolute sum, norm, hash of a few moments)
+        can hide a permutation or any other balanced parameter mutation.
+        """
+
+        with torch.no_grad():
+            return tuple(parameter.detach().clone() for parameter in self._actor.parameters())
+
+    def _actor_snapshot_intact(self) -> bool:
+        parameters = tuple(self._actor.parameters())
+        if len(parameters) != len(self._actor_snapshot):
+            return False
+        with torch.no_grad():
+            for expected, parameter in zip(self._actor_snapshot, parameters):
+                if expected.shape != parameter.shape:
+                    return False
+                if expected.dtype != parameter.dtype or expected.device != parameter.device:
+                    return False
+                if not torch.equal(expected, parameter.detach()):
+                    return False
+        return True
+
+    def _require_generation_snapshot(self) -> None:
+        if not self._actor_snapshot_intact():
             raise LearnerContractError(
-                "actor parameters changed outside the learner's generation boundary; the frozen "
-                f"generation theta_{self._generation_id} is no longer intact"
+                "actor parameters changed outside the learner's generation boundary; the exact "
+                f"snapshot of generation theta_{self._generation_id} is no longer intact"
             )
 
 

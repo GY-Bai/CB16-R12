@@ -143,6 +143,27 @@ def snapshot(module: torch.nn.Module) -> list:
     return [parameter.detach().clone() for parameter in module.parameters()]
 
 
+def legacy_aggregate_statistics(module: torch.nn.Module) -> list:
+    """The retired ``(numel, sum, abs_sum)`` fingerprint, kept for the adversarial test."""
+
+    statistics = []
+    for parameter in module.parameters():
+        values = parameter.detach().to(torch.float64)
+        statistics.append((int(values.numel()), float(values.sum()), float(values.abs().sum())))
+    return statistics
+
+
+def swap_two_unequal_values_in_place(parameter: torch.Tensor) -> None:
+    """Balanced mutation: swap two unequal entries, preserving sum and abs_sum exactly."""
+
+    with torch.no_grad():
+        flat = parameter.reshape(-1)
+        moved = flat[0].clone()
+        partner = int((flat != flat[0]).nonzero(as_tuple=False)[0, 0].item())
+        flat[0].copy_(flat[partner])
+        flat[partner].copy_(moved)
+
+
 class ReturnToGoTests(unittest.TestCase):
     def test_18_reverse_cumulative_return_to_go_known_answer(self):
         values = returns_to_go([0.5, -0.25, 2.0])
@@ -588,6 +609,37 @@ class LearnerBoundaryGuardTests(unittest.TestCase):
             learner.update(batch)
         self.assertIn("generation boundary", str(context.exception))
         self.assertEqual(learner.generation_id, 0)
+
+    def test_balanced_actor_mutation_that_preserves_aggregate_statistics_is_rejected(self):
+        learner = make_learner()
+        batch = [make_trajectory(learner)]
+        retired_statistics = legacy_aggregate_statistics(learner.actor)
+        actor_before = snapshot(learner.actor)
+
+        swap_two_unequal_values_in_place(next(learner.actor.parameters()))
+
+        # The retired aggregate fingerprint is blind to this mutation: every
+        # numel/sum/abs_sum survives even though theta_g changed.
+        self.assertEqual(legacy_aggregate_statistics(learner.actor), retired_statistics)
+        self.assertTrue(
+            any(
+                not torch.equal(before, after.detach())
+                for before, after in zip(actor_before, learner.actor.parameters())
+            )
+        )
+
+        mutated = snapshot(learner.actor)
+        with self.assertRaises(LearnerContractError) as context:
+            learner.update(batch)
+        self.assertIn("generation boundary", str(context.exception))
+
+        # The exact snapshot guard fires before any optimizer step: the mutation
+        # is the only difference and the generation did not advance.
+        self.assertEqual(learner.generation_id, 0)
+        for before, after in zip(mutated, learner.actor.parameters()):
+            self.assertTrue(torch.equal(before, after.detach()))
+        for parameter in learner.actor.parameters():
+            self.assertIsNone(parameter.grad)
 
     def test_non_finite_objectives_are_rejected_before_any_optimizer_step(self):
         learner = make_learner()
