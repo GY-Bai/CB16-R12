@@ -180,12 +180,57 @@ bwrap --ro-bind / / --dev /dev --proc /proc --die-with-parent --tmpfs /tmp \
       -- /bin/sh -c 'true'
 ```
 
-There is currently **no configuration hook** for this: `LocalSandboxProvider.Config`
-exposes only `runnerCommand`, `runnerFailureSignatures` and `probeTimeoutMs`, and
-`bwrapProfileArgs` is hard-coded. So masking means either patching
-`@deepseek-ai/dsh-sandbox-local/lib/index.js` (fragile across upgrades) or
-requesting a mask-paths option upstream. The host-level alternative is to remove
-the runner user from the `docker` group.
+There is **no mask-paths option**: `LocalSandboxProvider.Config` exposes only
+`runnerCommand`, `runnerFailureSignatures` and `probeTimeoutMs`, and
+`bwrapProfileArgs` is hard-coded. There is however a supported hook:
+`runnerCommand` is the *operator's assertion* of the runner invocation, and
+`confine()` still appends the ordinary bwrap profile arguments after it, so a
+wrapper can inject binds that win.
+
+### Applied mitigation
+
+`~/.local/bin/cb16-sandbox-runner` receives
+`<bwrap profile args...> -- <command...>`, inserts read-hiding binds after the
+profile arguments, and execs `bwrap`. It never runs the wrapped command itself:
+if bwrap cannot start it prints `cb16-sandbox-runner: <detail>` and exits 127,
+which is the configured fatal signature, so a broken wrapper fails closed.
+
+It hides:
+
+| Target | Bind | Why |
+| --- | --- | --- |
+| `/var/run/docker.sock`, `/run/docker.sock` | `--ro-bind /dev/null` | privileged-container escape to host root |
+| `~/.ssh` | `--tmpfs` | private keys |
+| `~/.config/gh` | `--tmpfs` | long-lived OAuth token with `repo` + `workflow` |
+| `~/.docker` | `--tmpfs` | registry credentials |
+| `~/.git-credentials` | `--ro-bind /dev/null` | stored git credentials |
+
+Wired in through the profile patch layer (a supported operator layer, not a
+vendored-code edit), in `~/.dsh/profiles/headless/cordis.patch.yml`:
+
+```yaml
+- id: sandbox
+  config:
+    runnerCommand:
+      - /home/bgy/.local/bin/cb16-sandbox-runner
+    runnerFailureSignatures:
+      - "cb16-sandbox-runner: "
+```
+
+Verify the composition with `dsh --profile headless --dump-config`, and verify
+the effect with a headless run that tries `docker ps` (measured:
+`RESULT=DOCKER_DENIED`, while workspace writes still succeed and writes outside
+the workspace are still refused).
+
+### Residual, not fixed
+
+The wrapper constrains **the agent**. It does not stop a workflow step, which
+runs as `bgy` outside the sandbox and therefore still holds the `docker` group.
+Removing `bgy` from that group is a root action
+(`sudo gpasswd -d bgy docker`) and was not performed here. Measured: a
+`systemd --user` service **cannot** drop a supplementary group via
+`SupplementaryGroups=`; both with and without the directive the test process
+reported `groups=1001(bgy),989(docker)`.
 
 ## 1h. Read-only data and package caches
 
