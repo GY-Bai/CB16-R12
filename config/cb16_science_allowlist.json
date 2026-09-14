@@ -4,134 +4,70 @@
   "entrypoints": {
     "cb16.noop@v1": {
       "description": "Deterministic no-op science-lane entrypoint. Writes dummy RESULT.json and REPORT.md. Permitted only for dry runs.",
-      "argv": [
-        "python3",
-        "-m",
-        "cb16_science.noop"
-      ],
-      "env": {
-        "PYTHONPATH": "science"
-      },
-      "produces": [
-        "RESULT.json",
-        "REPORT.md"
-      ],
+      "argv": ["python3", "-m", "cb16_science.noop"],
+      "env": {"PYTHONPATH": "science"},
+      "produces": ["RESULT.json", "REPORT.md"],
       "dry_run_only": true
     },
     "cb16.smoke@v1": {
       "description": "Bridge smoke-test entrypoint. Proves the Science lane can resolve an allowlisted command, execute it against an exact commit and collect deterministic artifacts. Writes DRY_RUN-labelled artifacts and must never be treated as a scientific result.",
-      "argv": [
-        "python3",
-        "-m",
-        "cb16_science.noop"
-      ],
-      "env": {
-        "PYTHONPATH": "science"
-      },
-      "produces": [
-        "RESULT.json",
-        "REPORT.md"
-      ]
+      "argv": ["python3", "-m", "cb16_science.noop"],
+      "env": {"PYTHONPATH": "science"},
+      "produces": ["RESULT.json", "REPORT.md"]
     },
     "cb16.boundary-probe@v1": {
       "description": "Diagnostic-only infra boundary probe. Measures the Science-lane worktree write boundary, the project-store write boundary, and whether a readable /proc/<pid>/environ exposes the dispatcher's CB16_GITHUB_TOKEN key marker to the scrubbed child. Writes RESULT.json and REPORT.md, reports booleans and counts only, and applies no host-side change.",
-      "argv": [
-        "python3",
-        "-m",
-        "cb16_science.boundary_probe"
-      ],
-      "env": {
-        "PYTHONPATH": "science"
-      },
-      "produces": [
-        "RESULT.json",
-        "REPORT.md"
-      ],
+      "argv": ["python3", "-m", "cb16_science.boundary_probe"],
+      "env": {"PYTHONPATH": "science"},
+      "produces": ["RESULT.json", "REPORT.md"],
       "diagnostic_only": true
     },
     "cb16.runtime-preflight@v1": {
       "description": "Runtime preflight for the Science lane. Reports the CPU Python/NumPy/PyTorch runtime (PyTorch and CUDA are diagnostics only), existence/readability booleans for the canonical /cb16/raw, /cb16/frozen and /cb16/brain_assets inputs advertised by the repository data manifest, the discovered BTCUSDT 2020-01..2020-03 archive count and basenames, and whether one archive opens with a valid OHLCV row. Writes RESULT.json and REPORT.md, emits no environment or credential values, trains nothing.",
-      "argv": [
-        "python3",
-        "-m",
-        "cb16_science.runtime_preflight"
-      ],
-      "env": {
-        "PYTHONPATH": "science"
-      },
-      "produces": [
-        "RESULT.json",
-        "REPORT.md"
-      ],
+      "argv": ["python3", "-m", "cb16_science.runtime_preflight"],
+      "env": {"PYTHONPATH": "science"},
+      "produces": ["RESULT.json", "REPORT.md"],
       "diagnostic_only": true
     },
     "cb16.vs-c-controlled-learnability@v1": {
       "description": "R12 VS-C Controlled Learnability R0. Runs the preregistered controlled synthetic qualification (Task A account-conditioned maintenance, Task B delayed-consequence credit) with their matched negative controls on the locked CPU UV runtime, evaluates the frozen deterministic adapter PRE and POST, computes the committed JSON gates mechanically, and writes experiment_spec.json, RESULT.json and REPORT.md. It first executes the repository implementation test suite against a byte-identical copy of the exact commit and fails closed unless that exact-commit gate is green (CONTRACT_MISMATCH for a suite that ran and failed, EXECUTION_BLOCKED when the suite cannot be executed), so Global PASS cannot be claimed without test evidence. No seed, budget, threshold or control can be overridden from the command line, and the UV environment/cache live only under /tmp.",
-      "argv": [
-        "uv",
-        "run",
-        "--frozen",
-        "--project",
-        ".",
-        "--python",
-        "3.12",
-        "python",
-        "-m",
-        "cb16_science.vslice.qualification"
-      ],
+      "argv": ["uv", "run", "--frozen", "--project", ".", "--python", "3.12", "python", "-m", "cb16_science.vslice.qualification"],
       "env": {
         "PYTHONPATH": "science",
         "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-c-venv",
         "UV_CACHE_DIR": "/tmp/cb16-vs-c-uv-cache",
         "UV_LINK_MODE": "copy"
       },
-      "produces": [
-        "experiment_spec.json",
-        "RESULT.json",
-        "REPORT.md"
-      ]
+      "produces": ["experiment_spec.json", "RESULT.json", "REPORT.md"]
     },
     "cb16.vs-c-vectorized-probe@v1": {
       "description": "Diagnostic-only probe for the vectorized VS controlled-task engine. Verifies Task-A tensorized Physics against canonical execute_transition, compares short scalar versus batched generation timings, and exercises the seed executor with at most four one-thread ARM workers. It emits no scientific verdict and never reinterprets the completed VS-C R0 SCIENTIFIC_FAIL.",
-      "argv": [
-        "uv",
-        "run",
-        "--frozen",
-        "--project",
-        ".",
-        "--python",
-        "3.12",
-        "python",
-        "-m",
-        "cb16_science.vslice.vectorized_probe"
-      ],
+      "argv": ["uv", "run", "--frozen", "--project", ".", "--python", "3.12", "python", "-m", "cb16_science.vslice.vectorized_probe"],
       "env": {
         "PYTHONPATH": "science",
         "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-c-vectorized-probe-venv",
         "UV_CACHE_DIR": "/tmp/cb16-vs-c-vectorized-probe-cache",
         "UV_LINK_MODE": "copy"
       },
-      "produces": [
-        "RESULT.json",
-        "REPORT.md"
-      ],
+      "produces": ["RESULT.json", "REPORT.md"],
       "diagnostic_only": true
+    },
+    "cb16.vs-c-task-a-variance-r1@v1": {
+      "description": "R12 VS-C Task-A Batch-Variance Attribution R1. Compares balanced B90 and B900 Task-A collection while keeping the learner, optimizer, AccountState, N0, Physics, seeds, 256 generations and matched zero-relation controls frozen. Uses the vectorized-batched-v1 engine with at most four one-thread CPU seed workers, runs the exact-commit repository test suite before scientific attribution, and writes experiment_spec.json, RESULT.json and REPORT.md. No CLI or environment override may alter scientific parameters.",
+      "argv": ["uv", "run", "--frozen", "--project", ".", "--python", "3.12", "python", "-m", "cb16_science.vslice.task_a_variance_r1"],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-c-task-a-variance-r1-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-c-task-a-variance-r1-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": ["experiment_spec.json", "RESULT.json", "REPORT.md"]
     },
     "cb16.normalization-ablation@v1": {
       "description": "R12 Normalization Ablation R0. Compares five fixed K-line normalization families (N0 endpoint-anchored log ratios, N1 per-bar log-return geometry, N2 causal window z-score with shared close statistics, N3 RevIN-style per-channel instance normalization, N4 volatility-normalized return geometry) on identical BTCUSDT 1m 2020-01..2020-03 windows, measures the contract invariant probes and one frozen linear sensory projection, and writes experiment_spec.json, RESULT.json and REPORT.md. Trains nothing, performs no Central Brain or Account Physics work, and promotes no winner.",
-      "argv": [
-        "python3",
-        "-m",
-        "cb16_science.normalization"
-      ],
-      "env": {
-        "PYTHONPATH": "science"
-      },
-      "produces": [
-        "experiment_spec.json",
-        "RESULT.json",
-        "REPORT.md"
-      ]
+      "argv": ["python3", "-m", "cb16_science.normalization"],
+      "env": {"PYTHONPATH": "science"},
+      "produces": ["experiment_spec.json", "RESULT.json", "REPORT.md"]
     }
   }
 }
