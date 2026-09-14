@@ -4,10 +4,34 @@
   "entrypoints": {
     "cb16.noop@v1": {
       "description": "Deterministic no-op science-lane entrypoint. Writes dummy RESULT.json and REPORT.md. Permitted only for dry runs.",
-      "argv": ["python3", "-m", "cb16_science.noop"],
-      "env": {"PYTHONPATH": "science"},
-      "produces": ["RESULT.json", "REPORT.md"],
+      "argv": [
+        "python3",
+        "-m",
+        "cb16_science.noop"
+      ],
+      "env": {
+        "PYTHONPATH": "science"
+      },
+      "produces": [
+        "RESULT.json",
+        "REPORT.md"
+      ],
       "dry_run_only": true
+    },
+    "cb16.smoke@v1": {
+      "description": "Bridge smoke-test entrypoint. Proves the Science lane can resolve an allowlisted command, execute it against an exact commit and collect deterministic artifacts. Writes DRY_RUN-labelled artifacts and must never be treated as a scientific result.",
+      "argv": [
+        "python3",
+        "-m",
+        "cb16_science.noop"
+      ],
+      "env": {
+        "PYTHONPATH": "science"
+      },
+      "produces": [
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
