@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib.util
+import inspect
 import io
 import itertools
 import json
@@ -103,6 +104,12 @@ class DispatchTestCase(unittest.TestCase):
             "MY_SERVICE_API_KEY": "service-not-a-real-key",
             "DEEPSEEK_API_KEY": "deepseek-not-a-real-key",
             "CB16_PROJECT_STORE": str(self.tmp / "project-store"),
+            # Lane-semantics tests must not depend on a host-installed wrapper:
+            # the sandbox wiring has dedicated tests that inject a fake wrapper.
+            # It also keeps the fixture work root usable, because the Science
+            # profile only re-exposes the result directory when the work root
+            # lives under a path the profile shadows (/tmp).
+            "CB16_SCIENCE_SANDBOX": "off",
         }
 
     # -- fixtures ---------------------------------------------------------
@@ -403,21 +410,30 @@ class LabelAndLaneTests(DispatchTestCase):
 class ScienceSandboxTests(DispatchTestCase):
     """Both lanes must run under one profile, owned by the wrapper."""
 
-    def _fake_wrapper(self, *, profile_mode="workspace-write", fail=False):
+    def _fake_wrapper(self, *, fail=False):
+        """A stand-in for cb16-sandbox-runner that mirrors its real interface.
+
+        It answers ``--print-profile`` with the workspace-write shape, or with the
+        Science shape when ``--read-only`` is passed, and records the exec
+        invocation's argv before running the command after ``--``. The profile is
+        therefore a behavioural record of the mode that was requested, which does
+        not depend on the wrapper's environment.
+        """
         script = self.tmp / "fake-sandbox-wrapper"
         body = [
             "#!/bin/sh",
             'if [ "${1:-}" = "--print-profile" ]; then',
             '  [ "' + ("1" if fail else "0") + '" = "1" ] && { echo "boom" >&2; exit 127; }',
-            '  WS="$2"',
-            '  printf "%s\\0" --ro-bind / / --dev /dev --proc /proc --die-with-parent',
-        ]
-        if profile_mode == "workspace-write":
-            body.append('  printf "%s\\0" --tmpfs /tmp --bind "$WS" "$WS"')
-        body += [
+            '  WS="$2"; MODE="${3:-}"',
+            '  printf "%s\\0" --ro-bind / / --dev /dev --proc /proc --die-with-parent --tmpfs /tmp',
+            '  if [ "$MODE" = "--read-only" ]; then',
+            '    printf "%s\\0" --bind "$WS/.cb16/results" "$WS/.cb16/results"',
+            "  else",
+            '    printf "%s\\0" --bind "$WS" "$WS"',
+            "  fi",
             "  exit 0",
             "fi",
-            'printf "%s\\n" "$@" > "$CB16_FAKE_LOG"',
+            '{ printf "EXEC\\n"; printf "%s\\n" "$@"; } >> "$CB16_FAKE_LOG"',
             'while [ "$#" -gt 0 ]; do',
             '  if [ "$1" = "--" ]; then shift; break; fi',
             "  shift",
@@ -439,10 +455,18 @@ class ScienceSandboxTests(DispatchTestCase):
         )
 
     def test_read_only_mode_asks_for_a_different_profile(self):
-        wrapper = self._fake_wrapper(profile_mode="read-only")
-        profile = dispatcher.query_sandbox_profile(str(wrapper), self.repo, mode="read-only")
-        self.assertNotIn("--tmpfs", profile)
-        self.assertNotIn("--bind", profile)
+        wrapper = self._fake_wrapper()
+        default = dispatcher.query_sandbox_profile(str(wrapper), self.repo)
+        science = dispatcher.query_sandbox_profile(str(wrapper), self.repo, mode="read-only")
+        self.assertNotEqual(default, science)
+        self.assertEqual(
+            default[default.index("--bind") + 1 : default.index("--bind") + 3],
+            [str(self.repo), str(self.repo)],
+        )
+        self.assertEqual(
+            science[science.index("--bind") + 1 : science.index("--bind") + 3],
+            [str(self.repo / ".cb16" / "results"), str(self.repo / ".cb16" / "results")],
+        )
 
     def test_profile_query_fails_closed_when_the_wrapper_errors(self):
         wrapper = self._fake_wrapper(fail=True)
@@ -493,6 +517,133 @@ class ScienceSandboxTests(DispatchTestCase):
         self.assertIn("--", recorded)
         self.assertTrue((result_dir / "RESULT.json").exists())
 
+    def _spy_profile_query(self, profile=None):
+        """Replace the wrapper query with a recorder and stub the child spawn."""
+        canned = list(
+            profile
+            or [
+                "--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc",
+                "--die-with-parent", "--tmpfs", "/tmp",
+                "--bind", "/ws/.cb16/results", "/ws/.cb16/results",
+            ]
+        )
+        record = {}
+
+        def fake_query(sandbox_runner, worktree, *, mode="workspace-write", timeout=30):
+            record["mode"] = mode
+            record["worktree"] = Path(worktree)
+            # The wrapper refuses a Science profile whose writable exception does
+            # not exist yet, so this is the assertion that catches wrong ordering.
+            record["result_dir_existed_at_query"] = (
+                Path(worktree) / ".cb16" / "results"
+            ).is_dir()
+            return canned
+
+        def fake_run(argv, **kwargs):
+            record["argv"] = list(argv)
+            record["env"] = dict(kwargs.get("env") or {})
+            return subprocess.CompletedProcess(argv, 0, stdout="BUILD_REPORT: ok\n", stderr="")
+
+        original_query, original_run = (
+            dispatcher.query_sandbox_profile,
+            dispatcher.subprocess.run,
+        )
+        dispatcher.query_sandbox_profile = fake_query  # type: ignore[assignment]
+        dispatcher.subprocess.run = fake_run  # type: ignore[assignment]
+        self.addCleanup(setattr, dispatcher, "query_sandbox_profile", original_query)
+        self.addCleanup(setattr, dispatcher.subprocess, "run", original_run)
+        return record
+
+    def _science_spec(self, result_command="cb16.smoke@v1"):
+        allowlist = dispatcher.load_allowlist(ALLOWLIST_PATH)
+        spec = dispatcher.validate_metadata(
+            self.science_meta(result_command=result_command), "science", allowlist=allowlist
+        )
+        return allowlist, spec
+
+    def test_science_requests_the_read_only_profile_mode(self):
+        record = self._spy_profile_query()
+        allowlist, spec = self._science_spec()
+        dispatcher.run_science_entrypoint(
+            self.repo,
+            spec,
+            allowlist=allowlist,
+            env={"PATH": os.environ.get("PATH", ""), "HOME": str(self.home)},
+            result_dir=self.repo / ".cb16" / "results",
+            sandbox_runner="/fake/wrapper",
+        )
+        self.assertEqual(record["mode"], "read-only")
+
+    def test_result_dir_exists_before_the_profile_is_queried(self):
+        record = self._spy_profile_query()
+        allowlist, spec = self._science_spec()
+        result_dir = self.repo / ".cb16" / "results"
+        self.assertFalse(result_dir.exists(), "precondition: the directory starts absent")
+        dispatcher.run_science_entrypoint(
+            self.repo,
+            spec,
+            allowlist=allowlist,
+            env={"PATH": os.environ.get("PATH", ""), "HOME": str(self.home)},
+            result_dir=result_dir,
+            sandbox_runner="/fake/wrapper",
+        )
+        self.assertTrue(record["result_dir_existed_at_query"])
+        self.assertTrue(result_dir.is_dir())
+
+    def test_science_still_receives_the_result_dir_contract(self):
+        record = self._spy_profile_query()
+        allowlist, spec = self._science_spec()
+        result_dir = self.repo / ".cb16" / "results"
+        dispatcher.run_science_entrypoint(
+            self.repo,
+            spec,
+            allowlist=allowlist,
+            env={"PATH": os.environ.get("PATH", ""), "HOME": str(self.home)},
+            result_dir=result_dir,
+            sandbox_runner="/fake/wrapper",
+        )
+        self.assertEqual(record["env"]["CB16_RESULT_DIR"], str(result_dir))
+        self.assertEqual(record["env"]["CB16_RESULT_COMMAND"], "cb16.smoke@v1")
+        self.assertEqual(record["env"]["CB16_COMMIT_SHA"], self.sha)
+
+    def test_read_only_profile_query_failure_stays_fail_closed(self):
+        def refusing(sandbox_runner, worktree, *, mode="workspace-write", timeout=30):
+            self.assertEqual(mode, "read-only")
+            raise dispatcher.ExecutionBlocked("wrapper refused the Science profile")
+
+        original = dispatcher.query_sandbox_profile
+        dispatcher.query_sandbox_profile = refusing  # type: ignore[assignment]
+        self.addCleanup(setattr, dispatcher, "query_sandbox_profile", original)
+        allowlist, spec = self._science_spec()
+        with self.assertRaises(dispatcher.ExecutionBlocked):
+            dispatcher.run_science_entrypoint(
+                self.repo,
+                spec,
+                allowlist=allowlist,
+                env={"PATH": os.environ.get("PATH", ""), "HOME": str(self.home)},
+                result_dir=self.repo / ".cb16" / "results",
+                sandbox_runner="/fake/wrapper",
+            )
+
+    def test_builder_lane_never_requests_the_read_only_profile(self):
+        calls = []
+        original = dispatcher.query_sandbox_profile
+
+        def recording(sandbox_runner, worktree, *, mode="workspace-write", timeout=30):
+            calls.append(mode)
+            return original(sandbox_runner, worktree, mode=mode, timeout=timeout)
+
+        dispatcher.query_sandbox_profile = recording  # type: ignore[assignment]
+        self.addCleanup(setattr, dispatcher, "query_sandbox_profile", original)
+
+        spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# fixture\n"})
+        outcome = self.dispatch(dsh_invoker=spy)
+
+        self.assertEqual(outcome.classification, dispatcher.CLASS_OK)
+        self.assertEqual(calls, [], "the Builder lane must not touch the Science profile path")
+        parameters = inspect.signature(dispatcher.query_sandbox_profile).parameters
+        self.assertEqual(parameters["mode"].default, "workspace-write")
+
     def test_require_mode_fails_closed_without_a_wrapper(self):
         env = dict(self.base_env)
         env["CB16_SCIENCE_SANDBOX"] = "require"
@@ -522,6 +673,35 @@ class ScienceSandboxTests(DispatchTestCase):
         published = outcome.evidence["summary"].parent / "results"
         self.assertTrue((published / "RESULT.json").exists())
         self.assertEqual(outcome.summary["result_dir"], str(published))
+
+    def test_science_writes_both_artifacts_through_the_result_directory(self):
+        allowlist, spec = self._science_spec()
+        wrapper = self._fake_wrapper()
+        log = self.tmp / "argv2.log"
+        env = {
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "HOME": str(self.home),
+            "CB16_FAKE_LOG": str(log),
+        }
+        result_dir = self.repo / ".cb16" / "results"
+        result = dispatcher.run_science_entrypoint(
+            self.repo,
+            spec,
+            allowlist=allowlist,
+            env=env,
+            result_dir=result_dir,
+            sandbox_runner=str(wrapper),
+        )
+        self.assertEqual(result.exit_code, 0, result.stderr)
+        self.assertTrue((result_dir / "RESULT.json").is_file())
+        self.assertTrue((result_dir / "REPORT.md").is_file())
+        recorded = log.read_text(encoding="utf-8").splitlines()
+        self.assertIn("EXEC", recorded)
+        # The exec profile binds the result directory rather than the workspace
+        # root, which is only possible if --read-only was requested.
+        binds = [recorded[i + 1] for i, item in enumerate(recorded) if item == "--bind"]
+        self.assertIn(str(result_dir), binds)
+        self.assertNotIn(str(self.repo), binds)
 
     def test_missing_artifacts_are_flagged_from_the_published_copy(self):
         def spy(worktree, spec, **kwargs):
