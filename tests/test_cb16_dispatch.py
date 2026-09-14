@@ -564,6 +564,23 @@ class EvidenceAndClassificationTests(DispatchTestCase):
         self.assertIn("BUILD_REPORT", outcome.build_report)
         self.assertIn(dispatcher.CLASS_OK, outcome.build_report)
 
+    def test_earlier_prose_mention_does_not_displace_the_report(self):
+        # A mention inside the opening prose must not hijack the captured
+        # section; capture starts at the line that actually opens the report.
+        text = (
+            "I will finish by writing a `BUILD_REPORT` below.\n\n"
+            "## BUILD_REPORT\nTask: demo\nChanged: one file\n"
+        )
+        report = dispatcher.extract_build_report(text)
+        self.assertIsNotNone(report)
+        self.assertTrue(report.startswith("## BUILD_REPORT"))
+        self.assertIn("Task: demo", report)
+        self.assertNotIn("I will finish", report)
+
+    def test_report_marker_inside_prose_only_is_not_a_report(self):
+        text = "I did not produce a BUILD_REPORT section this time.\n"
+        self.assertIsNone(dispatcher.extract_build_report(text))
+
     def test_evidence_is_written_on_failure(self):
         spy = self.builder_spy(exit_code=9, report="")
         outcome = self.dispatch(dsh_invoker=spy)

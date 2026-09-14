@@ -85,6 +85,9 @@ CONTROL_PLANE_PATTERNS: Tuple[str, ...] = (
 
 LOG_LIMIT = 20000
 BUILD_REPORT_MARKER = "BUILD_REPORT"
+#: A report section starts the line (optionally behind markdown decoration),
+#: which keeps prose mentions from being mistaken for the section itself.
+_BUILD_REPORT_LINE_RE = re.compile(r"^[ \t>*#_`-]*BUILD_REPORT\b", re.MULTILINE)
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{1,80}$")
@@ -181,6 +184,18 @@ def run(
             detail=(proc.stderr or proc.stdout or "")[:800],
         )
     return proc
+
+
+def env_path(name: str, fallback: Path) -> Path:
+    """Read a path from the environment, treating empty values as unset.
+
+    GitHub expands an undefined ``vars.*`` reference to the empty string rather
+    than leaving the variable unset, so an empty value must not silently become
+    the current directory.
+    """
+
+    value = os.environ.get(name, "").strip()
+    return Path(value) if value else fallback
 
 
 def bounded(text: str, limit: int = LOG_LIMIT) -> str:
@@ -618,7 +633,8 @@ def write_task_packet(
         "## Allowed scope",
         "",
         f"Work only inside this worktree ({worktree}).",
-        f"Mutate only the task contract at {spec.task_file or spec.experiment_spec}.",
+        f"The task contract at {spec.task_file or spec.experiment_spec} defines the exact",
+        "file scope for this task; honour it literally and keep the smallest footprint.",
         "",
         "## Forbidden scope",
         "",
@@ -912,12 +928,19 @@ def run_repo_tests(worktree: Path, *, env: Mapping[str, str], timeout: float = 9
 
 
 def extract_build_report(text: str) -> Optional[str]:
+    """Return the final BUILD_REPORT section, ignoring incidental mentions.
+
+    A trailing prose reference such as "the report ends with `BUILD_REPORT`"
+    must not displace the real section, so only a line whose first meaningful
+    token is the marker is accepted.
+    """
+
     if not text:
         return None
-    index = text.rfind(BUILD_REPORT_MARKER)
-    if index < 0:
+    matches = list(_BUILD_REPORT_LINE_RE.finditer(text))
+    if not matches:
         return None
-    return text[index:].strip()
+    return text[matches[-1].start() :].strip()
 
 
 def synthesize_build_report(
@@ -1357,12 +1380,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--work-root",
         type=Path,
-        default=Path(os.environ.get("CB16_WORK_ROOT", str(Path.home() / "cb16-worktrees"))),
+        default=env_path("CB16_WORK_ROOT", Path.home() / "cb16-worktrees"),
     )
     parser.add_argument(
         "--state-dir",
         type=Path,
-        default=Path(os.environ.get("CB16_STATE_DIR", str(Path.home() / ".cb16" / "state"))),
+        default=env_path("CB16_STATE_DIR", Path.home() / ".cb16" / "state"),
     )
     parser.add_argument("--report-dir", type=Path, default=None)
     parser.add_argument(
