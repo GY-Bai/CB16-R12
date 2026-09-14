@@ -564,6 +564,32 @@ Each Builder round writes its report to
 notes that nothing from an earlier round is remembered, and points at that
 section when it exists.
 
+### Report budgets
+
+| Round | Budget |
+| --- | --- |
+| build | **~2,000 characters** |
+| fix | **~500 characters** |
+
+A build round carries the design decisions the next round must not re-derive; a
+fix round only has to say what this delta changed. Past the budget the report is
+not more informative - it just costs output tokens and crowds the next round's
+packet. The budget is stated in the turn prompt.
+
+### When the agent omits the report
+
+One in three real turns ended without the `BUILD_REPORT` section it was asked
+for, and that round then handed the next one a nine-line stub. So when a finished
+turn has no report, the dispatcher makes **one bounded read-only call** asking
+the agent to reconstruct it from `git status`, `git diff HEAD` and the packet,
+under the same budget. The result is used only if it actually contains a
+`BUILD_REPORT` section, and discarded if the worktree changed while it ran -
+a report is not worth a silently mutated worktree.
+
+`build_report_source` in `dispatch_summary.json` records which path produced it:
+`agent` (the turn wrote it), `agent-recovered` (the rescue did), or
+`synthesized` (the dispatcher's stub).
+
 **The report is only as good as what the agent writes.** The dispatcher prefers
 the agent's own `BUILD_REPORT` section and only falls back to a synthesized
 stub - classification, changed files, test exit code - when the agent did not

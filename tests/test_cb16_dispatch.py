@@ -96,6 +96,18 @@ class DispatchTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="cb16-test-"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        # Guard: an unstubbed report rescue would spawn a real `dsh` process and
+        # make a real model call from the test suite. Tests that exercise the
+        # rescue inject `report_invoker`; everything else must never reach it.
+        original_rescue = dispatcher.summarize_round_report
+
+        def guarded(*args, **kwargs):
+            raise AssertionError(
+                "the test suite reached the real report rescue; inject report_invoker"
+            )
+
+        dispatcher.summarize_round_report = guarded  # type: ignore[assignment]
+        self.addCleanup(setattr, dispatcher, "summarize_round_report", original_rescue)
         self.repo, self.sha = self._make_repo()
         self.home = self.tmp / "home"
         self.home.mkdir()
@@ -185,6 +197,7 @@ class DispatchTestCase(unittest.TestCase):
         work_root=None,
         base_env=None,
         session_invoker=None,
+        report_invoker=None,
     ):
         if event is None:
             payload = meta if meta is not None else (
@@ -208,6 +221,7 @@ class DispatchTestCase(unittest.TestCase):
             github_token=token,
             dsh_invoker=dsh_invoker,
             session_invoker=session_invoker,
+            report_invoker=report_invoker,
             science_invoker=science_invoker,
             base_env=base_env or self.base_env,
         )
@@ -843,6 +857,91 @@ class FixRoundHandoffTests(DispatchTestCase):
         self.assertIn("truncated at", "\n".join(lines))
 
 
+class ReportRescueTests(DispatchTestCase):
+    """A missing report costs one bounded call, not the next round's context."""
+
+    def _silent_turn(self):
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="no report section here\n")
+
+        return spy
+
+    def _rescue(self, text):
+        calls = []
+
+        def spy(worktree, **kwargs):
+            calls.append(kwargs)
+            return dispatcher.RunResult(
+                exit_code=0, stdout=text, report_text=text
+            )
+
+        spy.calls = calls  # type: ignore[attr-defined]
+        return spy
+
+    def test_missing_report_is_recovered_by_one_bounded_call(self):
+        rescue = self._rescue("BUILD_REPORT\n- recovered: changed the loader\n")
+        outcome = self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        self.assertEqual(len(rescue.calls), 1)
+        self.assertEqual(outcome.summary["build_report_source"], "agent-recovered")
+        self.assertIn("recovered: changed the loader", outcome.build_report)
+        self.assertNotIn("Known unresolved: see Actions log", outcome.build_report)
+
+    def test_rescue_prompt_is_read_only_and_asks_only_for_the_report(self):
+        rescue = self._rescue("BUILD_REPORT\n- ok\n")
+        self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        prompt = rescue.calls[0]["prompt"]
+        self.assertIn("do not modify any file", prompt)
+        self.assertIn("Output the report and nothing else", prompt)
+        self.assertIn(str(dispatcher.REPORT_CHARS_BUILD), prompt)
+
+    def test_rescue_uses_the_fix_round_budget(self):
+        rescue = self._rescue("BUILD_REPORT\n- ok\n")
+        meta = self.builder_meta()
+        meta["mode"] = "fix"
+        meta["pr_number"] = 36
+        meta["review_delta"] = "bounded"
+        original = dispatcher.github_api
+        dispatcher.github_api = lambda *a, **k: (404, {})
+        try:
+            self.dispatch(meta=meta, dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        finally:
+            dispatcher.github_api = original
+        self.assertIn(str(dispatcher.REPORT_CHARS_FIX), rescue.calls[0]["prompt"])
+        self.assertNotIn(str(dispatcher.REPORT_CHARS_BUILD), rescue.calls[0]["prompt"])
+
+    def test_a_written_report_is_not_rescued(self):
+        rescue = self._rescue("BUILD_REPORT\n- should not be used\n")
+        outcome = self.dispatch(
+            dsh_invoker=self.builder_spy(
+                {"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"},
+                report="BUILD_REPORT\n- the agent's own\n",
+            ),
+            report_invoker=rescue,
+        )
+        self.assertEqual(rescue.calls, [], "no call when the agent already complied")
+        self.assertEqual(outcome.summary["build_report_source"], "agent")
+
+    def test_rescue_that_still_produces_nothing_falls_back_to_the_stub(self):
+        rescue = self._rescue("I could not find anything.\n")
+        outcome = self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        self.assertEqual(outcome.summary["build_report_source"], "synthesized")
+        self.assertIn("Known unresolved", outcome.build_report)
+
+    def test_rescue_result_without_a_section_is_not_used_verbatim(self):
+        rescue = self._rescue("some prose that only mentions BUILD_REPORT inline\n")
+        outcome = self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        self.assertEqual(outcome.summary["build_report_source"], "synthesized")
+
+    def test_default_budgets(self):
+        build = dispatcher.TaskSpec(lane="builder", mode="build", sha="0" * 40, branch="ds/x")
+        fix = dispatcher.TaskSpec(lane="builder", mode="fix", sha="0" * 40, branch="ds/x")
+        self.assertEqual(dispatcher.report_budget(build), 2000)
+        self.assertEqual(dispatcher.report_budget(fix), 500)
+
+
 class RoundVisibilityTests(DispatchTestCase):
     """A round must leave a readable trace on its PR, and must not read it back."""
 
@@ -1037,7 +1136,14 @@ class BuildReportHandoffTests(DispatchTestCase):
             (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
             return dispatcher.RunResult(exit_code=0, stdout="no report section here\n")
 
-        outcome = self.dispatch(dsh_invoker=silent)
+        outcome = self.dispatch(
+            dsh_invoker=silent,
+            # Stub the rescue too: this case is about the evidence label, and an
+            # unstubbed rescue would make a real model call from the suite.
+            report_invoker=lambda worktree, **kwargs: dispatcher.RunResult(
+                exit_code=0, stdout="still no report section\n"
+            ),
+        )
         self.assertEqual(outcome.summary["build_report_source"], "synthesized")
 
     def test_agent_report_reaches_the_next_round_instead_of_the_stub(self):
@@ -1159,7 +1265,14 @@ class SessionAffinityTests(DispatchTestCase):
             target.mkdir(parents=True, exist_ok=True)
             (target / "DRY_RUN_FIXTURE.md").write_text("# fixture\n", encoding="utf-8")
             return dispatcher.RunResult(
-                exit_code=0, stdout=json.dumps(payload) + "\n", note=action, payload=payload
+                exit_code=0,
+                stdout=json.dumps(payload) + "\n",
+                note=action,
+                payload=payload,
+                # The real session runner carries the agent text separately,
+                # because a JSON stdout cannot be scanned for a line-anchored
+                # report section.
+                report_text=payload["text"],
             )
 
         spy.calls = calls  # type: ignore[attr-defined]
@@ -2142,7 +2255,13 @@ class EvidenceAndClassificationTests(DispatchTestCase):
 
     def test_build_report_is_synthesised_when_the_agent_omits_it(self):
         spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# fixture\n"}, report="no report here")
-        outcome = self.dispatch(dsh_invoker=spy)
+        outcome = self.dispatch(
+            dsh_invoker=spy,
+            # Even the rescue cannot invent one here, so the stub is the result.
+            report_invoker=lambda worktree, **kwargs: dispatcher.RunResult(
+                exit_code=0, stdout="still nothing\n"
+            ),
+        )
         self.assertIn("BUILD_REPORT", outcome.build_report)
         self.assertIn(dispatcher.CLASS_OK, outcome.build_report)
 

@@ -138,6 +138,10 @@ SESSION_AFFINITY_BRANCH_V1 = "branch-v1"
 #: round's BUILD_REPORT instead. Set CB16_SESSION_AFFINITY=enabled to restore
 #: the old behaviour.
 SESSION_AFFINITY_ENABLED = False
+#: When a finished turn omits BUILD_REPORT, make one bounded read-only call to
+#: recover it. Measured need: of three real VS-C turns, one ended without the
+#: section, and that round's handoff was a nine-line stub.
+REPORT_RESCUE_ENABLED = True
 #: Profile that can create/resume an explicit session. The legacy `headless`
 #: profile is untouched and remains the default Builder path.
 SESSION_PROFILE = "cb16-builder-session"
@@ -160,6 +164,12 @@ ISSUE_DESCRIPTION_CHARS = 8000
 #: The previous round's BUILD_REPORT is the carrier for "what the last round
 #: concluded", now that no round remembers the one before it.
 PREVIOUS_REPORT_CHARS = 12000
+#: How long a round's BUILD_REPORT should be. A build round carries the design
+#: decisions the next round must not re-derive; a fix round only has to say what
+#: this delta changed. Longer than the budget is not more informative, it just
+#: costs output tokens and crowds the next packet.
+REPORT_CHARS_BUILD = 2000
+REPORT_CHARS_FIX = 500
 
 
 # --------------------------------------------------------------------------
@@ -1530,6 +1540,12 @@ INSTRUCTION_RANKS: tuple = (
 )
 
 
+def report_budget(spec: TaskSpec) -> int:
+    """Character budget for this round's BUILD_REPORT."""
+
+    return REPORT_CHARS_FIX if spec.mode == "fix" else REPORT_CHARS_BUILD
+
+
 def dsh_turn_prompt(spec: TaskSpec, *, previous_report: bool = False) -> str:
     """Prompt for a round that starts a fresh session.
 
@@ -1566,9 +1582,14 @@ def dsh_turn_prompt(spec: TaskSpec, *, previous_report: bool = False) -> str:
                 "  current diff and tests before changing anything,"
             )
         lines.append("- do not redo work the previous round already completed.")
+    budget = report_budget(spec)
     lines += [
         "",
-        "Do not redesign authority. Do not create commits or push. End with BUILD_REPORT.",
+        f"End with a `BUILD_REPORT` section of at most about {budget} characters:",
+        "what changed, what you ran, what you verified, what you deliberately did",
+        "not do, and any unresolved risk. State only what you know; do not pad it.",
+        "",
+        "Do not redesign authority. Do not create commits or push.",
     ]
     return "\n".join(lines)
 
@@ -2045,6 +2066,55 @@ def invoke_dsh_session(
     )
 
 
+def report_rescue_prompt(spec: TaskSpec) -> str:
+    """Ask for the report the finished turn forgot to write."""
+
+    budget = report_budget(spec)
+    return (
+        "Read the local CB16 task packet at .cb16/TASK_PACKET.md.\n"
+        "A Builder turn on this branch has already finished, but it did not end with\n"
+        "the BUILD_REPORT section it was asked for. Reconstruct what it did from\n"
+        "`git status`, `git diff HEAD` and the packet, then output ONLY a\n"
+        f"`BUILD_REPORT` section of at most about {budget} characters covering:\n"
+        "what changed, what you ran, what you verified, what was deliberately not\n"
+        "done, and any unresolved risk. State only what the evidence shows; do not\n"
+        "speculate, do not re-run work, and do not modify any file, commit, tag or\n"
+        "push. Output the report and nothing else."
+    )
+
+
+def summarize_round_report(
+    worktree: Path,
+    *,
+    spec: TaskSpec,
+    prompt: str,
+    dsh_bin: str = "dsh",
+    env: Mapping[str, str],
+    timeout: float = 600,
+) -> Optional[RunResult]:
+    """One bounded call to recover a report the turn did not write.
+
+    Runs after the turn and only when the agent omitted BUILD_REPORT, so it costs
+    one extra call on the rounds that would otherwise hand the next round nothing
+    but the dispatcher's nine-line stub.
+    """
+
+    before = git(worktree, "status", "--porcelain")
+    result = invoke_dsh(
+        worktree,
+        dsh_bin=dsh_bin,
+        env=env,
+        timeout=timeout,
+        prompt=prompt,
+    )
+    after = git(worktree, "status", "--porcelain")
+    if (before.stdout or "") != (after.stdout or ""):
+        # A report is not worth a silently mutated worktree.
+        result.note = "report-rescue-modified-worktree"
+        return None
+    return result
+
+
 def run_repo_tests(worktree: Path, *, env: Mapping[str, str], timeout: float = 900) -> RunResult:
     """Run the repository-owned test entrypoint (never supplied by the Issue)."""
 
@@ -2431,6 +2501,7 @@ def dispatch(
     dsh_timeout: float = 3600,
     dsh_invoker: Optional[Any] = None,
     session_invoker: Optional[Any] = None,
+    report_invoker: Optional[Any] = None,
     science_invoker: Optional[Any] = None,
     base_env: Optional[Mapping[str, str]] = None,
 ) -> DispatchOutcome:
@@ -2804,8 +2875,36 @@ def dispatch(
             extracted = extract_build_report(
                 run_result.report_text or run_result.stdout
             )
+            if not extracted and lane == LANE_BUILDER and REPORT_RESCUE_ENABLED:
+                # The turn finished but wrote no report. One bounded, read-only
+                # call recovers it rather than handing the next round a stub.
+                rescue = report_invoker or summarize_round_report
+                try:
+                    rescued = rescue(
+                        worktree,
+                        spec=spec,
+                        prompt=report_rescue_prompt(spec),
+                        dsh_bin=dsh_bin,
+                        env=child_env,
+                        timeout=min(float(dsh_timeout), 600.0),
+                    )
+                except DispatchError as exc:
+                    rescued = None
+                    warnings.append(f"report rescue failed: {exc.message}")
+                if rescued is not None:
+                    recovered = extract_build_report(
+                        rescued.report_text or rescued.stdout
+                    )
+                    if recovered:
+                        extracted = recovered
+                        report_source = "agent-recovered"
+                    else:
+                        warnings.append(
+                            "report rescue ran but produced no BUILD_REPORT section"
+                        )
             if extracted:
-                report_source = "agent"
+                if report_source != "agent-recovered":
+                    report_source = "agent"
                 report_text = extracted
             else:
                 report_text = synthesize_build_report(
