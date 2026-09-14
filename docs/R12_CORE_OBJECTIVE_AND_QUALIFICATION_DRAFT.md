@@ -16,10 +16,10 @@ a_t=\pi(Z_t,A_t,X_t)
 
 - \(Z_t\): frozen representation of causally normalized K-line context;
 - \(A_t\): minimal dimensionless account state;
-- \(X_t\): minimal normalized execution/constraint context;
+- \(X_t\): optional minimal execution-economics context, present only when hidden execution conditions would otherwise change action value;
 - \(a_t\): direction + `requested_risk`.
 
-A future learned-memory interface \(S_t\) is reserved, but R12 v1 does not require it.
+If execution economics are fixed and identical across the relevant environment, \(X_t\) may be empty. A future learned-memory interface \(S_t\) is reserved, but R12 v1 does not require it.
 
 ## 3. Market state
 
@@ -72,9 +72,73 @@ Do not feed raw equity, raw quantity, raw entry price, symbol/venue identity, cu
 
 A history-derived feature enters policy state only if removing it breaks transition sufficiency, reward sufficiency, constraint sufficiency, or a preregistered ablation shows repeatable decision value.
 
-## 5. Execution / permission context
+## 5. Execution economics and permission
 
-\(X_t\) contains only external friction or feasibility that materially changes action value, in normalized form. A v1 candidate is normalized expected trading friction. If long/short feasibility is materially asymmetric, Permission may expose a normalized direction-specific feasible-action envelope rather than venue-specific rules.
+Execution economics remain part of Physics. The Central Brain should not receive venue-specific rules or duplicate the execution engine.
+
+Let the target exposure implied by the nominal action be \(e_t^{target}\), and define:
+
+\[
+\Delta e_t=e_t^{target}-e_t.
+\]
+
+Trading cost is action-dependent:
+
+\[
+\frac{C_t^{trade}}{W_t}=g(\Delta e_t;X_t).
+\]
+
+For the initial price-taker system, a simple proportional model is sufficient unless evidence requires more:
+
+\[
+\frac{C_t^{trade}}{W_t}=\kappa_t|\Delta e_t|.
+\]
+
+Here \(\kappa_t\) is a normalized proportional friction coefficient under the frozen execution convention.
+
+### When `X_t` is unnecessary
+
+If \(\kappa\) and all other execution economics are constant across the relevant training/evaluation universe, they remain environment parameters and are not repeated as policy input:
+
+\[
+X_t=\varnothing.
+\]
+
+The policy can learn their consequence through true account transitions and net-equity reward.
+
+### When `X_t` is required
+
+If two otherwise identical decision states can have different future reward or transition because execution economics vary, the minimal parameters causing that difference must be observable. Examples include:
+
+- time/asset-varying proportional trading friction;
+- materially asymmetric long/short execution cost;
+- variable carry, funding, or borrow cost if modeled by the environment.
+
+Expose the parameters needed to evaluate future marginal economics, not a venue name and not a post-hoc realized cost.
+
+Do not provide a scalar "cost of the chosen action" as an input before the action is chosen. The Central Brain chooses the target exposure; Physics evaluates that target using the observable cost parameters.
+
+### Carry cost
+
+If holding cost is modeled and varies, it is distinct from transaction cost. A normalized form may be represented conceptually as:
+
+\[
+\frac{C_t^{carry}}{W_t}
+=
+\rho_t^{long}\max(e_t,0)
++
+\rho_t^{short}\max(-e_t,0).
+\]
+
+Only include \(\rho_t\) in \(X_t\) if the modeled carry economics actually vary and affect decisions. Fixed carry remains an environment parameter.
+
+### Market impact
+
+Nonlinear endogenous market impact is deferred under the initial price-taker assumption. Do not add order-book, liquidity, or impact features to the Central Brain merely to make the execution model look realistic.
+
+### Permission
+
+Hard feasibility and legality remain Permission/Physics semantics, not reward shaping. `new_risk_capacity` provides the account-level ability to increase risk. If materially different long/short feasible capacity exists and cannot be inferred from the minimal state, expose a normalized direction-specific feasible-action envelope rather than venue-specific rules.
 
 Nominal intent != permitted action != executed action.
 
@@ -106,11 +170,13 @@ The Pareto Archive stores qualified non-dominated policies. Active Champion is t
 - Truth != Belief != Decision != Permission
 - nominal action != executed action
 - `requested_risk` != confidence
-- market state != account state != execution context
+- market state != account state != execution economics
 - prediction quality != economic decision quality
 - training reward != qualification != diagnostics
 - evidence strength != economic value
 - survival cushion != new-risk capacity
+- transaction cost != carry cost
+- environment parameter != policy state
 
 ## 9. Scientific validity
 
@@ -122,7 +188,8 @@ Formal experiments freeze question, data, transforms, metrics, and gates before 
 
 - exact K-line normalization;
 - exact numerical scaling/clipping of \(e_t,s_t,c_t\);
-- exact v1 \(X_t\) friction schema;
+- exact frozen v1 proportional execution convention and whether \(X_t\) can remain empty;
+- whether variable carry/funding/borrow economics are modeled in v1;
 - whether direction-specific feasible-action capacity is needed;
 - Survival / Path-Risk authority metric;
 - whether risk must later enter the training objective;
