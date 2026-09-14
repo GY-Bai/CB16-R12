@@ -91,6 +91,32 @@
         "REPORT.md"
       ]
     },
+    "cb16.vs-c-vectorized-probe@v1": {
+      "description": "Diagnostic-only probe for the vectorized VS controlled-task engine. Verifies Task-A tensorized Physics against canonical execute_transition, compares short scalar versus batched generation timings, and exercises the seed executor with at most four one-thread ARM workers. It emits no scientific verdict and never reinterprets the completed VS-C R0 SCIENTIFIC_FAIL.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.vectorized_probe"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-c-vectorized-probe-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-c-vectorized-probe-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "RESULT.json",
+        "REPORT.md"
+      ],
+      "diagnostic_only": true
+    },
     "cb16.normalization-ablation@v1": {
       "description": "R12 Normalization Ablation R0. Compares five fixed K-line normalization families (N0 endpoint-anchored log ratios, N1 per-bar log-return geometry, N2 causal window z-score with shared close statistics, N3 RevIN-style per-channel instance normalization, N4 volatility-normalized return geometry) on identical BTCUSDT 1m 2020-01..2020-03 windows, measures the contract invariant probes and one frozen linear sensory projection, and writes experiment_spec.json, RESULT.json and REPORT.md. Trains nothing, performs no Central Brain or Account Physics work, and promotes no winner.",
       "argv": [
