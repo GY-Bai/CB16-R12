@@ -170,6 +170,12 @@ PREVIOUS_REPORT_CHARS = 12000
 #: costs output tokens and crowds the next packet.
 REPORT_CHARS_BUILD = 2000
 REPORT_CHARS_FIX = 500
+#: Where a round writes its report. Inside the task packet directory, which is
+#: git-ignored, so the report never enters a commit and never shows up in
+#: `changed`. A file is also a far more reliable channel than a text convention:
+#: it does not depend on the agent ending its reply a particular way, and it
+#: cannot be broken by how the transport escapes newlines.
+REPORT_FILE_NAME = "BUILD_REPORT.md"
 
 
 # --------------------------------------------------------------------------
@@ -1292,7 +1298,8 @@ def write_task_packet(
         "## Done-when conditions",
         "",
         "The task contract file states the required tests and done-when conditions.",
-        "End your final message with a `BUILD_REPORT` section.",
+        f"Write your report to `.cb16/{REPORT_FILE_NAME}` before you finish, and end",
+        "your final message with the same `BUILD_REPORT` section.",
     ]
     lines += render_previous_report(previous_report, secrets=secrets)
     lines += render_issue_description(
@@ -1585,9 +1592,15 @@ def dsh_turn_prompt(spec: TaskSpec, *, previous_report: bool = False) -> str:
     budget = report_budget(spec)
     lines += [
         "",
-        f"End with a `BUILD_REPORT` section of at most about {budget} characters:",
-        "what changed, what you ran, what you verified, what you deliberately did",
-        "not do, and any unresolved risk. State only what you know; do not pad it.",
+        f"Before you finish, write your report to `.cb16/{REPORT_FILE_NAME}` (at most",
+        f"about {budget} characters). That file is how the next round learns what you",
+        "concluded, and it is the only one of these instructions the dispatcher reads",
+        "from disk, so write it as your last action. Cover: what changed, what you",
+        "ran, what you verified, what you deliberately did not do, and any unresolved",
+        "risk. State only what you know; do not pad it.",
+        "",
+        "End your reply with the same report under a `BUILD_REPORT` heading so the",
+        "log shows it too.",
         "",
         "Do not redesign authority. Do not create commits or push.",
     ]
@@ -2066,20 +2079,50 @@ def invoke_dsh_session(
     )
 
 
+def agent_report_path(worktree: Path) -> Path:
+    return worktree / ".cb16" / REPORT_FILE_NAME
+
+
+def clear_agent_report(worktree: Path) -> bool:
+    """Remove a previous round's report before the next turn runs.
+
+    The worktree is reused across rounds, so without this a round that forgot to
+    write a report would inherit the previous round's file and the dispatcher
+    would record stale conclusions as this round's.
+    """
+
+    try:
+        agent_report_path(worktree).unlink()
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def read_agent_report(worktree: Path) -> Optional[str]:
+    """Return the report the round wrote to disk, or None if it did not."""
+
+    try:
+        text = agent_report_path(worktree).read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return text or None
+
+
 def report_rescue_prompt(spec: TaskSpec) -> str:
     """Ask for the report the finished turn forgot to write."""
 
     budget = report_budget(spec)
     return (
         "Read the local CB16 task packet at .cb16/TASK_PACKET.md.\n"
-        "A Builder turn on this branch has already finished, but it did not end with\n"
-        "the BUILD_REPORT section it was asked for. Reconstruct what it did from\n"
-        "`git status`, `git diff HEAD` and the packet, then output ONLY a\n"
-        f"`BUILD_REPORT` section of at most about {budget} characters covering:\n"
+        "A Builder turn on this branch has already finished without writing the\n"
+        f"report file `.cb16/{REPORT_FILE_NAME}` it was asked for. Reconstruct what it\n"
+        "did from `git status`, `git diff HEAD` and the packet, then write ONLY a\n"
+        f"`BUILD_REPORT` section of at most about {budget} characters to\n"
+        f"`.cb16/{REPORT_FILE_NAME}` covering:\n"
         "what changed, what you ran, what you verified, what was deliberately not\n"
         "done, and any unresolved risk. State only what the evidence shows; do not\n"
-        "speculate, do not re-run work, and do not modify any file, commit, tag or\n"
-        "push. Output the report and nothing else."
+        "speculate and do not re-run work. Write that one file and nothing else;\n"
+        "do not touch any other file, and do not commit, tag or push."
     )
 
 
@@ -2710,6 +2753,11 @@ def dispatch(
         lane_result_dir = (worktree / ".cb16" / "results") if lane == LANE_SCIENCE else (report_dir / "results")
         published_result_dir = report_dir / "results"
 
+        if lane == LANE_BUILDER:
+            # The worktree outlives the round, so a stale report would be read
+            # back as this round's. Clear it before the turn runs.
+            clear_agent_report(worktree)
+
         if dry_run and lane == LANE_BUILDER:
             run_result = run_dry_run(worktree, spec, result_dir=lane_result_dir)
         elif lane == LANE_BUILDER:
@@ -2872,7 +2920,12 @@ def dispatch(
 
         report_source = "synthesized"
         if classification == CLASS_OK:
-            extracted = extract_build_report(
+            # The report file is the primary channel: it does not depend on how
+            # the turn ended, nor on how the transport escaped its newlines.
+            from_file = read_agent_report(worktree) if lane == LANE_BUILDER else None
+            if from_file:
+                report_source = "agent-file"
+            extracted = from_file or extract_build_report(
                 run_result.report_text or run_result.stdout
             )
             if not extracted and lane == LANE_BUILDER and REPORT_RESCUE_ENABLED:
@@ -2892,7 +2945,7 @@ def dispatch(
                     rescued = None
                     warnings.append(f"report rescue failed: {exc.message}")
                 if rescued is not None:
-                    recovered = extract_build_report(
+                    recovered = read_agent_report(worktree) or extract_build_report(
                         rescued.report_text or rescued.stdout
                     )
                     if recovered:
@@ -2903,7 +2956,7 @@ def dispatch(
                             "report rescue ran but produced no BUILD_REPORT section"
                         )
             if extracted:
-                if report_source != "agent-recovered":
+                if report_source not in ("agent-recovered", "agent-file"):
                     report_source = "agent"
                 report_text = extracted
             else:
@@ -2929,6 +2982,10 @@ def dispatch(
             write_branch_report(
                 branch_report_path(state_dir, repo, spec.branch), report_text
             )
+            # The report is recorded in the state directory and the evidence
+            # bundle, so the worktree copy has done its job. Removing it here as
+            # well means a later round cannot mistake it for its own.
+            clear_agent_report(worktree)
 
         summary: Dict[str, Any] = {
             "schema": "cb16.dispatch.v1",

@@ -869,14 +869,16 @@ class ReportRescueTests(DispatchTestCase):
 
         return spy
 
-    def _rescue(self, text):
+    def _rescue(self, text, *, write_file=True):
         calls = []
 
         def spy(worktree, **kwargs):
             calls.append(kwargs)
-            return dispatcher.RunResult(
-                exit_code=0, stdout=text, report_text=text
-            )
+            if write_file:
+                target = dispatcher.agent_report_path(Path(worktree))
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(text, encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout=text, report_text=text)
 
         spy.calls = calls  # type: ignore[attr-defined]
         return spy
@@ -893,8 +895,8 @@ class ReportRescueTests(DispatchTestCase):
         rescue = self._rescue("BUILD_REPORT\n- ok\n")
         self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
         prompt = rescue.calls[0]["prompt"]
-        self.assertIn("do not modify any file", prompt)
-        self.assertIn("Output the report and nothing else", prompt)
+        self.assertIn("do not touch any other file", prompt)
+        self.assertIn(dispatcher.REPORT_FILE_NAME, prompt)
         self.assertIn(str(dispatcher.REPORT_CHARS_BUILD), prompt)
 
     def test_rescue_uses_the_fix_round_budget(self):
@@ -925,15 +927,128 @@ class ReportRescueTests(DispatchTestCase):
         self.assertEqual(outcome.summary["build_report_source"], "agent")
 
     def test_rescue_that_still_produces_nothing_falls_back_to_the_stub(self):
-        rescue = self._rescue("I could not find anything.\n")
+        rescue = self._rescue("I could not find anything.\n", write_file=False)
         outcome = self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
         self.assertEqual(outcome.summary["build_report_source"], "synthesized")
         self.assertIn("Known unresolved", outcome.build_report)
 
     def test_rescue_result_without_a_section_is_not_used_verbatim(self):
-        rescue = self._rescue("some prose that only mentions BUILD_REPORT inline\n")
+        rescue = self._rescue("some prose that only mentions BUILD_REPORT inline\n",
+                              write_file=False)
         outcome = self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
         self.assertEqual(outcome.summary["build_report_source"], "synthesized")
+
+    def test_the_report_file_wins_over_the_reply_text(self):
+        """The file is the primary channel; the reply is only for the log."""
+
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            report = dispatcher.agent_report_path(Path(worktree))
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text("BUILD_REPORT\n- from the file\n", encoding="utf-8")
+            return dispatcher.RunResult(
+                exit_code=0, stdout="BUILD_REPORT\n- from the reply\n"
+            )
+
+        outcome = self.dispatch(dsh_invoker=spy)
+        self.assertEqual(outcome.summary["build_report_source"], "agent-file")
+        self.assertIn("from the file", outcome.build_report)
+        self.assertNotIn("from the reply", outcome.build_report)
+
+    def test_the_report_file_is_used_even_when_the_reply_has_no_section(self):
+        """The case that used to hand the next round a nine-line stub."""
+
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            report = dispatcher.agent_report_path(Path(worktree))
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text("BUILD_REPORT\n- the turn wrote the file but not the reply\n",
+                              encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="done, see the report file\n")
+
+        rescue = self._rescue("should never run\n")
+        outcome = self.dispatch(dsh_invoker=spy, report_invoker=rescue)
+        self.assertEqual(rescue.calls, [], "no rescue when the file exists")
+        self.assertEqual(outcome.summary["build_report_source"], "agent-file")
+        self.assertIn("wrote the file but not the reply", outcome.build_report)
+
+    def test_the_report_file_never_enters_the_change_set(self):
+        """`.cb16/` is git-ignored, so the report cannot pollute a commit."""
+
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            report = dispatcher.agent_report_path(Path(worktree))
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text("BUILD_REPORT\n- file\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT\n- reply\n")
+
+        outcome = self.dispatch(dsh_invoker=spy)
+        self.assertNotIn(
+            f".cb16/{dispatcher.REPORT_FILE_NAME}", outcome.summary["changed_files"]
+        )
+
+    def test_rescue_is_read_back_from_the_file_it_writes(self):
+        rescue = self._rescue("BUILD_REPORT\n- recovered via the file\n")
+        outcome = self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        self.assertEqual(outcome.summary["build_report_source"], "agent-recovered")
+        self.assertIn("recovered via the file", outcome.build_report)
+
+    def test_a_stale_report_from_an_earlier_round_is_not_inherited(self):
+        """The worktree is reused, so last round's file must not be read as this one's."""
+
+        stale = dispatcher.agent_report_path(self.tmp)
+        stale.parent.mkdir(parents=True, exist_ok=True)
+        stale.write_text("BUILD_REPORT\n- stale conclusions from an earlier round\n",
+                         encoding="utf-8")
+
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            # This round writes no report at all.
+            return dispatcher.RunResult(exit_code=0, stdout="no report section here\n")
+
+        outcome = self.dispatch(
+            dsh_invoker=spy,
+            report_invoker=lambda worktree, **kwargs: dispatcher.RunResult(
+                exit_code=0, stdout="nothing\n"
+            ),
+        )
+        self.assertNotIn("stale conclusions", outcome.build_report)
+        self.assertEqual(outcome.summary["build_report_source"], "synthesized")
+
+    def test_the_worktree_copy_is_removed_once_recorded(self):
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            report = dispatcher.agent_report_path(Path(worktree))
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text("BUILD_REPORT\n- recorded\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT\n- reply\n")
+
+        outcome = self.dispatch(dsh_invoker=spy)
+        self.assertIn("recorded", outcome.build_report)
+        worktree = Path(outcome.summary["worktree"])
+        self.assertFalse(
+            dispatcher.agent_report_path(worktree).exists(),
+            "the recorded copy is removed from the worktree",
+        )
+        self.assertTrue(
+            dispatcher.read_branch_report(
+                dispatcher.branch_report_path(self.tmp / "state", TRUSTED_REPO, "ds/test-task")
+            ),
+            "but it survives in the state directory",
+        )
+
+    def test_missing_report_file_is_none_not_an_error(self):
+        self.assertIsNone(dispatcher.read_agent_report(Path(self.tmp)))
 
     def test_default_budgets(self):
         build = dispatcher.TaskSpec(lane="builder", mode="build", sha="0" * 40, branch="ds/x")
