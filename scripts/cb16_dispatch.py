@@ -1075,24 +1075,46 @@ def resolve_sandbox_runner(env: Mapping[str, str]) -> Optional[str]:
     return None
 
 
-def science_sandbox_argv(
-    argv: Sequence[str], worktree: Path, *, sandbox_runner: str
+def query_sandbox_profile(
+    sandbox_runner: str, worktree: Path, *, mode: str = "workspace-write", timeout: float = 30
 ) -> List[str]:
-    """Wrap the Science entrypoint in the same profile the Builder lane uses.
+    """Ask the wrapper for the canonical sandbox profile.
 
-    Mirrors the workspace-write profile the DSH sandbox provider builds, so the
-    Science lane sees the same writable roots and the same masked paths as a
-    sandboxed Builder run.
+    The wrapper owns the one definition of the profile; both lanes ask for it
+    instead of each carrying a copy, so a version change cannot make them
+    diverge. A wrapper that cannot answer fails closed.
     """
 
-    profile = [
-        "--ro-bind", "/", "/",
-        "--dev", "/dev",
-        "--proc", "/proc",
-        "--die-with-parent",
-        "--tmpfs", "/tmp",
-        "--bind", str(worktree), str(worktree),
-    ]
+    argv = [sandbox_runner, "--print-profile", str(worktree)]
+    if mode == "read-only":
+        argv.append("--read-only")
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ExecutionBlocked("sandbox wrapper could not report its profile", detail=str(exc))
+    if proc.returncode != 0:
+        raise ExecutionBlocked(
+            "sandbox wrapper refused to report its profile", detail=bounded(proc.stderr)
+        )
+    profile = [part for part in proc.stdout.split("\0") if part != ""]
+    if not profile:
+        raise ExecutionBlocked("sandbox wrapper reported an empty profile")
+    return profile
+
+
+def science_sandbox_argv(
+    argv: Sequence[str],
+    worktree: Path,
+    *,
+    sandbox_runner: str,
+    profile: Sequence[str],
+) -> List[str]:
+    """Wrap the Science entrypoint in the wrapper's own canonical profile.
+
+    ``profile`` comes from :func:`query_sandbox_profile`, so the Science lane
+    runs under exactly the profile the Builder lane verifies against.
+    """
+
     return [sandbox_runner, *profile, "--", *argv]
 
 
@@ -1126,7 +1148,10 @@ def run_science_entrypoint(
     argv = resolve_allowlisted_argv(entrypoint, worktree)
     wrapped = sandbox_runner is not None
     if wrapped:
-        argv = science_sandbox_argv(argv, worktree, sandbox_runner=sandbox_runner)
+        profile = query_sandbox_profile(sandbox_runner, worktree)
+        argv = science_sandbox_argv(
+            argv, worktree, sandbox_runner=sandbox_runner, profile=profile
+        )
     child_env = dict(env)
     for key, value in (entrypoint.get("env") or {}).items():
         if not re.match(r"^[A-Z][A-Z0-9_]*$", str(key)):

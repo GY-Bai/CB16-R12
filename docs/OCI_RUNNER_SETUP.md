@@ -360,6 +360,31 @@ explicitly when it is not on `PATH`.
 Because the wrapper is a host file, a new host needs it installed before Science
 dispatches can run under `require`.
 
+### One profile, verified, not mirrored
+
+Mirroring the provider's `bwrapProfileArgs` in the dispatcher would have left the
+two lanes free to drift apart whenever DSH changed that profile. Instead the
+wrapper **owns the single definition**:
+
+```bash
+cb16-sandbox-runner --print-profile <workspace> [--read-only]   # NUL separated
+```
+
+The dispatcher asks for the profile rather than carrying a copy, and the wrapper
+verifies whatever the DSH provider sends against the same definition before it
+execs bwrap. An unrecognised or mismatching profile fails closed with
+
+```text
+cb16-sandbox-runner: sandbox profile does not match the canonical profile
+  expected: --ro-bind / / --dev /dev --proc /proc --die-with-parent --tmpfs /tmp --bind <ws> <ws>
+  received: ... --unshare-net
+```
+
+so a version change shows up as a loud failure rather than as two lanes that
+quietly differ. Measured after the change: a headless DSH run still starts and
+writes its file (the provider's profile matches), and the Science lane reports
+`science_sandbox` pointing at the wrapper.
+
 ## 2. Repository variables
 
 Set these as repository Actions **variables** (not secrets) — they are paths,
