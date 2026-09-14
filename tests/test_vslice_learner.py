@@ -550,7 +550,6 @@ class GenerationBoundaryTests(unittest.TestCase):
             "v_trace",
             "vtrace",
             "gae",
-            "entropy",
             "clip",
             "target_",
             "q_value",
@@ -560,6 +559,9 @@ class GenerationBoundaryTests(unittest.TestCase):
             "offpolicy",
             "scheduler",
         )
+        self.assertEqual(learner.direction_entropy_coefficient, 0.0)
+        self.assertFalse(hasattr(learner, "beta_entropy_coefficient"))
+        self.assertFalse(hasattr(learner, "risk_entropy_coefficient"))
         public_names = [name for name in dir(learner) if not name.startswith("_")]
         self.assertTrue(public_names)
         for name in public_names:
