@@ -1088,8 +1088,8 @@ def commit_worktree(
     worktree: Path,
     *,
     message: str,
-    author_name: str = "CB16 OCI Builder",
-    author_email: str = "cb16-oci-builder@users.noreply.github.com",
+    author_name: str = "Gengyuan Bai",
+    author_email: str = "37661207+GY-Bai@users.noreply.github.com",
     env: Optional[Mapping[str, str]] = None,
 ) -> Optional[str]:
     changed = collect_changed_files(worktree)
@@ -1390,12 +1390,18 @@ def dispatch(
             set_issue_labels(
                 token=github_token, slug=repo, issue_number=trigger.issue_number, add=[BLOCKED_LABEL]
             )
-            comment_on_issue(
-                token=github_token,
-                slug=repo,
-                issue_number=trigger.issue_number,
-                body=f"CB16 dispatch classified this run as `{classification}`.\n\n```\n{report_text[:2000]}\n```",
-            )
+            # A locked Issue rejects comments.  The label transition is the
+            # authoritative state change, so a failed comment is recorded as a
+            # warning instead of failing an already-completed dispatch.
+            try:
+                comment_on_issue(
+                    token=github_token,
+                    slug=repo,
+                    issue_number=trigger.issue_number,
+                    body=f"CB16 dispatch classified this run as `{classification}`.\n\n```\n{report_text[:2000]}\n```",
+                )
+            except DispatchError as exc:
+                warnings.append(f"could not comment on Issue #{trigger.issue_number}: {exc.message}")
 
         evidence = write_evidence(
             report_dir,

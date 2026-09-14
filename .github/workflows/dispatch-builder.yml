@@ -44,8 +44,8 @@ jobs:
       - name: Configure git identity for dispatcher-owned commits
         run: |
           set -euo pipefail
-          git config --local user.name "CB16 OCI Builder"
-          git config --local user.email "cb16-oci-builder@users.noreply.github.com"
+          git config --local user.name "Gengyuan Bai"
+          git config --local user.email "37661207+GY-Bai@users.noreply.github.com"
 
       - name: Run deterministic dispatcher (Builder lane)
         env:

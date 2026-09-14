@@ -715,6 +715,40 @@ class PublishFlowTests(DispatchTestCase):
         self.assertTrue(outcome.summary["published"])
         self.assertIsNone(outcome.summary.get("pr_number"))
 
+    def test_locked_issue_comment_failure_does_not_break_dispatch(self):
+        def fake_api(method, path, *, token, payload=None, timeout=30):
+            if method == "POST" and path.endswith("/comments"):
+                raise dispatcher.ExecutionBlocked("GitHub API returned HTTP 403", detail="locked")
+            return 200, {}
+
+        def timing_out(worktree, **kwargs):
+            return dispatcher.RunResult(exit_code=124, timed_out=True)
+
+        original = dispatcher.github_api
+        dispatcher.github_api = fake_api  # type: ignore[assignment]
+        try:
+            # HARDWARE_LIMIT is not publishable, so it takes the blocked path
+            # that parks a comment on the Issue.
+            outcome = self.dispatch(publish=True, token="t", dsh_invoker=timing_out)
+        finally:
+            dispatcher.github_api = original  # type: ignore[assignment]
+
+        self.assertEqual(outcome.classification, dispatcher.CLASS_HARDWARE_LIMIT)
+        self.assertTrue(
+            any("could not comment" in w for w in outcome.summary["credential_warnings"])
+            or any("could not comment" in w for w in outcome.summary.get("publish_warnings", []))
+        )
+
+    def test_commit_author_defaults_to_the_attributed_account(self):
+        import inspect
+
+        signature = inspect.signature(dispatcher.commit_worktree)
+        self.assertEqual(signature.parameters["author_name"].default, "Gengyuan Bai")
+        self.assertEqual(
+            signature.parameters["author_email"].default,
+            "37661207+GY-Bai@users.noreply.github.com",
+        )
+
     def test_builder_lane_publishes_a_draft_pull_request(self):
         calls = self._patch_api()
         spy = self.builder_spy()  # no file changes, so no push is attempted
