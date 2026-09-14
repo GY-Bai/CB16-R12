@@ -27,12 +27,17 @@ class VectorizedTaskTests(unittest.TestCase):
         return q.build_learner(self.authority, self.optimizer)
 
     def test_task_a_vectorized_rewards_match_canonical_physics(self) -> None:
+        # Include risk=1.0 in both directions so the R0 kappa=0.1 case
+        # actually exercises cost-aware clipping/bisection instead of only
+        # comparing interior feasible targets.
         actions = (
             NominalAction(Direction.SHORT, 0.2),
             NominalAction(Direction.SHORT, 0.8),
+            NominalAction(Direction.SHORT, 1.0),
             NominalAction(Direction.FLAT, 0.0),
             NominalAction(Direction.LONG, 0.2),
             NominalAction(Direction.LONG, 0.8),
+            NominalAction(Direction.LONG, 1.0),
         )
         actual = []
         indices = []
