@@ -335,6 +335,31 @@ private mount, which is what keeps the path identical outside the sandbox.
 Both lanes receive the same `CB16_STORE` and `CB16_DATA_MANIFEST` values; a test
 asserts that, so the two lanes cannot drift apart silently.
 
+### Both lanes are sandboxed
+
+The Science lane originally ran its entrypoint with a bare `subprocess.run`, so
+it shared the Builder lane's paths but none of its confinement. It now runs
+through the same `cb16-sandbox-runner` wrapper with the same workspace-write
+profile, which means:
+
+- the same writable roots (the task worktree plus `CB16_STORE`) and the same
+  masked paths (`docker.sock`, `~/.ssh`, `~/.config/gh`, `~/.docker`,
+  `~/.git-credentials`);
+- the result package is written inside the worktree, the only place the sandbox
+  permits writes, and the dispatcher copies it out for artifact upload. The
+  produced-artifact check reads the published copy, so a lane cannot satisfy it
+  by writing somewhere it should not;
+- `run_science_entrypoint` records `sandboxed` / `unsandboxed` in its run note
+  and the dispatch summary records `science_sandbox`.
+
+`CB16_SCIENCE_SANDBOX` selects the policy: `require` (set by the Science
+workflow) fails closed when the wrapper is missing, `auto` degrades with a
+recorded note, `off` disables wrapping. `CB16_SANDBOX_RUNNER` names the wrapper
+explicitly when it is not on `PATH`.
+
+Because the wrapper is a host file, a new host needs it installed before Science
+dispatches can run under `require`.
+
 ## 2. Repository variables
 
 Set these as repository Actions **variables** (not secrets) — they are paths,
