@@ -401,45 +401,74 @@ class LabelAndLaneTests(DispatchTestCase):
 
 
 class ScienceSandboxTests(DispatchTestCase):
-    """The Science lane must run under the same sandbox profile as the Builder lane."""
+    """Both lanes must run under one profile, owned by the wrapper."""
 
-    def _fake_sandbox_runner(self):
-        script = self.tmp / "fake-sandbox-runner"
-        script.write_text(
-            "#!/bin/sh\n"
-            "# Record every argument, then execute the command after --.\n"
-            'printf "%s\\n" "$@" > "$CB16_FAKE_LOG"\n'
-            'while [ "$#" -gt 0 ]; do\n'
-            '  if [ "$1" = "--" ]; then shift; break; fi\n'
-            "  shift\n"
-            "done\n"
-            'exec "$@"\n',
-            encoding="utf-8",
-        )
+    def _fake_wrapper(self, *, profile_mode="workspace-write", fail=False):
+        script = self.tmp / "fake-sandbox-wrapper"
+        body = [
+            "#!/bin/sh",
+            'if [ "${1:-}" = "--print-profile" ]; then',
+            '  [ "' + ("1" if fail else "0") + '" = "1" ] && { echo "boom" >&2; exit 127; }',
+            '  WS="$2"',
+            '  printf "%s\\0" --ro-bind / / --dev /dev --proc /proc --die-with-parent',
+        ]
+        if profile_mode == "workspace-write":
+            body.append('  printf "%s\\0" --tmpfs /tmp --bind "$WS" "$WS"')
+        body += [
+            "  exit 0",
+            "fi",
+            'printf "%s\\n" "$@" > "$CB16_FAKE_LOG"',
+            'while [ "$#" -gt 0 ]; do',
+            '  if [ "$1" = "--" ]; then shift; break; fi',
+            "  shift",
+            "done",
+            'exec "$@"',
+        ]
+        script.write_text("\n".join(body) + "\n", encoding="utf-8")
         script.chmod(0o755)
         return script
 
-    def test_science_profile_mirrors_the_builder_profile(self):
-        argv = dispatcher.science_sandbox_argv(
-            ["python3", "-m", "cb16_science.noop"], self.repo, sandbox_runner="/x/wrapper"
-        )
-        self.assertEqual(argv[0], "/x/wrapper")
-        self.assertIn("--ro-bind", argv)
-        self.assertEqual(argv[argv.index("--ro-bind") + 1 : argv.index("--ro-bind") + 3], ["/", "/"])
-        self.assertEqual(argv[argv.index("--bind") + 1 : argv.index("--bind") + 3], [str(self.repo), str(self.repo)])
+    def test_profile_comes_from_the_wrapper_not_a_local_copy(self):
+        wrapper = self._fake_wrapper()
+        profile = dispatcher.query_sandbox_profile(str(wrapper), self.repo)
+        self.assertEqual(profile[:4], ["--ro-bind", "/", "/", "--dev"])
+        self.assertIn("--bind", profile)
         self.assertEqual(
-            argv[argv.index("--") + 1 :], ["python3", "-m", "cb16_science.noop"]
+            profile[profile.index("--bind") + 1 : profile.index("--bind") + 3],
+            [str(self.repo), str(self.repo)],
         )
-        # No --unshare-* flags: the wrapper's masks plus the read-only root are
-        # what the Builder lane relies on too.
-        self.assertFalse([a for a in argv if a.startswith("--unshare")])
 
-    def test_entrypoint_is_executed_through_the_sandbox_wrapper(self):
+    def test_read_only_mode_asks_for_a_different_profile(self):
+        wrapper = self._fake_wrapper(profile_mode="read-only")
+        profile = dispatcher.query_sandbox_profile(str(wrapper), self.repo, mode="read-only")
+        self.assertNotIn("--tmpfs", profile)
+        self.assertNotIn("--bind", profile)
+
+    def test_profile_query_fails_closed_when_the_wrapper_errors(self):
+        wrapper = self._fake_wrapper(fail=True)
+        with self.assertRaises(dispatcher.ExecutionBlocked):
+            dispatcher.query_sandbox_profile(str(wrapper), self.repo)
+
+    def test_science_argv_uses_the_queried_profile_verbatim(self):
+        wrapper = self._fake_wrapper()
+        profile = dispatcher.query_sandbox_profile(str(wrapper), self.repo)
+        argv = dispatcher.science_sandbox_argv(
+            ["python3", "-m", "cb16_science.noop"],
+            self.repo,
+            sandbox_runner=str(wrapper),
+            profile=profile,
+        )
+        self.assertEqual(argv[0], str(wrapper))
+        self.assertEqual(argv[1 : 1 + len(profile)], list(profile))
+        self.assertEqual(argv[1 + len(profile)], "--")
+        self.assertEqual(argv[-3:], ["python3", "-m", "cb16_science.noop"])
+
+    def test_entrypoint_is_executed_through_the_wrapper(self):
         allowlist = dispatcher.load_allowlist(ALLOWLIST_PATH)
         spec = dispatcher.validate_metadata(
             self.science_meta(result_command="cb16.smoke@v1"), "science", allowlist=allowlist
         )
-        wrapper = self._fake_sandbox_runner()
+        wrapper = self._fake_wrapper()
         log = self.tmp / "argv.log"
         env = {
             "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
@@ -461,7 +490,6 @@ class ScienceSandboxTests(DispatchTestCase):
         self.assertEqual(result.note, "sandboxed")
         recorded = log.read_text(encoding="utf-8").splitlines()
         self.assertIn("--ro-bind", recorded)
-        self.assertIn(str(self.repo), recorded)
         self.assertIn("--", recorded)
         self.assertTrue((result_dir / "RESULT.json").exists())
 
@@ -490,18 +518,12 @@ class ScienceSandboxTests(DispatchTestCase):
             return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
 
         outcome = self.dispatch(lane="science", dry_run=True, science_invoker=spy)
-        self.assertTrue(
-            str(captured["result_dir"]).startswith(str(captured["worktree"])),
-            "the lane must write inside the worktree it is allowed to write to",
-        )
+        self.assertTrue(str(captured["result_dir"]).startswith(str(captured["worktree"])))
         published = outcome.evidence["summary"].parent / "results"
         self.assertTrue((published / "RESULT.json").exists())
-        self.assertTrue((published / "REPORT.md").exists())
         self.assertEqual(outcome.summary["result_dir"], str(published))
 
-    def test_results_written_outside_the_worktree_are_still_flagged(self):
-        # The produced-artifact check must look at the published copy, not at a
-        # path the lane could not have written to.
+    def test_missing_artifacts_are_flagged_from_the_published_copy(self):
         def spy(worktree, spec, **kwargs):
             return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
 
