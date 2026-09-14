@@ -18,6 +18,10 @@ plus the existing NumPy, imports no PyTorch, and implements no Central Brain,
 actor/critic, learner, replay, teacher, checkpoint, database or throughput
 machinery.  Every physics function is pure and deterministic; there is no
 hidden mutable account object.
+
+The R12 VS-B learner spine lives in the sibling submodules ``sensory``,
+``policy``, ``trajectory`` and ``learner``.  They import CPU PyTorch and are
+imported explicitly, so this VS-A package stays importable without PyTorch.
 """
 
 from __future__ import annotations
