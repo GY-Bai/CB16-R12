@@ -1,0 +1,20 @@
+cb16-builder-session
+====================
+
+The runner in lib/index.js is modelled on `@deepseek-ai/dsh-headless` from the
+DeepSeek Harness distribution (MIT), which is the reference implementation of
+the one-shot direct Agent driver. The session identity handling, resume
+validation, fallback and machine-readable output are CB16 additions; the
+turn-driving sequence (create/resume an Agent through the core registry, await
+quiescence, append one user message, flush the session, print the final
+assistant text and exit) follows that reference so the new path behaves like the
+legacy one.
+
+The startup plugin in lib/startup.js follows the command-line provider pattern of
+`@deepseek-ai/dsh-headless/startup` for the same reason.
+
+No third-party source outside the DeepSeek Harness distribution was copied. The
+plug-in described in the task brief (ghbhiee/dsh-plugin-cli-session) was studied
+for its pattern only - replace the startup/runner pair, inherit the rest - and
+nothing from it was reused, including its sessionTag -> agentPreset design, which
+CB16 deliberately rejects.

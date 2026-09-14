@@ -28,6 +28,7 @@ import argparse
 import base64
 import ctypes
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -40,6 +41,7 @@ import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -112,7 +114,23 @@ SHELL_TEXT_RE = re.compile(r"[;&|`$<>(){}\[\]!*?~\"'\\\r\n\t]")
 
 BUILDER_REQUIRED = ("mode", "base_sha", "branch", "task_file")
 SCIENCE_REQUIRED = ("mode", "commit_sha", "experiment_spec", "result_command")
-OPTIONAL_KEYS = ("pr_number", "review_delta", "allow_control_plane", "issue_title")
+OPTIONAL_KEYS = (
+    "pr_number",
+    "review_delta",
+    "allow_control_plane",
+    "issue_title",
+    "session_affinity",
+)
+
+#: The only session-affinity contract version this dispatcher understands.
+SESSION_AFFINITY_BRANCH_V1 = "branch-v1"
+#: Profile that can create/resume an explicit session. The legacy `headless`
+#: profile is untouched and remains the default Builder path.
+SESSION_PROFILE = "cb16-builder-session"
+LEGACY_PROFILE = "headless"
+SESSION_REGISTRY_SCHEMA = "cb16.builder_session_affinity.v1"
+#: Shared package download cache; each worktree keeps its own .venv.
+DEFAULT_UV_CACHE_DIR = "/cb16/cache/uv"
 
 
 # --------------------------------------------------------------------------
@@ -521,6 +539,7 @@ class TaskSpec:
     allow_control_plane: bool = False
     review_delta: Optional[str] = None
     issue_title: Optional[str] = None
+    session_affinity: Optional[str] = None
     raw: Mapping[str, str] = field(default_factory=dict)
 
 
@@ -584,6 +603,20 @@ def validate_metadata(
             raise ContractMismatch("allow_control_plane must be 'true' or 'false'")
         allow_control_plane = raw_flag == "true"
 
+    session_affinity: Optional[str] = None
+    if "session_affinity" in meta:
+        if lane != LANE_BUILDER:
+            raise ContractMismatch(
+                "session_affinity is a Builder-only field and must not appear in Science metadata"
+            )
+        raw_affinity = reject_shell_text(meta["session_affinity"], "session_affinity")
+        if raw_affinity != SESSION_AFFINITY_BRANCH_V1:
+            raise ContractMismatch(
+                f"session_affinity {raw_affinity!r} is not a known contract "
+                f"(expected {SESSION_AFFINITY_BRANCH_V1!r})"
+            )
+        session_affinity = raw_affinity
+
     return TaskSpec(
         lane=lane,
         mode=mode,
@@ -596,6 +629,7 @@ def validate_metadata(
         allow_control_plane=allow_control_plane,
         review_delta=meta.get("review_delta"),
         issue_title=meta.get("issue_title"),
+        session_affinity=session_affinity,
         raw=dict(meta),
     )
 
@@ -894,7 +928,27 @@ def write_task_packet(
             "after the task or issue so concurrent tasks do not collide.",
         ]
     if caches:
-        lines += ["", "## Package caches (workspace-local)", ""]
+        lines += [
+            "",
+            "## Python dependencies",
+            "",
+            "Use `uv` for ordinary Python dependency management. This task has a",
+            "persistent branch-specific environment and a shared package download",
+            "cache, so a missing ordinary package is a task-scope problem, not a host",
+            "infrastructure blocker:",
+            "",
+            f"- `UV_CACHE_DIR={caches['UV_CACHE_DIR']}` is shared across branches and is",
+            "  writable from this sandbox;",
+            f"- `UV_PROJECT_ENVIRONMENT={caches['UV_PROJECT_ENVIRONMENT']}` is this",
+            "  branch's own environment and persists across dispatches.",
+            "",
+            "If a required package is absent, install it into the task environment with",
+            "`uv` when that is within task scope (large wheels such as PyTorch are",
+            "expected to download once and be cached afterwards). Do not request",
+            "host-level installation merely because a package is absent, do not mutate",
+            "the system Python, and do not use sudo.",
+        ]
+        lines += ["", "## Package caches", ""]
         for key, value in sorted(caches.items()):
             lines.append(f"- `{key}` -> `{value}`")
         lines += [
@@ -1119,6 +1173,8 @@ class RunResult:
     stderr: str = ""
     timed_out: bool = False
     note: str = ""
+    #: Machine-readable turn record, when the runner emits one.
+    payload: Optional[Dict[str, Any]] = None
 
     @property
     def ok(self) -> bool:
@@ -1129,6 +1185,31 @@ DSH_PROMPT = (
     "Read the local CB16 task packet at .cb16/TASK_PACKET.md and execute it exactly. "
     "Do not redesign authority. Do not create commits or push. End with BUILD_REPORT."
 )
+
+
+def session_followup_prompt(branch: str) -> str:
+    """Prompt for a resumed turn: remembered context is a cache, Git is truth.
+
+    An affinity session exists to save context rebuild cost, never to own state.
+    The wording therefore re-asserts authority before anything is touched, and
+    asks for reconciliation rather than a full re-read.
+    """
+
+    return (
+        f"You are resuming work on branch {branch}.\n"
+        "Your previous conversation is context only.\n"
+        "The current Git worktree, task contract, and review delta are authoritative.\n"
+        "Before changing anything:\n"
+        "1. inspect current git status / diff,\n"
+        "2. read .cb16/TASK_PACKET.md,\n"
+        "3. inspect only the files necessary to reconcile your remembered context\n"
+        "   with the current branch state.\n"
+        "If your remembered state conflicts with Git, Git wins.\n"
+        "Execute the current task/review delta exactly.\n"
+        "Do not redesign authority.\n"
+        "Do not create commits, tags, or pushes.\n"
+        "End with BUILD_REPORT."
+    )
 
 
 def invoke_dsh(
@@ -1345,6 +1426,131 @@ def run_dry_run(worktree: Path, spec: TaskSpec, *, result_dir: Path) -> RunResul
         exit_code=0,
         stdout="DRY_RUN science lane stub complete\nBUILD_REPORT: dry-run artifacts written\n",
         note="dry-run stub (allowlisted entrypoint not executed)",
+    )
+
+
+def session_registry_path(state_dir: Path, repo: str, branch: str) -> Path:
+    """Deterministic per-(repository, branch) registry path.
+
+    The key is a hash of repo+branch rather than the branch text so no branch
+    name can escape the state directory, and it is never "the latest session":
+    routing is always an exact lookup.
+    """
+
+    key = hashlib.sha256(f"{repo}\n{branch}".encode("utf-8")).hexdigest()[:32]
+    return state_dir / "session-affinity" / f"{key}.json"
+
+
+def read_session_registry(path: Path) -> Optional[Dict[str, Any]]:
+    """Return a usable registry record, or None when there is nothing to resume.
+
+    A malformed or foreign-schema file is treated as absent: the branch loses
+    affinity and takes a fresh session, which is always safe.
+    """
+
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(record, dict) or record.get("schema") != SESSION_REGISTRY_SCHEMA:
+        return None
+    if record.get("status") != "active" or not record.get("session_id"):
+        return None
+    return record
+
+
+def write_session_registry(path: Path, record: Mapping[str, Any]) -> None:
+    """Persist the registry atomically so a crash cannot leave it half written."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(f".tmp-{os.getpid()}")
+    tmp.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def branch_existed_remotely(repo: Path, branch: str) -> bool:
+    """Whether the task branch already existed on the remote when we looked.
+
+    This is half of the legacy protection: an already-published branch must not
+    become stateful just because its Issue metadata was edited later.
+    """
+
+    return (
+        git(repo, "show-ref", "--verify", "--quiet", f"refs/remotes/origin/{branch}").returncode == 0
+    )
+
+
+def parse_session_payload(stdout: str) -> Optional[Dict[str, Any]]:
+    """Read the last JSON object the session runner printed."""
+
+    for line in reversed((stdout or "").splitlines()):
+        candidate = line.strip()
+        if not candidate.startswith("{"):
+            continue
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict) and "session_id" in payload:
+            return payload
+    return None
+
+
+def invoke_dsh_session(
+    worktree: Path,
+    *,
+    mode: str,
+    session_id: Optional[str],
+    dsh_bin: str = "dsh",
+    env: Mapping[str, str],
+    timeout: float = 3600,
+    profile: str = SESSION_PROFILE,
+    prompt: str = DSH_PROMPT,
+) -> RunResult:
+    """Run one turn through the session-capable profile.
+
+    The session identity is always explicit: `--new` mints one, `--session <id>`
+    continues that exact id. "Latest session in this directory" is never used,
+    so one branch can never continue another branch's conversation.
+    """
+
+    if mode == "new":
+        identity = ["--new"]
+    elif mode == "resume":
+        if not session_id:
+            raise ExecutionBlocked("resume requested without a session id")
+        identity = ["--session", str(session_id)]
+    else:
+        raise ExecutionBlocked(f"unknown session mode: {mode}")
+
+    argv = [dsh_bin, "--profile", profile, *identity, "--output-format", "json", prompt]
+    try:
+        proc = subprocess.run(
+            argv,
+            cwd=str(worktree),
+            env=dict(env),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            **child_lifetime_kwargs(),
+        )
+    except FileNotFoundError as exc:
+        raise ExecutionBlocked("DSH executable not found", detail=str(exc))
+    except subprocess.TimeoutExpired as exc:
+        return RunResult(
+            exit_code=124,
+            stdout=exc.stdout or "",
+            stderr=exc.stderr or "",
+            timed_out=True,
+            note="session-timeout",
+        )
+    payload = parse_session_payload(proc.stdout or "")
+    return RunResult(
+        exit_code=proc.returncode,
+        stdout=proc.stdout or "",
+        stderr=proc.stderr or "",
+        note=payload.get("session_action") if payload else "session-no-payload",
+        payload=payload,
     )
 
 
@@ -1683,6 +1889,7 @@ def dispatch(
     dsh_bin: str = "dsh",
     dsh_timeout: float = 3600,
     dsh_invoker: Optional[Any] = None,
+    session_invoker: Optional[Any] = None,
     science_invoker: Optional[Any] = None,
     base_env: Optional[Mapping[str, str]] = None,
 ) -> DispatchOutcome:
@@ -1726,11 +1933,59 @@ def dispatch(
     with TaskLock(state_dir, trigger.issue_number, lane):
         worktree, reused = ensure_worktree(repo_path, work_root, spec)
 
+        # ---- session affinity routing (Builder only) -------------------------
+        # Resolved under the same task lock that guards the worktree, so one
+        # branch cannot race two session assignments.
+        session_route: Optional[Dict[str, Any]] = None
+        affinity_state: Dict[str, Any] = {
+            "declared": spec.session_affinity or "off",
+            "action": "legacy-fresh",
+            "session_id": None,
+            "generation": 0,
+            "persisted": False,
+            "detail": None,
+        }
+        if lane == LANE_BUILDER and spec.session_affinity == SESSION_AFFINITY_BRANCH_V1:
+            registry_path = session_registry_path(state_dir, repo, spec.branch)
+            record = read_session_registry(registry_path)
+            if record is not None:
+                session_route = {
+                    "mode": "resume",
+                    "session_id": record["session_id"],
+                    "generation": int(record.get("generation") or 1),
+                    "registry_path": registry_path,
+                    "prior": record,
+                }
+                affinity_state.update({"action": "resume", "session_id": record["session_id"]})
+            elif branch_existed_remotely(repo_path, spec.branch):
+                # Strong legacy protection: a branch that was already published
+                # must not become stateful just because its metadata was edited.
+                affinity_state.update({
+                    "action": "declined-existing-branch",
+                    "detail": (
+                        "branch already existed on the remote with no affinity record; "
+                        "refusing to adopt it into a session (legacy fresh behaviour)"
+                    ),
+                })
+            else:
+                session_route = {
+                    "mode": "new",
+                    "session_id": None,
+                    "generation": 0,
+                    "registry_path": registry_path,
+                    "prior": None,
+                }
+                affinity_state["action"] = "new"
+
         # Workspace-local, git-ignored caches: the sandbox only permits writes
         # under the worktree, so this is where package downloads must land to be
         # reused instead of re-fetched on every dispatch.
+        # Downloads are shared across branches; the environment stays per
+        # branch. uv's cache is built for concurrent readers and writers, and the
+        # dispatcher only creates the directory - it never edits cache contents.
+        uv_cache_dir = Path(env.get("CB16_UV_CACHE_DIR") or DEFAULT_UV_CACHE_DIR)
         caches = {
-            "UV_CACHE_DIR": str(worktree / ".uv-cache"),
+            "UV_CACHE_DIR": str(uv_cache_dir),
             "PIP_CACHE_DIR": str(worktree / ".pip-cache"),
             "UV_PROJECT_ENVIRONMENT": str(worktree / ".venv"),
         }
@@ -1764,10 +2019,31 @@ def dispatch(
         if dry_run and lane == LANE_BUILDER:
             run_result = run_dry_run(worktree, spec, result_dir=lane_result_dir)
         elif lane == LANE_BUILDER:
-            invoker = dsh_invoker or invoke_dsh
-            run_result = invoker(
-                worktree, dsh_bin=dsh_bin, env=child_env, timeout=dsh_timeout, prompt=DSH_PROMPT
-            )
+            if session_route is None:
+                invoker = dsh_invoker or invoke_dsh
+                run_result = invoker(
+                    worktree, dsh_bin=dsh_bin, env=child_env, timeout=dsh_timeout, prompt=DSH_PROMPT
+                )
+            else:
+                # Explicit, dispatcher-owned session identity. Git stays
+                # authoritative: a resumed turn re-asserts the worktree, task
+                # packet and review delta before touching anything.
+                mode = session_route["mode"]
+                prompt = (
+                    session_followup_prompt(spec.branch)
+                    if mode == "resume"
+                    else DSH_PROMPT
+                )
+                invoker = session_invoker or invoke_dsh_session
+                run_result = invoker(
+                    worktree,
+                    mode=mode,
+                    session_id=session_route.get("session_id"),
+                    dsh_bin=dsh_bin,
+                    env=child_env,
+                    timeout=dsh_timeout,
+                    prompt=prompt,
+                )
         else:
             invoker = science_invoker or run_science_entrypoint
             science_env = dict(child_env)
@@ -1785,6 +2061,59 @@ def dispatch(
                 timeout=dsh_timeout,
                 **({"sandbox_runner": science_sandbox_runner} if science_invoker is None else {}),
             )
+
+        if lane == LANE_BUILDER and session_route is not None:
+            payload = run_result.payload or {}
+            reported_id = payload.get("session_id")
+            action = payload.get("session_action") or "unknown"
+            prior = session_route.get("prior") or {}
+            prior_generation = int(prior.get("generation") or 0)
+            if action == "new":
+                generation = 1
+            elif action == "fallback-new":
+                generation = prior_generation + 1 if prior_generation else 1
+            else:
+                generation = prior_generation or 1
+
+            affinity_state.update({
+                "action": action,
+                "session_id": reported_id,
+                "generation": generation,
+                "resume_attempted": bool(payload.get("resume_attempted")),
+                "resume_succeeded": bool(payload.get("resume_succeeded")),
+                "resume_failure_class": payload.get("resume_failure_class"),
+                "resume_detail": payload.get("resume_detail"),
+                "turn_outcome": payload.get("turn_outcome"),
+            })
+
+            if reported_id:
+                # The runner flushes the session before it emits this record, so
+                # a reported id is a durable, resumable session.
+                now = datetime.now(timezone.utc).isoformat()
+                write_session_registry(session_route["registry_path"], {
+                    "schema": SESSION_REGISTRY_SCHEMA,
+                    "repo": repo,
+                    "branch": spec.branch,
+                    "issue_number": trigger.issue_number,
+                    "worktree": str(worktree),
+                    "profile": SESSION_PROFILE,
+                    "session_id": reported_id,
+                    "generation": generation,
+                    "status": "active",
+                    "created_at": (prior.get("created_at") if prior else now) or now,
+                    "last_used_at": now,
+                    "model_at_creation": {
+                        "provider": payload.get("provider"),
+                        "model": payload.get("model"),
+                        "reasoningEffort": payload.get("reasoning_effort"),
+                    },
+                })
+                affinity_state["persisted"] = True
+            else:
+                affinity_state["detail"] = (
+                    "session runner produced no machine-readable session record; "
+                    "no registry entry written"
+                )
 
         changed = collect_changed_files(worktree)
         test_result: Optional[RunResult] = None
@@ -1860,6 +2189,9 @@ def dispatch(
             "workspace_caches": caches,
             "project_store": str(project_store) if project_store else None,
             "science_sandbox": science_sandbox_runner or "unsandboxed",
+            "session_affinity": spec.session_affinity or "off",
+            "session_profile": SESSION_PROFILE if session_route is not None else LEGACY_PROFILE,
+            "session_route": affinity_state,
             "builder_model": builder_model,
             "host_identifiers_redacted": len(redactions),
             "credential_warnings": warnings,

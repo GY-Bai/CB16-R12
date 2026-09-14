@@ -22,7 +22,18 @@ task_file: docs/tasks/EXAMPLE.md
 # pr_number: 123
 # review_delta: one-line summary of the requested fix
 # allow_control_plane: false
+# session_affinity: branch-v1
 ```
+
+`session_affinity: branch-v1` is optional and Builder-only. It opts a **new**
+task branch into a resumable DSH session so later dispatches continue the same
+conversation instead of starting fresh. Git stays authoritative: the resumed
+turn re-reads `git status`/`diff` and the task packet, and a missing or
+mismatched session silently falls back to a fresh one.
+
+Leave it out for the legacy behaviour (a fresh session every dispatch). It is
+ignored for a branch that already existed on the remote, and it must not appear
+in Science metadata.
 
 Science lane uses a different block:
 
