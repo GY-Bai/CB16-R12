@@ -158,6 +158,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-c-task-a-direction-entropy-r2@v1": {
+      "description": "R12 VS-C Task-A Direction-Entropy Attribution R2. Compares B900 baseline versus categorical-direction entropy coefficient 0.005 with Beta-risk entropy fixed at zero, matched controls, paired seeds, exact-commit implementation-test gate and at most four one-thread CPU seed workers. Writes experiment_spec.json, RESULT.json and REPORT.md.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.task_a_direction_entropy_r2"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-c-task-a-direction-entropy-r2-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-c-task-a-direction-entropy-r2-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }

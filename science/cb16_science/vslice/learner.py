@@ -34,9 +34,11 @@ L_actor = -mean(log_pi(a_t | s_t) * A_hat_t)
 L_value =  mean((V_phi(s_t) - G_t)^2)
 ```
 
-with ``A_hat_t = G_t - stopgrad(V_phi(s_t))``, no discount, no entropy bonus,
-no clipping, no bootstrapping, no target network and no behaviour-policy
-correction.
+with ``A_hat_t = G_t - stopgrad(V_phi(s_t))``, no discount, no clipping, no
+bootstrapping, no target network and no behaviour-policy correction.  The
+default direction-entropy coefficient is exactly zero; later controlled
+experiments may opt into a categorical-direction-only entropy term without
+adding any Beta-risk entropy.
 """
 
 from __future__ import annotations
@@ -97,6 +99,7 @@ class _Objectives:
     values: torch.Tensor
     returns: torch.Tensor
     advantages: torch.Tensor
+    direction_entropy: torch.Tensor
 
 
 def _grad_norm(module: nn.Module) -> float:
@@ -129,6 +132,7 @@ class OnPolicyLearner:
         *,
         actor_lr: float = ACTOR_LR,
         critic_lr: float = CRITIC_LR,
+        direction_entropy_coefficient: float = 0.0,
     ) -> None:
         if not isinstance(sensory, FrozenSensory):
             raise LearnerContractError(
@@ -155,6 +159,9 @@ class OnPolicyLearner:
 
         self._actor_lr = _require_positive_lr(actor_lr, "actor_lr")
         self._critic_lr = _require_positive_lr(critic_lr, "critic_lr")
+        self._direction_entropy_coefficient = _require_nonnegative_coefficient(
+            direction_entropy_coefficient, "direction_entropy_coefficient"
+        )
         self._sensory = sensory
         self._actor = actor
         self._critic = critic
@@ -194,6 +201,10 @@ class OnPolicyLearner:
     @property
     def critic_optimizer(self) -> torch.optim.Optimizer:
         return self._critic_optimizer
+
+    @property
+    def direction_entropy_coefficient(self) -> float:
+        return self._direction_entropy_coefficient
 
     @property
     def state_dim(self) -> int:
@@ -361,7 +372,10 @@ class OnPolicyLearner:
         log_prob = self._actor.log_prob_batch(states, index, risks)
         values = self._critic(states)
         advantages = returns - values.detach()
-        actor_loss = -(log_prob * advantages).mean()
+        direction_entropy = self._actor.direction_entropy_batch(states)
+        actor_loss = -(log_prob * advantages).mean() - (
+            self._direction_entropy_coefficient * direction_entropy.mean()
+        )
         critic_loss = ((values - returns) ** 2).mean()
         objectives = _Objectives(
             actor_loss=actor_loss,
@@ -370,6 +384,7 @@ class OnPolicyLearner:
             values=values,
             returns=returns,
             advantages=advantages,
+            direction_entropy=direction_entropy,
         )
         self._require_finite_objectives(objectives)
         return objectives
@@ -381,6 +396,7 @@ class OnPolicyLearner:
             ("return-to-go", objectives.returns),
             ("critic value", objectives.values),
             ("advantage", objectives.advantages),
+            ("direction entropy", objectives.direction_entropy),
             ("actor loss", objectives.actor_loss),
             ("critic loss", objectives.critic_loss),
         )
@@ -419,6 +435,13 @@ class OnPolicyLearner:
                 "actor parameters changed outside the learner's generation boundary; the exact "
                 f"snapshot of generation theta_{self._generation_id} is no longer intact"
             )
+
+
+def _require_nonnegative_coefficient(value: Any, name: str) -> float:
+    coefficient = _require_finite_float(value, name)
+    if coefficient < 0.0:
+        raise LearnerContractError(f"{name} must be non-negative, got {value!r}")
+    return coefficient
 
 
 def _require_positive_lr(value: Any, name: str) -> float:

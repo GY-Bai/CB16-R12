@@ -466,6 +466,24 @@ class Actor(nn.Module):
         _require_semantic_consistency(index, risks)
         return self._log_prob_impl(vector, index, risks)
 
+    def direction_entropy_batch(self, states: Any) -> torch.Tensor:
+        """Categorical direction entropy ``[N]`` for a batch of states.
+
+        This surface intentionally excludes the conditional Beta risk heads.
+        It is used only by experiments that explicitly opt into direction-head
+        exploration; sampled-action and hybrid log-probability semantics remain
+        unchanged.
+        """
+
+        vector = _require_state_vector(states, self.input_dim, self.dtype)
+        if vector.ndim != 2:
+            raise ContractError("direction_entropy_batch expects states of shape [N, input_dim]")
+        output = self.forward(vector)
+        entropy = Categorical(logits=output.direction_logits).entropy()
+        if not bool(torch.isfinite(entropy).all()):
+            raise ContractError("direction categorical entropy must be finite")
+        return entropy
+
     def sample(self, state: Any) -> ActionSample:
         """Sample one semantic action from the stochastic training policy.
 

@@ -340,7 +340,12 @@ def configure_deterministic_runtime() -> None:
 # ---------------------------------------------------------------------------
 
 
-def build_learner(authority: Authority, optimizer: OptimizerSettings) -> OnPolicyLearner:
+def build_learner(
+    authority: Authority,
+    optimizer: OptimizerSettings,
+    *,
+    direction_entropy_coefficient: float = 0.0,
+) -> OnPolicyLearner:
     """One frozen-sensory / Actor / Critic learner with preregistered shapes.
 
     The caller seeds the ambient torch RNG immediately before this call, so two
@@ -363,7 +368,12 @@ def build_learner(authority: Authority, optimizer: OptimizerSettings) -> OnPolic
         hidden_layers=authority.actor_hidden_layers,
     )
     return OnPolicyLearner(
-        sensory, actor, critic, actor_lr=optimizer.actor_lr, critic_lr=optimizer.critic_lr
+        sensory,
+        actor,
+        critic,
+        actor_lr=optimizer.actor_lr,
+        critic_lr=optimizer.critic_lr,
+        direction_entropy_coefficient=direction_entropy_coefficient,
     )
 
 
