@@ -65,6 +65,32 @@
       ],
       "diagnostic_only": true
     },
+    "cb16.vs-c-controlled-learnability@v1": {
+      "description": "R12 VS-C Controlled Learnability R0. Runs the preregistered controlled synthetic qualification (Task A account-conditioned maintenance, Task B delayed-consequence credit) with their matched negative controls on the locked CPU UV runtime, evaluates the frozen deterministic adapter PRE and POST, computes the committed JSON gates mechanically, and writes experiment_spec.json, RESULT.json and REPORT.md. It first executes the repository implementation test suite against a byte-identical copy of the exact commit and fails closed unless that exact-commit gate is green (CONTRACT_MISMATCH for a suite that ran and failed, EXECUTION_BLOCKED when the suite cannot be executed), so Global PASS cannot be claimed without test evidence. No seed, budget, threshold or control can be overridden from the command line, and the UV environment/cache live only under /tmp.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.qualification"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-c-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-c-uv-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
+    },
     "cb16.normalization-ablation@v1": {
       "description": "R12 Normalization Ablation R0. Compares five fixed K-line normalization families (N0 endpoint-anchored log ratios, N1 per-bar log-return geometry, N2 causal window z-score with shared close statistics, N3 RevIN-style per-channel instance normalization, N4 volatility-normalized return geometry) on identical BTCUSDT 1m 2020-01..2020-03 windows, measures the contract invariant probes and one frozen linear sensory projection, and writes experiment_spec.json, RESULT.json and REPORT.md. Trains nothing, performs no Central Brain or Account Physics work, and promotes no winner.",
       "argv": [
