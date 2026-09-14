@@ -41,6 +41,86 @@ gh api repos/GY-Bai/CB16-R12/actions/runners \
 The workflow `runs-on` list is `[self-hosted, Linux, ARM64, japan-oci, r12]`;
 all five labels must be present on the registered runner.
 
+## 1b. Runner service must carry the user PATH
+
+The dispatcher and `dsh` live under `~/.local/bin`, and `systemd --user` starts
+services with a minimal `PATH`. A runner unit without an explicit `PATH` fails
+every dispatch with:
+
+```text
+classification: EXECUTION_BLOCKED
+detail: [Errno 2] No such file or directory: 'dsh'
+```
+
+The unit therefore pins the path:
+
+```ini
+[Service]
+Environment=PATH=/home/bgy/.local/bin:/home/bgy/.nvm/versions/node/v22.23.2/bin:/usr/local/bin:/usr/bin:/bin
+```
+
+## 1c. Actions policy must permit GitHub-owned actions
+
+`GY-Bai/CB16-R12` was configured with `allowed_actions: local_only`, which
+rejects `actions/checkout` and `actions/upload-artifact` before the job starts
+(the run shows `startup_failure` with zero jobs). The policy was narrowed
+rather than opened: only GitHub-authored actions are allowed, third-party and
+verified marketplace actions stay blocked.
+
+```bash
+gh api -X PUT repos/GY-Bai/CB16-R12/actions/permissions \
+  --input - <<<'{"enabled":true,"allowed_actions":"selected"}'
+gh api -X PUT repos/GY-Bai/CB16-R12/actions/permissions/selected-actions \
+  --input - <<<'{"github_owned_allowed":true,"verified_allowed":false,"patterns_allowed":[]}'
+```
+
+To revert to the stricter original policy:
+
+```bash
+gh api -X PUT repos/GY-Bai/CB16-R12/actions/permissions \
+  --input - <<<'{"enabled":true,"allowed_actions":"local_only"}'
+```
+
+## 1d. Dispatcher-owned repository clone
+
+The dispatcher keeps its own clone at `$CB16_WORK_ROOT/repo` and creates task
+worktrees there. It deliberately does **not** create worktrees inside the
+Actions workspace: `actions/checkout` deletes local branches to avoid conflicts
+and, when a branch is checked out in a worktree, recreates the whole repository
+instead — which orphans worktree registrations. Keeping task branches out of
+the checkout repository removes that interaction entirely.
+
+## 1e. Action versions and the runner floor
+
+The dispatch workflows use `actions/checkout@v7` and
+`actions/upload-artifact@v7`. Both run on `node24`, which imposes a **minimum
+Actions runner version of 2.327.1** on self-hosted runners. The R12 runner
+reports `2.337.0`, so the floor is satisfied.
+
+Pinning v4 was a real defect: those releases run on Node 20, and the runner
+already emits
+
+```text
+Node 20 is being deprecated. This workflow is running with Node 24 by default.
+If you need to temporarily use Node 20, set
+ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true
+```
+
+which means the platform forces a newer Node onto an action that was not built
+for it. Check the runner version before upgrading either action:
+
+```bash
+grep -ohE "Runner version: [0-9.]+" ~/cb16-r12-runner/_diag/*.log | tail -n 1
+```
+
+Inputs used by these workflows were verified against the `v7.0.1` manifests:
+checkout uses `ref`, `fetch-depth`, `persist-credentials`; upload-artifact uses
+`name`, `path`, `if-no-files-found`, `retention-days`. All still exist.
+
+Artifact uploads are immutable from v4 onwards, so both workflows include
+`github.run_attempt` in the artifact name; without it a re-run of the same run
+id is rejected with "an artifact with this name already exists".
+
 ## 2. Repository variables
 
 Set these as repository Actions **variables** (not secrets) — they are paths,
@@ -101,6 +181,7 @@ Recorded after the bootstrap dry runs on this host:
 | Work tree root | `/home/bgy/cb16-worktrees` |
 | Dispatch state/locks | `/home/bgy/.cb16/state` |
 | Sandbox binary | `/home/bgy/.local/bin/bwrap` (bubblewrap 0.6.3) |
+| Dispatch clone | `/home/bgy/cb16-worktrees/repo` (owned by the dispatcher) |
 
 ## 4. Credential boundary
 

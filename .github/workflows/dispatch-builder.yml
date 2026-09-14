@@ -35,7 +35,7 @@ jobs:
           echo "repository=${{ github.repository }} issue=#${ISSUE_NUMBER} label=${TRIGGER_LABEL} actor=${ACTOR}"
 
       - name: Checkout trusted default branch without persisted credentials
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
@@ -62,14 +62,15 @@ jobs:
             --lane builder \
             --event "$GITHUB_EVENT_PATH" \
             --repo-dir "$GITHUB_WORKSPACE" \
+            --repo-url "https://github.com/${GITHUB_REPOSITORY}.git" \
             --report-dir "$GITHUB_WORKSPACE/.cb16/report" \
             --publish
 
       - name: Upload bounded dispatch evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: cb16-builder-evidence-${{ github.event.issue.number }}-${{ github.run_id }}
+          name: cb16-builder-evidence-${{ github.event.issue.number }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ github.workspace }}/.cb16/report/
           if-no-files-found: warn
           retention-days: 14

@@ -574,6 +574,9 @@ def ensure_worktree(repo: Path, work_root: Path, spec: TaskSpec) -> Tuple[Path, 
     Returns ``(path, reused)``.
     """
 
+    # Drop registrations whose directories no longer exist.
+    git(repo, "worktree", "prune")
+
     existing = worktree_for_branch(repo, spec.branch)
     if existing is not None:
         return existing, True
@@ -581,7 +584,11 @@ def ensure_worktree(repo: Path, work_root: Path, spec: TaskSpec) -> Tuple[Path, 
     work_root.mkdir(parents=True, exist_ok=True)
     target = work_root / spec.branch.replace("/", "__")
     if target.exists():
-        raise ExecutionBlocked(f"worktree path already exists but is not a git worktree: {target}")
+        # A directory with no registration is residue from an earlier run whose
+        # repository was recreated underneath it.  Drop it and start clean.
+        shutil.rmtree(target, ignore_errors=True)
+        if target.exists():
+            raise ExecutionBlocked(f"cannot clear stale worktree directory: {target}")
 
     has_local = git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{spec.branch}").returncode == 0
     has_remote = (
@@ -753,6 +760,57 @@ def scrubbed_env(base: Mapping[str, str], *, allow_extra: Sequence[str] = ()) ->
     # Keep lane children from leaving __pycache__ inside a frozen worktree.
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     return env
+
+
+def git_auth_env(base: Mapping[str, str], token: Optional[str]) -> Dict[str, str]:
+    """Environment carrying a one-shot git auth header for fetch/clone.
+
+    The header travels through GIT_CONFIG_COUNT/KEY/VALUE rather than argv so
+    the token never appears in a process listing.
+    """
+
+    env = publish_env(base)
+    if token:
+        basic = base64.b64encode(f"x-access-token:{token}".encode("utf-8")).decode("ascii")
+        env["GIT_CONFIG_COUNT"] = "1"
+        env["GIT_CONFIG_KEY_0"] = "http.https://github.com/.extraheader"
+        env["GIT_CONFIG_VALUE_0"] = f"AUTHORIZATION: basic {basic}"
+    return env
+
+
+def ensure_repo_clone(
+    clone_dir: Path,
+    url: str,
+    *,
+    env: Mapping[str, str],
+    timeout: float = 600,
+) -> Path:
+    """Maintain the dispatcher's own persistent clone of the trusted repository.
+
+    Task worktrees live in this clone, never in the Actions workspace: the
+    checkout step deletes local branches (and, when it cannot, recreates the
+    whole repository), which would otherwise orphan worktree registrations.
+    """
+
+    if (clone_dir / ".git").exists():
+        proc = git(
+            clone_dir,
+            "fetch",
+            "--prune",
+            "origin",
+            "+refs/heads/*:refs/remotes/origin/*",
+            env=env,
+            timeout=timeout,
+        )
+        if proc.returncode != 0:
+            raise ExecutionBlocked("cannot fetch the dispatch repository", detail=bounded(proc.stderr))
+        return clone_dir
+
+    clone_dir.parent.mkdir(parents=True, exist_ok=True)
+    proc = run(["git", "clone", "--quiet", url, str(clone_dir)], env=dict(env), timeout=timeout)
+    if proc.returncode != 0:
+        raise ExecutionBlocked("cannot clone the dispatch repository", detail=bounded(proc.stderr))
+    return clone_dir
 
 
 def publish_env(base: Mapping[str, str]) -> Dict[str, str]:
@@ -1224,6 +1282,8 @@ def dispatch(
     report_dir: Path,
     allowlist_path: Path,
     repo: str = DEFAULT_REPO,
+    repo_url: Optional[str] = None,
+    repo_clone_dir: Optional[Path] = None,
     trusted_actors: Sequence[str] = (),
     dry_run: bool = False,
     publish: bool = False,
@@ -1247,16 +1307,26 @@ def dispatch(
     meta = parse_metadata_block(extract_metadata_block(trigger.body))
     spec = validate_metadata(meta, lane, allowlist=allowlist)
 
-    ensure_sha_present(repo_dir, spec.sha)
+    if repo_url:
+        # Own a persistent clone instead of borrowing the Actions checkout.
+        repo_path = ensure_repo_clone(
+            repo_clone_dir or (work_root / "repo"),
+            repo_url,
+            env=git_auth_env(env, github_token),
+        )
+    else:
+        repo_path = repo_dir
+
+    ensure_sha_present(repo_path, spec.sha)
     if spec.task_file:
-        ensure_path_at_sha(repo_dir, spec.sha, spec.task_file)
+        ensure_path_at_sha(repo_path, spec.sha, spec.task_file)
     if spec.experiment_spec:
-        ensure_path_at_sha(repo_dir, spec.sha, spec.experiment_spec)
+        ensure_path_at_sha(repo_path, spec.sha, spec.experiment_spec)
 
     warnings = credential_warnings(Path(env.get("HOME", str(Path.home()))))
 
     with TaskLock(state_dir, trigger.issue_number, lane):
-        worktree, reused = ensure_worktree(repo_dir, work_root, spec)
+        worktree, reused = ensure_worktree(repo_path, work_root, spec)
         packet = write_task_packet(worktree, spec, trigger, review_delta=spec.review_delta)
 
         child_env = scrubbed_env(env)
@@ -1348,6 +1418,7 @@ def dispatch(
             "result_command": spec.result_command,
             "worktree": str(worktree),
             "worktree_reused": reused,
+            "work_repo": str(repo_path),
             "dry_run": dry_run,
             "classification": classification,
             "lane_exit_status": run_result.exit_code,
@@ -1459,6 +1530,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path(__file__).resolve().parent.parent / "config" / "cb16_science_allowlist.json",
     )
     parser.add_argument("--repo", default=os.environ.get("CB16_REPO", DEFAULT_REPO))
+    parser.add_argument(
+        "--repo-url",
+        default=os.environ.get("CB16_REPO_URL") or None,
+        help="trusted repository URL; when set the dispatcher keeps its own clone",
+    )
+    parser.add_argument("--repo-clone-dir", type=Path, default=None)
     parser.add_argument("--trusted-actors", default=os.environ.get("CB16_TRUSTED_ACTORS", "GY-Bai"))
     parser.add_argument("--dsh-bin", default=os.environ.get("CB16_DSH_BIN", "dsh"))
     parser.add_argument("--dsh-timeout", type=float, default=float(os.environ.get("CB16_DSH_TIMEOUT", "3600")))
@@ -1472,7 +1549,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     report_dir = args.report_dir or (args.state_dir / "report")
     trusted = [a.strip() for a in args.trusted_actors.split(",") if a.strip()]
-    token = os.environ.get(args.token_env) if args.publish else None
+    # The token is read even without --publish because the dispatcher's own
+    # clone may need it to fetch; only the publish path may use it beyond that.
+    token = os.environ.get(args.token_env) or None
 
     summary: Dict[str, Any] = {
         "schema": "cb16.dispatch.v1",
@@ -1490,6 +1569,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             report_dir=report_dir.resolve(),
             allowlist_path=args.allowlist.resolve(),
             repo=args.repo,
+            repo_url=args.repo_url,
+            repo_clone_dir=args.repo_clone_dir,
             trusted_actors=trusted,
             dry_run=args.dry_run,
             publish=args.publish,
