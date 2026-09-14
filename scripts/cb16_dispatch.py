@@ -1772,7 +1772,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"detail: {detail}", file=sys.stderr)
         return EXIT_EXECUTION_BLOCKED
 
-    print(json.dumps(outcome.summary, indent=2, sort_keys=True))
+    # The console output is what the Actions log captures, so it must be
+    # scrubbed exactly like the evidence files.
+    terms = redaction_terms(os.environ)
+    print(redact_hosts(json.dumps(outcome.summary, indent=2, sort_keys=True), terms))
     print(f"classification: {outcome.classification}")
     return outcome.exit_code
 

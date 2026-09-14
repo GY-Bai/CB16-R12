@@ -898,6 +898,26 @@ class RedactionTests(DispatchTestCase):
         for name, path in outcome.evidence.items():
             self.assertNotIn(home, path.read_text(encoding="utf-8"), f"{name} leaked the home path")
 
+    def test_console_summary_is_scrubbed_like_the_evidence(self):
+        home = self.home.as_posix()
+        hostname = dispatcher.socket.gethostname()
+        buffer = io.StringIO()
+
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(io.StringIO()):
+            code = dispatcher.main(
+                [
+                    "--lane", "builder",
+                    "--event", str(self.tmp / "missing.json"),
+                    "--report-dir", str(self.tmp / "stdout-report"),
+                ]
+            )
+        # A missing event file is an execution blocker; the point is that
+        # whatever is printed carries no home path and no host name.
+        output = buffer.getvalue()
+        self.assertEqual(code, dispatcher.EXIT_EXECUTION_BLOCKED)
+        self.assertNotIn(home, output)
+        self.assertNotIn(hostname, output)
+
     def test_unexpected_exception_is_scrubbed_and_classified(self):
         home = self.home.as_posix()
         hostname = dispatcher.socket.gethostname()
