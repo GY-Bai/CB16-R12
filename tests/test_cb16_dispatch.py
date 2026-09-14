@@ -13,7 +13,9 @@ and dry-run coverage.
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import itertools
 import json
 import os
@@ -871,6 +873,61 @@ class RedactionTests(DispatchTestCase):
         terms = dispatcher.redaction_terms(env)
         self.assertIn("internal.example.com", terms)
         self.assertIn("secret-project", terms)
+
+    def test_home_path_is_a_redaction_term(self):
+        terms = dispatcher.redaction_terms(self.base_env)
+        self.assertIn(self.home.as_posix(), terms)
+        scrubbed = dispatcher.redact_hosts(f"cache at {self.home}/.cache", terms)
+        self.assertNotIn(self.home.as_posix(), scrubbed)
+
+    def test_nested_terms_are_replaced_longest_first(self):
+        env = dict(self.base_env)
+        env["CB16_REDACT_TERMS"] = f"{self.home}, {self.home}/secret"
+        terms = dispatcher.redaction_terms(env)
+        self.assertEqual(terms, sorted(terms, key=len, reverse=True))
+
+    def test_evidence_redacts_the_home_path(self):
+        home = self.home.as_posix()
+
+        def noisy_dsh(worktree, **kwargs):
+            return dispatcher.RunResult(
+                exit_code=0, stdout=f"wrote {home}/worktree/file.txt\nBUILD_REPORT: ok\n"
+            )
+
+        outcome = self.dispatch(dsh_invoker=noisy_dsh)
+        for name, path in outcome.evidence.items():
+            self.assertNotIn(home, path.read_text(encoding="utf-8"), f"{name} leaked the home path")
+
+    def test_unexpected_exception_is_scrubbed_and_classified(self):
+        home = self.home.as_posix()
+        hostname = dispatcher.socket.gethostname()
+
+        def exploding(**kwargs):
+            raise RuntimeError(f"boom at {home} on {hostname}")
+
+        original = dispatcher.dispatch
+        dispatcher.dispatch = exploding  # type: ignore[assignment]
+        buffer = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(buffer):
+                code = dispatcher.main(
+                    [
+                        "--lane", "builder",
+                        "--event", str(self.tmp / "event.json"),
+                        "--report-dir", str(self.tmp / "reported"),
+                    ]
+                )
+        finally:
+            dispatcher.dispatch = original  # type: ignore[assignment]
+
+        self.assertEqual(code, dispatcher.EXIT_EXECUTION_BLOCKED)
+        output = buffer.getvalue()
+        self.assertNotIn(hostname, output)
+        self.assertNotIn(home, output)
+        self.assertIn(dispatcher.CLASS_EXECUTION_BLOCKED, output)
+        summary = json.loads((self.tmp / "reported" / "dispatch_summary.json").read_text())
+        self.assertNotIn(home, json.dumps(summary))
+        self.assertNotIn(hostname, json.dumps(summary))
 
     def test_evidence_never_carries_the_host_name(self):
         hostname = dispatcher.socket.gethostname()
