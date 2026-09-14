@@ -629,6 +629,75 @@ def load_allowlist(path: Path) -> Mapping[str, Any]:
 DEFAULT_PROJECT_STORE = "/cb16/store"
 
 
+def _yaml_block(text: str, key: str) -> Optional[Dict[str, str]]:
+    """Read the indented children of one top-level key.
+
+    Deliberately tiny: the dispatcher stays dependency free, and the only file
+    read this way is the DSH settings file, whose shape is stable.
+    """
+
+    lines = text.splitlines()
+    start = None
+    for index, line in enumerate(lines):
+        if line.rstrip() == f"{key}:":
+            start = index + 1
+            break
+    if start is None:
+        return None
+    block: Dict[str, str] = {}
+    for line in lines[start:]:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line.startswith((" ", "\t")):
+            break
+        stripped = line.strip()
+        if ":" not in stripped:
+            continue
+        name, _, value = stripped.partition(":")
+        value = value.strip().strip('"').strip("'")
+        if value:
+            block[name.strip()] = value
+    return block or None
+
+
+def read_declared_builder_model(env: Mapping[str, str]) -> Dict[str, Any]:
+    """Report the model the Builder lane is configured to use.
+
+    The value comes from the DSH settings file, which is where
+    ``agent-default-model`` lives and where the running session header reads it
+    from. It is recorded as **declared**, not measured: the dispatcher cannot
+    observe which model the API actually served without parsing the session
+    transcript, and that fragility is not worth it. The source path travels with
+    the value so a reviewer can check it, and a missing or unreadable file is
+    reported rather than failing the dispatch.
+    """
+
+    dsh_home = env.get("DSH_HOME") or str(Path(env.get("HOME") or Path.home()) / ".dsh")
+    path = Path(dsh_home) / "settings.yaml"
+    record: Dict[str, Any] = {
+        "provider": None,
+        "model": None,
+        "reasoningEffort": None,
+        "source": str(path),
+        "declared": True,
+    }
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        record["source"] = None
+        record["note"] = "DSH settings file is not readable; model not recorded"
+        return record
+
+    block = _yaml_block(text, "agent-default-model")
+    if block is None:
+        record["note"] = "no agent-default-model block in the DSH settings file"
+        return record
+    for key in ("provider", "model", "reasoningEffort"):
+        if key in block:
+            record[key] = block[key]
+    return record
+
+
 def resolve_project_store(env: Mapping[str, str]) -> Optional[Path]:
     """Return the project-level persistent store, creating it if needed.
 
@@ -1652,6 +1721,7 @@ def dispatch(
     data_entries, data_missing = load_data_manifest(data_manifest_path)
     project_store = resolve_project_store(env)
     science_sandbox_runner = resolve_sandbox_runner(env)
+    builder_model = read_declared_builder_model(env)
 
     with TaskLock(state_dir, trigger.issue_number, lane):
         worktree, reused = ensure_worktree(repo_path, work_root, spec)
@@ -1790,6 +1860,7 @@ def dispatch(
             "workspace_caches": caches,
             "project_store": str(project_store) if project_store else None,
             "science_sandbox": science_sandbox_runner or "unsandboxed",
+            "builder_model": builder_model,
             "host_identifiers_redacted": len(redactions),
             "credential_warnings": warnings,
             "published": False,
