@@ -198,10 +198,10 @@ def validate_physics_config(
 
     if isinstance(context_length, bool) or not isinstance(context_length, int):
         raise ContractError(f"context_length must be an int, got {context_length!r}")
-    if context_length < 2:
+    if context_length < 1:
         raise ContractError(
-            "context_length must retain one predecessor plus at least one represented bar, "
-            f"got {context_length!r}"
+            "context_length counts represented bars and must be >= 1 "
+            f"(the retained predecessor is an extra input bar), got {context_length!r}"
         )
     budget = _require_finite_float(nominal_exposure_budget, "nominal_exposure_budget")
     if not budget > 0.0:

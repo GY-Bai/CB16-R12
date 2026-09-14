@@ -94,6 +94,15 @@ class FrozenConfigTests(unittest.TestCase):
         self.assertEqual(config.nominal_exposure_budget, 2.5)
         self.assertEqual(config.permission_bisection_iterations, 3)
 
+    def test_context_length_counts_represented_bars(self):
+        # The retained predecessor is an extra input bar, so one represented
+        # bar is semantically valid and zero is not.
+        self.assertEqual(PhysicsConfig(context_length=1).context_length, 1)
+        for bad in (0, -1):
+            with self.subTest(context_length=bad):
+                with self.assertRaises(ContractError):
+                    PhysicsConfig(context_length=bad)
+
 
 class DirectionTests(unittest.TestCase):
     def test_direction_values_are_exact(self):

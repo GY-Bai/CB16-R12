@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Any
 
 from .contracts import (
     AccountSolvencyError,
@@ -36,15 +37,59 @@ TERMINAL_DEFAULT = False
 TRUNCATED_DEFAULT = False
 
 
+def _validate_pretrade(pretrade: "PreTradeTruth") -> None:
+    """Fail closed on a malformed pre-trade record.
+
+    ``notional`` and ``exposure`` are derived from the primitive fields, so the
+    only possible contradictions are non-finite or non-positive primitives and
+    non-finite derived quantities.  Every rule is checked here; callers must
+    never reinterpret a malformed record as ordinary infeasibility.
+    """
+
+    equity = _require_finite_float(pretrade.equity, "pre-trade equity")
+    if not equity > 0.0:
+        raise AccountSolvencyError(
+            f"pre-trade equity must be strictly positive, got {pretrade.equity!r}"
+        )
+    quantity = _require_finite_float(pretrade.quantity, "pre-trade quantity")
+    price = _require_positive_float(pretrade.open_next, "open_next")
+    notional = quantity * price
+    _require_finite_float(notional, "pre-trade notional")
+    _require_finite_float(notional / equity, "pre-trade exposure")
+
+
 @dataclass(frozen=True)
 class PreTradeTruth:
-    """Execution-time truth at ``open_{t+1}`` for the position inherited from ``t``."""
+    """Execution-time truth at ``open_{t+1}`` for the position inherited from ``t``.
+
+    Only the primitive fields ``equity`` (``W_minus``), ``quantity`` (``q_t``)
+    and ``open_next`` are stored; ``notional`` (``N_minus``) and ``exposure``
+    (``a_minus``) are derived from them, so one record can never hold
+    contradictory redundant values.  Construction fails closed on any
+    non-finite value, non-positive equity or non-positive execution price.
+    """
 
     equity: float
     quantity: float
     open_next: float
-    notional: float
-    exposure: float
+
+    def __post_init__(self) -> None:
+        _validate_pretrade(self)
+        object.__setattr__(self, "equity", float(self.equity))
+        object.__setattr__(self, "quantity", float(self.quantity))
+        object.__setattr__(self, "open_next", float(self.open_next))
+
+    @property
+    def notional(self) -> float:
+        """``N_minus = q_t * open_next``, derived and never independently stored."""
+
+        return self.quantity * self.open_next
+
+    @property
+    def exposure(self) -> float:
+        """``a_minus = N_minus / W_minus``, derived and never independently stored."""
+
+        return self.notional / self.equity
 
 
 @dataclass(frozen=True)
@@ -106,14 +151,7 @@ def mark_to_next_open(truth: AccountTruth, open_next: float) -> PreTradeTruth:
         raise AccountSolvencyError(
             f"pre-trade equity must be strictly positive, got {equity!r}"
         )
-    notional = truth.quantity * price
-    return PreTradeTruth(
-        equity=equity,
-        quantity=truth.quantity,
-        open_next=price,
-        notional=notional,
-        exposure=notional / equity,
-    )
+    return PreTradeTruth(equity=equity, quantity=truth.quantity, open_next=price)
 
 
 # ---------------------------------------------------------------------------
@@ -121,9 +159,10 @@ def mark_to_next_open(truth: AccountTruth, open_next: float) -> PreTradeTruth:
 # ---------------------------------------------------------------------------
 
 
-def _require_pretrade(pretrade: PreTradeTruth) -> PreTradeTruth:
+def _require_pretrade(pretrade: Any) -> PreTradeTruth:
     if not isinstance(pretrade, PreTradeTruth):
         raise ContractError(f"pretrade must be a PreTradeTruth, got {type(pretrade).__name__}")
+    _validate_pretrade(pretrade)
     return pretrade
 
 

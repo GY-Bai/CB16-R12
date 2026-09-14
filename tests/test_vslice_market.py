@@ -8,6 +8,7 @@ transform: identical output, no duplicated math, no parallel raw OHLCV.
 
 from __future__ import annotations
 
+import math
 import sys
 import unittest
 from pathlib import Path
@@ -65,13 +66,15 @@ class VsliceMarketWiringTests(unittest.TestCase):
         self.assertTrue((through_vslice == direct.values).all())
         self.assertEqual(float(np.max(np.abs(through_vslice - direct.values))), 0.0)
 
-        # The same identity holds on the literal hand window and on the
-        # extreme-value case where N0 legitimately returns NaN.
+        # The same identity holds on the literal hand windows; short windows
+        # carry an explicit context_length because the canonical default is 64.
         for window in (HAND_RAW, walk_window(4, seed=7)):
             with self.subTest(shape=window.shape):
+                config = PhysicsConfig(context_length=window.shape[0] - 1)
                 self.assertTrue(
                     np.array_equal(
-                        normalize_market_window(window), n0_endpoint_log_ratios(window).values
+                        normalize_market_window(window, config),
+                        n0_endpoint_log_ratios(window).values,
                     )
                 )
 
@@ -121,6 +124,169 @@ class VsliceMarketWiringTests(unittest.TestCase):
             normalize_market_window(np.zeros((1, 5)))
         with self.assertRaises(ContractError):
             normalize_market_window(np.zeros(CONTEXT_LENGTH))
+
+
+class MarketBoundaryClosureTests(unittest.TestCase):
+    """Regression tests for the raw-window and context-length closures.
+
+    The VS-A market function is the canonical raw-market boundary: it must fail
+    closed before N0 (validated raw window), after N0 (finite normalized
+    output) and on the canonical default ``context_length=64``.
+    """
+
+    VALID_PREDECESSOR = [101.0, 106.0, 96.0, 103.0, 11.0]
+
+    def test_default_config_enforces_the_frozen_context_length(self):
+        # No config supplied -> the frozen default PhysicsConfig() semantics.
+        self.assertEqual(
+            normalize_market_window(walk_window(CONTEXT_LENGTH)).shape,
+            (CONTEXT_LENGTH, 5),
+        )
+        for represented in (1, 4, 63, 65):
+            with self.subTest(represented=represented):
+                with self.assertRaises(ContractError):
+                    normalize_market_window(walk_window(represented))
+        # An explicit default config is the same contract, not a second rule.
+        self.assertEqual(
+            normalize_market_window(walk_window(CONTEXT_LENGTH), PhysicsConfig()).shape,
+            (CONTEXT_LENGTH, 5),
+        )
+        with self.assertRaises(ContractError):
+            normalize_market_window(walk_window(CONTEXT_LENGTH), object())  # type: ignore[arg-type]
+
+    def test_small_hand_windows_need_an_explicit_context_length(self):
+        with self.assertRaises(ContractError):
+            normalize_market_window(HAND_RAW)
+        explicit = PhysicsConfig(context_length=HAND_RAW.shape[0] - 1)
+        self.assertTrue(
+            np.array_equal(
+                normalize_market_window(HAND_RAW, explicit),
+                n0_endpoint_log_ratios(HAND_RAW).values,
+            )
+        )
+
+    def test_one_represented_bar_plus_predecessor_is_valid(self):
+        # One represented bar is semantically valid: the predecessor is an
+        # extra input bar, so context_length >= 1.
+        config = PhysicsConfig(context_length=1)
+        window = walk_window(1, seed=99)
+        output = normalize_market_window(window, config)
+        self.assertEqual(output.shape, (1, 5))
+        self.assertTrue(np.array_equal(output, n0_endpoint_log_ratios(window).values))
+        with self.assertRaises(ContractError):
+            PhysicsConfig(context_length=0)
+        with self.assertRaises(ContractError):
+            PhysicsConfig(context_length=-1)
+
+    def test_non_finite_raw_values_are_rejected(self):
+        config = PhysicsConfig()
+        base = walk_window(CONTEXT_LENGTH, seed=5)
+        for bad in (math.nan, math.inf, -math.inf):
+            for row, column in ((0, 0), (0, 4), (CONTEXT_LENGTH, 3), (CONTEXT_LENGTH, 4)):
+                with self.subTest(value=bad, row=row, column=column):
+                    corrupted = base.copy()
+                    corrupted[row, column] = bad
+                    with self.assertRaises(ContractError):
+                        normalize_market_window(corrupted, config)
+
+    def test_non_positive_ohlc_prices_are_rejected(self):
+        config = PhysicsConfig()
+        base = walk_window(CONTEXT_LENGTH, seed=6)
+        for row in (0, 7):  # predecessor row first: N0 never looks at it
+            for column in range(4):
+                for bad in (0.0, -1.0):
+                    with self.subTest(row=row, column=column, value=bad):
+                        corrupted = base.copy()
+                        corrupted[row, column] = bad
+                        with self.assertRaises(ContractError):
+                            normalize_market_window(corrupted, config)
+
+    def test_invalid_per_bar_ohlc_ordering_is_rejected(self):
+        config = PhysicsConfig(context_length=1)
+        for label, represented in (
+            # low above min(open, close); the high bound is still satisfied.
+            ("low_above_min", [100.0, 105.0, 101.0, 102.0, 10.0]),
+            # high below max(open, close); the low bound is still satisfied.
+            ("high_below_max", [100.0, 101.0, 95.0, 102.0, 10.0]),
+        ):
+            with self.subTest(violation=label):
+                window = np.array([self.VALID_PREDECESSOR, represented], dtype=np.float64)
+                with self.assertRaises(ContractError):
+                    normalize_market_window(window, config)
+
+    def test_negative_volume_is_rejected(self):
+        window = np.array(
+            [self.VALID_PREDECESSOR, [102.0, 107.0, 97.0, 104.0, -1.0]], dtype=np.float64
+        )
+        with self.assertRaises(ContractError):
+            normalize_market_window(window, PhysicsConfig(context_length=1))
+
+    def test_zero_causal_median_volume_is_rejected_without_repair(self):
+        # Represented volumes [0, 10, 0] have median 0; the single positive bar
+        # is not repaired into a positive statistic.
+        window = np.array(
+            [
+                self.VALID_PREDECESSOR,
+                [102.0, 107.0, 97.0, 104.0, 0.0],
+                [103.0, 108.0, 98.0, 105.0, 10.0],
+                [104.0, 109.0, 99.0, 106.0, 0.0],
+            ],
+            dtype=np.float64,
+        )
+        with self.assertRaises(ContractError):
+            normalize_market_window(window, PhysicsConfig(context_length=3))
+
+    def test_median_uses_only_the_causal_represented_window(self):
+        # A zero predecessor volume is excluded, exactly as the N0 statistic does.
+        window = np.array(
+            [
+                [101.0, 106.0, 96.0, 103.0, 0.0],
+                [102.0, 107.0, 97.0, 104.0, 10.0],
+                [103.0, 108.0, 98.0, 105.0, 20.0],
+            ],
+            dtype=np.float64,
+        )
+        output = normalize_market_window(window, PhysicsConfig(context_length=2))
+        self.assertTrue(np.all(np.isfinite(output)))
+
+    def test_non_finite_n0_output_is_rejected_after_normalization(self):
+        # A finite, strictly positive, correctly ordered price bar can still
+        # overflow the endpoint log-ratio; the normalized tensor must be finite.
+        price_overflow = np.array(
+            [
+                self.VALID_PREDECESSOR,
+                [1e308, 1e308, 1e-308, 1e-308, 10.0],
+            ],
+            dtype=np.float64,
+        )
+        # A positive but denormal represented median volume still overflows the
+        # relative-volume ratio of one large bar.
+        volume_overflow = np.array(
+            [
+                self.VALID_PREDECESSOR,
+                [102.0, 107.0, 97.0, 104.0, 1e-308],
+                [103.0, 108.0, 98.0, 105.0, 1e-308],
+                [104.0, 109.0, 99.0, 106.0, 1e308],
+            ],
+            dtype=np.float64,
+        )
+        with np.errstate(over="ignore"):
+            for label, window, config in (
+                ("price", price_overflow, PhysicsConfig(context_length=1)),
+                ("volume", volume_overflow, PhysicsConfig(context_length=3)),
+            ):
+                with self.subTest(overflow=label):
+                    with self.assertRaises(ContractError):
+                        normalize_market_window(window, config)
+
+    def test_normalized_output_is_finite_for_valid_windows(self):
+        for represented in (1, 3, CONTEXT_LENGTH):
+            with self.subTest(represented=represented):
+                output = normalize_market_window(
+                    walk_window(represented, seed=13),
+                    PhysicsConfig(context_length=represented),
+                )
+                self.assertTrue(np.all(np.isfinite(output)))
 
 
 if __name__ == "__main__":  # pragma: no cover

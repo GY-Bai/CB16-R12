@@ -27,6 +27,7 @@ from cb16_science.vslice.contracts import (  # noqa: E402
     PhysicsConfig,
 )
 from cb16_science.vslice.physics import (  # noqa: E402
+    PreTradeTruth,
     candidate_target_feasible,
     execute_transition,
     feasible_target_interval,
@@ -456,6 +457,82 @@ class RewardAndFailureTests(unittest.TestCase):
                 self.assertFalse(step.truncated)
                 self.assertFalse(step.forced_risk)
                 self.assertFalse(step.permission.forced_risk)
+
+
+class PreTradeTruthBoundaryTests(unittest.TestCase):
+    """Regression tests for the fail-closed pre-trade truth closure.
+
+    ``PreTradeTruth`` stores only primitives and derives ``notional`` and
+    ``exposure``; a malformed record must be rejected explicitly instead of
+    being reinterpreted as ordinary infeasibility.
+    """
+
+    def test_construction_derives_notional_and_exposure(self):
+        pretrade = PreTradeTruth(equity=1000.0, quantity=3.0, open_next=105.0)
+        self.assertEqual(pretrade.notional, 315.0)
+        self.assertEqual(pretrade.exposure, 0.315)
+        # Only primitives are stored; the derived fields cannot contradict them.
+        self.assertEqual(
+            tuple(pretrade.__dataclass_fields__), ("equity", "quantity", "open_next")
+        )
+
+    def test_malformed_construction_fails_closed(self):
+        cases = (
+            (ContractError, {"equity": math.nan, "quantity": 0.0, "open_next": 100.0}),
+            (ContractError, {"equity": math.inf, "quantity": 0.0, "open_next": 100.0}),
+            (ContractError, {"equity": -math.inf, "quantity": 0.0, "open_next": 100.0}),
+            (AccountSolvencyError, {"equity": 0.0, "quantity": 0.0, "open_next": 100.0}),
+            (AccountSolvencyError, {"equity": -1.0, "quantity": 4.0, "open_next": 100.0}),
+            (ContractError, {"equity": 1000.0, "quantity": math.nan, "open_next": 100.0}),
+            (ContractError, {"equity": 1000.0, "quantity": math.inf, "open_next": 100.0}),
+            (ContractError, {"equity": 1000.0, "quantity": 0.0, "open_next": 0.0}),
+            (ContractError, {"equity": 1000.0, "quantity": 0.0, "open_next": -1.0}),
+            (ContractError, {"equity": 1000.0, "quantity": 0.0, "open_next": math.nan}),
+            (ContractError, {"equity": 1000.0, "quantity": 0.0, "open_next": math.inf}),
+            # Derived quantities must stay finite as well.
+            (ContractError, {"equity": 1.0, "quantity": 1e308, "open_next": 1e308}),
+            (ContractError, {"equity": 1e-300, "quantity": 1.0, "open_next": 1e300}),
+        )
+        for expected_error, fields in cases:
+            with self.subTest(**fields):
+                with self.assertRaises(expected_error):
+                    PreTradeTruth(**fields)
+
+    def test_public_physics_functions_reject_forged_malformed_pretrade(self):
+        config = PhysicsConfig()
+        for fields in (
+            {"equity": -1000.0, "quantity": 0.0, "open_next": 100.0},
+            {"equity": math.nan, "quantity": 0.0, "open_next": 100.0},
+            {"equity": 1000.0, "quantity": math.inf, "open_next": 100.0},
+            {"equity": 1000.0, "quantity": 0.0, "open_next": 0.0},
+            {"equity": 1.0, "quantity": 1e308, "open_next": 1e308},
+        ):
+            # Bypass construction to prove the public functions re-validate.
+            forged = object.__new__(PreTradeTruth)
+            for name, value in fields.items():
+                object.__setattr__(forged, name, value)
+            with self.subTest(**fields):
+                with self.assertRaises(ContractError):
+                    candidate_target_feasible(forged, 0.0, config)
+                with self.assertRaises(ContractError):
+                    feasible_target_interval(forged, config)
+                with self.assertRaises(ContractError):
+                    permit_target(forged, 0.5, config)
+
+    def test_non_pretrade_values_are_rejected(self):
+        config = PhysicsConfig()
+        for bad in (None, 0.0, {"equity": 1000.0, "quantity": 0.0, "open_next": 100.0}):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ContractError):
+                    candidate_target_feasible(bad, 0.0, config)  # type: ignore[arg-type]
+
+    def test_mark_to_next_open_reports_insolvency_without_building_a_record(self):
+        truth = AccountTruth(equity=1000.0, quantity=-10.0, mark_price=100.0)
+        with self.assertRaises(AccountSolvencyError):
+            mark_to_next_open(truth, 320.0)
+        valid = mark_to_next_open(truth, 103.0)
+        self.assertEqual(valid.notional, -10.0 * 103.0)
+        self.assertEqual(valid.exposure, valid.notional / valid.equity)
 
 
 if __name__ == "__main__":  # pragma: no cover
