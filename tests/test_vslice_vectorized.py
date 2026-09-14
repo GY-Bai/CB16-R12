@@ -61,7 +61,10 @@ class VectorizedTaskTests(unittest.TestCase):
             self.env_a,
             torch.tensor(actual, dtype=torch.long),
             torch.tensor(indices, dtype=torch.long),
-            torch.tensor(risks, dtype=torch.float32),
+            # The fixture actions above are Python float authority values. Keep
+            # them in float64 here so the equivalence check measures Physics,
+            # not an intentional float32 quantization of 0.2/0.8.
+            torch.tensor(risks, dtype=torch.float64),
         )
         self.assertEqual(observed.dtype, torch.float64)
         for got, want in zip(observed.tolist(), expected):
