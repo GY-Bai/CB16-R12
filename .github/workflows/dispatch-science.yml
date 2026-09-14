@@ -1,0 +1,68 @@
+name: CB16 Dispatch — Science (science:run)
+
+# Command surface: adding the trusted `science:run` label to an Issue is the
+# trigger.  The Science lane never invokes DSH and never edits source or
+# experiment configuration: it runs one allowlisted entrypoint against an exact
+# commit so a formal qualification cannot be adaptively repaired afterwards.
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: cb16-dispatch-${{ github.repository }}-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  science:
+    if: >-
+      github.event.label.name == 'science:run' &&
+      github.repository == 'GY-Bai/CB16-R12'
+    runs-on: [self-hosted, Linux, ARM64, japan-oci, r12]
+    timeout-minutes: 180
+    steps:
+      - name: Validate trusted trigger
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          TRIGGER_LABEL: ${{ github.event.label.name }}
+          ACTOR: ${{ github.event.sender.login }}
+        run: |
+          set -euo pipefail
+          echo "repository=${{ github.repository }} issue=#${ISSUE_NUMBER} label=${TRIGGER_LABEL} actor=${ACTOR}"
+
+      - name: Checkout trusted default branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run deterministic dispatcher (Science lane)
+        env:
+          # Science lane never spawns DSH, so this token is only used for the
+          # final Issue label transition.
+          CB16_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CB16_TRUSTED_ACTORS: ${{ github.repository_owner }}
+          CB16_STATE_DIR: ${{ vars.CB16_STATE_DIR }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          set -euo pipefail
+          python3 scripts/cb16_dispatch.py \
+            --lane science \
+            --event "$GITHUB_EVENT_PATH" \
+            --repo-dir "$GITHUB_WORKSPACE" \
+            --report-dir "$GITHUB_WORKSPACE/.cb16/report" \
+            --publish
+
+      - name: Upload science result package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cb16-science-results-${{ github.event.issue.number }}-${{ github.run_id }}
+          path: ${{ github.workspace }}/.cb16/report/
+          if-no-files-found: warn
+          retention-days: 30

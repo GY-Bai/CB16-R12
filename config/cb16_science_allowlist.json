@@ -1,0 +1,13 @@
+{
+  "schema": "cb16.science.allowlist.v1",
+  "comment": "Repository-owned authority for the Science lane. result_command in a trusted Issue must resolve here; raw shell text is never accepted.",
+  "entrypoints": {
+    "cb16.noop@v1": {
+      "description": "Deterministic no-op science-lane entrypoint. Writes dummy RESULT.json and REPORT.md. Permitted only for dry runs.",
+      "argv": ["python3", "-m", "cb16_science.noop"],
+      "env": {"PYTHONPATH": "science"},
+      "produces": ["RESULT.json", "REPORT.md"],
+      "dry_run_only": true
+    }
+  }
+}
