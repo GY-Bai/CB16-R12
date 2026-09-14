@@ -32,6 +32,22 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.boundary-probe@v1": {
+      "description": "Diagnostic-only infra boundary probe. Measures the Science-lane worktree write boundary, the project-store write boundary, and whether a readable /proc/<pid>/environ exposes the dispatcher's CB16_GITHUB_TOKEN key marker to the scrubbed child. Writes RESULT.json and REPORT.md, reports booleans and counts only, and applies no host-side change.",
+      "argv": [
+        "python3",
+        "-m",
+        "cb16_science.boundary_probe"
+      ],
+      "env": {
+        "PYTHONPATH": "science"
+      },
+      "produces": [
+        "RESULT.json",
+        "REPORT.md"
+      ],
+      "diagnostic_only": true
     }
   }
 }
