@@ -1,0 +1,184 @@
+{
+  "experiment_id": "r12.vs_d.historical_market_information_canary.r0",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "purpose": "Test whether the minimal R12 policy learns genuine out-of-sample historical market-to-consequence information beyond a matched shuffled-consequence learner, before introducing transaction costs, funding, continuing-account path dependence or any final holdout claim.",
+  "claim_level": "HISTORICAL_MARKET_INFORMATION_CANARY_ONLY",
+  "data": {
+    "symbol": "BTCUSDT",
+    "source_interval": "1m",
+    "decision_interval": "1h_UTC",
+    "source_root": "/cb16/raw/klines_1m/BTCUSDT",
+    "manifest_path": "/cb16/raw/DOWNLOAD_MANIFEST.json",
+    "require_manifest_final_holdout_accessed_false": true,
+    "allowed_archives": [
+      {
+        "name": "BTCUSDT-1m-2020-01.zip",
+        "sha256": "b4e13ea185ba96c413ac9167cfbb6e238eb5eae119a7a77f41f4c61c5e099d03",
+        "expected_rows": 44640
+      },
+      {
+        "name": "BTCUSDT-1m-2020-02.zip",
+        "sha256": "f32b20168ea590cd7d04a2995bc5ec500ea06331c8174f7fd14f29c1078e5ed2",
+        "expected_rows": 41760
+      },
+      {
+        "name": "BTCUSDT-1m-2020-03.zip",
+        "sha256": "15790b4b031cbc5f59cae30e523fb8341588d279fe3839ba1224c7fe8a6bc929",
+        "expected_rows": 44640
+      }
+    ],
+    "hourly_aggregation": {
+      "timezone": "UTC",
+      "require_exactly_60_contiguous_1m_rows_per_hour": true,
+      "open": "first_1m_open",
+      "high": "max_1m_high",
+      "low": "min_1m_low",
+      "close": "last_1m_close",
+      "volume": "sum_1m_volume",
+      "expected_hourly_bars": 2184
+    },
+    "context": {
+      "normalization": "N0_ENDPOINT_ANCHORED_V1",
+      "represented_hours": 64,
+      "retained_predecessor_hours": 1,
+      "raw_window_hours": 65
+    },
+    "train": {
+      "role": "development_training",
+      "source_months": [
+        "2020-01",
+        "2020-02"
+      ],
+      "consequence_hour_start_utc": "2020-01-03T17:00:00Z",
+      "consequence_hour_end_utc": "2020-02-29T23:00:00Z",
+      "expected_decisions": 1375,
+      "validation_consequence_overlap_count": 0
+    },
+    "validation": {
+      "role": "development_validation_not_final_holdout",
+      "source_month": "2020-03",
+      "consequence_hour_start_utc": "2020-03-01T00:00:00Z",
+      "consequence_hour_end_utc": "2020-03-31T23:00:00Z",
+      "expected_decisions": 744,
+      "expected_utc_day_blocks": 31,
+      "decisions_per_day": 24,
+      "training_updates_forbidden": true,
+      "causal_context_history_carryover": "may use trailing February hourly bars strictly before each March consequence; no future or same-consequence bar may enter the observation",
+      "march_consequence_rows_used_for_training": false
+    }
+  },
+  "authority": {
+    "context_length": 64,
+    "sensory_seed": 12012,
+    "sensory_z_dim": 32,
+    "actor_hidden_width": 64,
+    "actor_hidden_layers": 2,
+    "device": "cpu",
+    "deterministic_algorithms": true,
+    "torch_num_threads_per_worker": 1,
+    "max_seed_workers": 4,
+    "nominal_exposure_budget": 1.0,
+    "hard_exposure_limit": 1.0,
+    "initial_equity": 1.0,
+    "initial_quantity": 0.0,
+    "account_state_per_sample": "FLAT_RESET_[e=0,s=1,c=1]",
+    "execution_timing": "observe_hour_t_close_then_execute_hour_t_plus_1_open_then_mark_hour_t_plus_1_close",
+    "proportional_friction_kappa": 0.0,
+    "funding": "OFF",
+    "symbol_identity_input": false
+  },
+  "learner": {
+    "actor_optimizer": "Adam",
+    "actor_lr": 0.001,
+    "critic_optimizer": "Adam",
+    "critic_lr": 0.001,
+    "discount_factor": 1.0,
+    "replay": false,
+    "direction_entropy_coefficient": 0.005,
+    "direction_entropy_target": "categorical_direction_only",
+    "beta_risk_entropy_bonus": 0.0,
+    "generations": 256,
+    "training_batch": "all_1375_training_windows_each_generation",
+    "action_sampling": "stochastic_Categorical_direction_plus_conditional_Beta_risk",
+    "evaluation_adapter": "deterministic_argmax_direction_plus_beta_mean"
+  },
+  "training_positive": {
+    "name": "TRUE_CONTEXT_TO_NEXT_HOUR_CONSEQUENCE",
+    "reward": "canonical one-step log-equity growth under the sampled action and matching next-hour open/close consequence",
+    "realized_winner_label": false
+  },
+  "training_control": {
+    "name": "SHUFFLED_CONTEXT_TO_CONSEQUENCE",
+    "construction": "each generation retains every training context/action and the exact multiset of next-hour (open,close) consequences, but assigns consequences through a deterministic seed-and-generation-specific fixed-point-free permutation",
+    "permutation": "controlled_tasks.no_fixed_point_permutation",
+    "fixed_points_allowed": false,
+    "evaluation": "control learner is evaluated on the same true March chronology as the positive learner"
+  },
+  "model_seeds": [
+    3101,
+    3102,
+    3103,
+    3104,
+    3105,
+    3106,
+    3107,
+    3108
+  ],
+  "validation_statistics": {
+    "unit": "UTC_calendar_day_of_consequence_hour",
+    "day_blocks": 31,
+    "hours_per_block": 24,
+    "bootstrap_replicates": 4096,
+    "bootstrap_resample": "sample_31_day_indices_with_replacement",
+    "bootstrap_rng": "python_random_MersenneTwister_with_deterministic_derived_stream_seed",
+    "confidence": "one_sided_95_percent_lower_bound",
+    "lower_bound_order_statistic": "sort_4096_replicates_and_take_index_204_zero_based",
+    "seed_metrics": [
+      "post_positive_mean_one_step_log_growth",
+      "post_control_mean_one_step_log_growth",
+      "pre_untrained_mean_one_step_log_growth",
+      "post_positive_minus_control_mean_one_step_log_growth",
+      "post_positive_minus_pre_mean_one_step_log_growth",
+      "post_positive_active_decision_fraction",
+      "post_control_active_decision_fraction"
+    ]
+  },
+  "seed_pass_gate": {
+    "post_positive_mean_log_growth_lcb_strictly_gt": 0.0,
+    "post_positive_minus_control_mean_log_growth_lcb_strictly_gt": 0.0,
+    "post_positive_minus_pre_mean_log_growth_lcb_strictly_gt": 0.0
+  },
+  "aggregate_gate": {
+    "seed_pass_count_min": 6,
+    "median_post_positive_mean_log_growth_strictly_gt": 0.0,
+    "median_post_positive_minus_control_mean_log_growth_strictly_gt": 0.0,
+    "median_post_positive_minus_pre_mean_log_growth_strictly_gt": 0.0
+  },
+  "outcomes": {
+    "historical_market_information_qualified": "all aggregate_gate conditions pass",
+    "historical_market_information_not_qualified": "one or more aggregate_gate conditions fail while data/control/contracts remain valid"
+  },
+  "global_gate": {
+    "implementation_tests_must_pass": true,
+    "validation_updates_forbidden": true,
+    "only_allowed_archives_may_be_opened": true,
+    "final_holdout_must_remain_unaccessed": true,
+    "no_threshold_or_training_changes_after_results": true,
+    "scientific_gate_miss_classification": "SCIENTIFIC_FAIL",
+    "contract_violation_classification": "CONTRACT_MISMATCH",
+    "runtime_or_environment_blocker_classification": "EXECUTION_BLOCKED"
+  },
+  "explicit_non_claims": [
+    "not_a_final_holdout_result",
+    "not_a_transaction_cost_result",
+    "not_a_funding_result",
+    "not_a_continuing_account_profitability_result",
+    "not_a_multi_symbol_generalization_result",
+    "not_production_authority_for_lambda_dir_0.005"
+  ],
+  "required_artifacts": [
+    "experiment_spec.json",
+    "RESULT.json",
+    "REPORT.md"
+  ]
+}
