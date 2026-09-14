@@ -41,6 +41,55 @@ gh api repos/GY-Bai/CB16-R12/actions/runners \
 The workflow `runs-on` list is `[self-hosted, Linux, ARM64, japan-oci, r12]`;
 all five labels must be present on the registered runner.
 
+## 1b. Runner service must carry the user PATH
+
+The dispatcher and `dsh` live under `~/.local/bin`, and `systemd --user` starts
+services with a minimal `PATH`. A runner unit without an explicit `PATH` fails
+every dispatch with:
+
+```text
+classification: EXECUTION_BLOCKED
+detail: [Errno 2] No such file or directory: 'dsh'
+```
+
+The unit therefore pins the path:
+
+```ini
+[Service]
+Environment=PATH=/home/bgy/.local/bin:/home/bgy/.nvm/versions/node/v22.23.2/bin:/usr/local/bin:/usr/bin:/bin
+```
+
+## 1c. Actions policy must permit GitHub-owned actions
+
+`GY-Bai/CB16-R12` was configured with `allowed_actions: local_only`, which
+rejects `actions/checkout` and `actions/upload-artifact` before the job starts
+(the run shows `startup_failure` with zero jobs). The policy was narrowed
+rather than opened: only GitHub-authored actions are allowed, third-party and
+verified marketplace actions stay blocked.
+
+```bash
+gh api -X PUT repos/GY-Bai/CB16-R12/actions/permissions \
+  --input - <<<'{"enabled":true,"allowed_actions":"selected"}'
+gh api -X PUT repos/GY-Bai/CB16-R12/actions/permissions/selected-actions \
+  --input - <<<'{"github_owned_allowed":true,"verified_allowed":false,"patterns_allowed":[]}'
+```
+
+To revert to the stricter original policy:
+
+```bash
+gh api -X PUT repos/GY-Bai/CB16-R12/actions/permissions \
+  --input - <<<'{"enabled":true,"allowed_actions":"local_only"}'
+```
+
+## 1d. Dispatcher-owned repository clone
+
+The dispatcher keeps its own clone at `$CB16_WORK_ROOT/repo` and creates task
+worktrees there. It deliberately does **not** create worktrees inside the
+Actions workspace: `actions/checkout` deletes local branches to avoid conflicts
+and, when a branch is checked out in a worktree, recreates the whole repository
+instead — which orphans worktree registrations. Keeping task branches out of
+the checkout repository removes that interaction entirely.
+
 ## 2. Repository variables
 
 Set these as repository Actions **variables** (not secrets) — they are paths,
@@ -101,6 +150,7 @@ Recorded after the bootstrap dry runs on this host:
 | Work tree root | `/home/bgy/cb16-worktrees` |
 | Dispatch state/locks | `/home/bgy/.cb16/state` |
 | Sandbox binary | `/home/bgy/.local/bin/bwrap` (bubblewrap 0.6.3) |
+| Dispatch clone | `/home/bgy/cb16-worktrees/repo` (owned by the dispatcher) |
 
 ## 4. Credential boundary
 

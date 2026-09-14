@@ -62,6 +62,7 @@ jobs:
             --lane builder \
             --event "$GITHUB_EVENT_PATH" \
             --repo-dir "$GITHUB_WORKSPACE" \
+            --repo-url "https://github.com/${GITHUB_REPOSITORY}.git" \
             --report-dir "$GITHUB_WORKSPACE/.cb16/report" \
             --publish
 

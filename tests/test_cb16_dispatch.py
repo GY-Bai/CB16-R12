@@ -164,6 +164,7 @@ class DispatchTestCase(unittest.TestCase):
         dsh_invoker=None,
         science_invoker=None,
         token: str | None = None,
+        work_root=None,
     ):
         if event is None:
             payload = meta if meta is not None else (
@@ -176,7 +177,7 @@ class DispatchTestCase(unittest.TestCase):
             lane=lane,
             event=event,
             repo_dir=self.repo,
-            work_root=self.tmp / "worktrees",
+            work_root=work_root or (self.tmp / "worktrees"),
             state_dir=self.tmp / "state",
             report_dir=report_dir,
             allowlist_path=ALLOWLIST_PATH,
@@ -899,6 +900,50 @@ class WorktreeTests(DispatchTestCase):
                     dispatcher.resolve_allowlisted_argv({"argv": argv}, self.repo)
         with self.assertRaises(dispatcher.ContractMismatch):
             dispatcher.resolve_allowlisted_argv({"argv": "not-a-list"}, self.repo)
+
+    def test_stale_worktree_directory_is_recreated(self):
+        # Simulate the residue left when the Actions checkout recreates its
+        # repository: the directory survives but the registration is gone.
+        stale = self.tmp / "worktrees" / "ds__test-task"
+        stale.mkdir(parents=True)
+        (stale / "leftover.txt").write_text("stale\n", encoding="utf-8")
+        spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# fixture\n"})
+        outcome = self.dispatch(dsh_invoker=spy)
+        worktree = Path(outcome.summary["worktree"])
+        self.assertFalse((worktree / "leftover.txt").exists())
+        self.assertEqual(git(worktree, "rev-parse", "--abbrev-ref", "HEAD"), "ds/test-task")
+
+    def test_dispatcher_keeps_its_own_clone_of_the_trusted_repository(self):
+        # A local bare repository stands in for GitHub, so no network is used.
+        origin = self.tmp / "origin.git"
+        subprocess.run(["git", "clone", "--bare", "-q", str(self.repo), str(origin)], check=True)
+        clone_dir = self.tmp / "work-repo"
+
+        env = dispatcher.publish_env(dict(self.base_env))
+        first = dispatcher.ensure_repo_clone(clone_dir, str(origin), env=env)
+        self.assertTrue((first / ".git").exists())
+
+        # A new upstream commit must become visible through the dispatcher clone.
+        other = self.tmp / "other"
+        subprocess.run(["git", "clone", "-q", str(origin), str(other)], check=True)
+        git(other, "config", "user.email", "x@example.com")
+        git(other, "config", "user.name", "X")
+        (other / "NEW_FILE.md").write_text("new\n", encoding="utf-8")
+        git(other, "add", "-A")
+        git(other, "commit", "-q", "-m", "upstream move")
+        git(other, "push", "-q", "origin", "HEAD:refs/heads/main")
+
+        dispatcher.ensure_repo_clone(clone_dir, str(origin), env=env)
+        fetched = git(clone_dir, "rev-parse", "origin/main").strip()
+        self.assertEqual(fetched, git(other, "rev-parse", "HEAD"))
+
+    def test_task_worktrees_are_never_created_in_the_actions_workspace(self):
+        work_root = self.tmp / "own-worktrees"
+        spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# fixture\n"})
+        outcome = self.dispatch(dsh_invoker=spy, work_root=work_root)
+        worktree = Path(outcome.summary["worktree"])
+        self.assertTrue(str(worktree).startswith(str(work_root)))
+        self.assertFalse(str(worktree).startswith(str(self.repo)))
 
     def test_main_branch_is_never_the_task_branch(self):
         with self.assertRaises(dispatcher.ContractMismatch):
