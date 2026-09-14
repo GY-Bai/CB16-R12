@@ -537,6 +537,48 @@ Properties worth keeping:
 * **redacted** - bodies pass through the same host-identifier scrubbing as the
   rest of the evidence.
 
+## 1l. Rounds hand off through the packet, not through a session
+
+Session affinity is **off** (`SESSION_AFFINITY_ENABLED`). A resumed session
+carries every earlier round's packet, and each of those contains its own
+"newest instruction" block, so a later round has to be told in prose which of
+several contradictory blocks is current. A cold round has no such ambiguity,
+and on the measured VS-C pair resuming also cost about $0.015 more per round:
+prompt caching makes rebuilding context nearly free ($0.003/M) while every
+resumed step carries the whole conversation.
+
+`session_affinity: branch-v1` still parses, and a round that declares it is
+recorded as `declined-affinity-disabled` and runs on the legacy fresh path. Set
+`CB16_SESSION_AFFINITY=enabled` to restore the old behaviour.
+
+Information now travels two ways:
+
+| Carrier | Content |
+| --- | --- |
+| the packet | contract, merged PR timeline, the newest unaddressed reviewer instruction, the instruction ranking |
+| `BUILD_REPORT` | what the round changed, tested, and deliberately did not do |
+
+Each Builder round writes its report to
+`<CB16_STATE_DIR>/reports/<hash>.md`, and the next round reads it into a
+`## Previous round report` section. A fix-round prompt states the ranking,
+notes that nothing from an earlier round is remembered, and points at that
+section when it exists.
+
+**The report is only as good as what the agent writes.** The dispatcher prefers
+the agent's own `BUILD_REPORT` section and only falls back to a synthesized
+stub - classification, changed files, test exit code - when the agent did not
+emit one. Observed on the real VS-C rounds: two of three turns produced a
+proper section (5,180 and 8,480 characters), one did not. The synthesized stub
+is not a substitute for the agent's reasoning, so a round that ends without
+`BUILD_REPORT` degrades the next round's context.
+
+Two defects fixed while wiring this up:
+
+* the session runner's stdout is a JSON record, whose newlines are escaped, so
+  a line-anchored `BUILD_REPORT` scan could never match and **every** agent
+  report on the session path was silently replaced by the stub;
+* the synthesized report used the branch name in the `Issue #` field.
+
 ## 1m. Which instruction source wins
 
 Five places can look like an instruction, and a fix round can hold several at

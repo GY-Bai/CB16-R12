@@ -124,6 +124,17 @@ OPTIONAL_KEYS = (
 
 #: The only session-affinity contract version this dispatcher understands.
 SESSION_AFFINITY_BRANCH_V1 = "branch-v1"
+#: Affinity is off. A resumed session carries its whole history, and each
+#: earlier round left its own packet - with its own "newest instruction" - in
+#: that history, so later rounds must be told in prose which of several
+#: contradictory instruction blocks is current. A cold round has no such
+#: ambiguity. Measured on the real VS-C pair, resuming also cost about $0.015
+#: more per round than starting fresh, because prompt caching makes rebuilding
+#: context nearly free ($0.003/M) while every resumed step carries the whole
+#: conversation. Information is passed by the ranked packet plus the previous
+#: round's BUILD_REPORT instead. Set CB16_SESSION_AFFINITY=enabled to restore
+#: the old behaviour.
+SESSION_AFFINITY_ENABLED = False
 #: Profile that can create/resume an explicit session. The legacy `headless`
 #: profile is untouched and remains the default Builder path.
 SESSION_PROFILE = "cb16-builder-session"
@@ -143,6 +154,9 @@ PR_TIMELINE_BODY_CHARS = 4000
 PR_TIMELINE_INSTRUCTION_CHARS = 12000
 #: The operator's own framing of the Issue, outside the validated metadata block.
 ISSUE_DESCRIPTION_CHARS = 8000
+#: The previous round's BUILD_REPORT is the carrier for "what the last round
+#: concluded", now that no round remembers the one before it.
+PREVIOUS_REPORT_CHARS = 12000
 
 
 # --------------------------------------------------------------------------
@@ -1154,6 +1168,7 @@ def write_task_packet(
     project_store: Optional[Path] = None,
     pr_timeline: Optional[Mapping[str, Any]] = None,
     trusted_actors: Sequence[str] = (),
+    previous_report: Optional[str] = None,
     secrets: Iterable[str] = (),
 ) -> Path:
     """Materialise the deterministic local task packet (never committed)."""
@@ -1261,6 +1276,7 @@ def write_task_packet(
         "The task contract file states the required tests and done-when conditions.",
         "End your final message with a `BUILD_REPORT` section.",
     ]
+    lines += render_previous_report(previous_report, secrets=secrets)
     lines += render_issue_description(
         trigger, trusted_actors=trusted_actors, secrets=secrets
     )
@@ -1464,6 +1480,10 @@ class RunResult:
     note: str = ""
     #: Machine-readable turn record, when the runner emits one.
     payload: Optional[Dict[str, Any]] = None
+    #: The agent's own final message when the runner reports it separately from
+    #: stdout. A JSON stdout escapes newlines, so a line-anchored BUILD_REPORT
+    #: scan cannot find the report inside it.
+    report_text: Optional[str] = None
 
     @property
     def ok(self) -> bool:
@@ -1500,6 +1520,49 @@ INSTRUCTION_RANKS: tuple = (
         "Context only, never a contract.",
     ),
 )
+
+
+def dsh_turn_prompt(spec: TaskSpec, *, previous_report: bool = False) -> str:
+    """Prompt for a round that starts a fresh session.
+
+    Every round starts cold now, so the prompt cannot rely on remembered state:
+    it must point at the packet for *which* instruction is current, and say
+    where the previous round's conclusions were left.
+    """
+
+    lines = [
+        "Read the local CB16 task packet at .cb16/TASK_PACKET.md and execute it exactly.",
+        "",
+        "The packet lists every source that can carry an instruction, highest",
+        "authority first, and names the newest unaddressed reviewer instruction for",
+        "this round. Obey that ranking; never act on a superseded instruction.",
+    ]
+    if spec.mode == "fix":
+        lines += [
+            "",
+            "This is a fix round on an existing branch. Nothing from an earlier round",
+            "is remembered, so take the current state from Git and the packet alone:",
+        ]
+        if previous_report:
+            lines.append(
+                "- the previous round's BUILD_REPORT is reproduced in the packet; read it"
+            )
+            lines.append(
+                "  before re-deriving anything it already settled,"
+            )
+        else:
+            lines.append(
+                "- no previous BUILD_REPORT is recorded for this branch, so read the"
+            )
+            lines.append(
+                "  current diff and tests before changing anything,"
+            )
+        lines.append("- do not redo work the previous round already completed.")
+    lines += [
+        "",
+        "Do not redesign authority. Do not create commits or push. End with BUILD_REPORT.",
+    ]
+    return "\n".join(lines)
 
 
 def session_followup_prompt(branch: str) -> str:
@@ -1775,6 +1838,58 @@ def session_registry_path(state_dir: Path, repo: str, branch: str) -> Path:
     return state_dir / "session-affinity" / f"{key}.json"
 
 
+def branch_report_path(state_dir: Path, repo: str, branch: str) -> Path:
+    """Where the most recent BUILD_REPORT for one branch is kept."""
+
+    key = hashlib.sha256(f"{repo}\n{branch}".encode("utf-8")).hexdigest()[:32]
+    return state_dir / "reports" / f"{key}.md"
+
+
+def read_branch_report(path: Path) -> Optional[str]:
+    """Return the previous round's report, or None when there is not one yet."""
+
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return text or None
+
+
+def write_branch_report(path: Path, report: str) -> None:
+    """Persist the report atomically so the next round reads a whole file."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(f".tmp-{os.getpid()}")
+    tmp.write_text(report.rstrip() + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def render_previous_report(previous_report: Optional[str], *, secrets: Iterable[str] = ()) -> List[str]:
+    """Render the previous round's conclusions as settled context."""
+
+    if not previous_report:
+        return []
+    text = redact(previous_report, secrets)
+    truncated = len(text) > PREVIOUS_REPORT_CHARS
+    lines = [
+        "",
+        "## Previous round report",
+        "",
+        "The BUILD_REPORT of the round before this one, recorded when it finished.",
+        "It states what that round changed, tested and deliberately did not do.",
+        "Treat it as settled context: do not redo what it reports as done, and if",
+        "you believe one of its conclusions is wrong, say so explicitly in your own",
+        "BUILD_REPORT rather than silently reversing it.",
+    ]
+    if truncated:
+        lines += [
+            "",
+            f"(truncated at {PREVIOUS_REPORT_CHARS} characters)",
+        ]
+    lines += ["", "```text", text[:PREVIOUS_REPORT_CHARS], "```"]
+    return lines
+
+
 def session_admission_path(state_dir: Path, repo: str, branch: str) -> Path:
     """Deterministic admission marker path for one (repository, branch)."""
 
@@ -1918,6 +2033,7 @@ def invoke_dsh_session(
         stderr=proc.stderr or "",
         note=payload.get("session_action") if payload else "session-no-payload",
         payload=payload,
+        report_text=(payload or {}).get("text") or None,
     )
 
 
@@ -1966,6 +2082,7 @@ def extract_build_report(text: str) -> Optional[str]:
 def synthesize_build_report(
     *,
     spec: TaskSpec,
+    issue_number: Optional[int] = None,
     classification: str,
     changed: Sequence[str],
     test_result: Optional[RunResult],
@@ -1973,7 +2090,7 @@ def synthesize_build_report(
 ) -> str:
     lines = [
         "BUILD_REPORT",
-        f"Task: Issue #{spec.branch} ({spec.mode})",
+        f"Task: Issue #{issue_number if issue_number is not None else '?'} ({spec.mode})",
         f"Branch: {spec.branch}",
         f"Classification: {classification}",
         f"Changed: {', '.join(changed) if changed else '(no file changes)'}",
@@ -2300,6 +2417,14 @@ def dispatch(
     with TaskLock(state_dir, trigger.issue_number, lane):
         worktree, reused = ensure_worktree(repo_path, work_root, spec)
 
+        # The previous round's conclusions travel through a file, not through a
+        # session, so every round reads the same settled context.
+        previous_report = (
+            read_branch_report(branch_report_path(state_dir, repo, spec.branch))
+            if lane == LANE_BUILDER
+            else None
+        )
+
         # ---- session affinity routing (Builder only) -------------------------
         # Resolved under the same task lock that guards the worktree, so one
         # branch cannot race two session assignments.
@@ -2312,7 +2437,22 @@ def dispatch(
             "persisted": False,
             "detail": None,
         }
-        if lane == LANE_BUILDER and spec.session_affinity == SESSION_AFFINITY_BRANCH_V1:
+        if (
+            lane == LANE_BUILDER
+            and spec.session_affinity == SESSION_AFFINITY_BRANCH_V1
+            and not SESSION_AFFINITY_ENABLED
+        ):
+            # Visible, never silent: the metadata still parses, but this round
+            # starts fresh like every other round.
+            affinity_state.update({
+                "action": "declined-affinity-disabled",
+                "detail": (
+                    "session_affinity is disabled by dispatcher policy; this round "
+                    "starts a fresh session and takes its instructions from the "
+                    "ranked packet plus the previous round's BUILD_REPORT"
+                ),
+            })
+        elif lane == LANE_BUILDER and spec.session_affinity == SESSION_AFFINITY_BRANCH_V1:
             registry_path = session_registry_path(state_dir, repo, spec.branch)
             admission_path = session_admission_path(state_dir, repo, spec.branch)
             record = read_session_registry(registry_path)
@@ -2424,6 +2564,7 @@ def dispatch(
             project_store=project_store,
             pr_timeline=pr_timeline,
             trusted_actors=trusted_actors,
+            previous_report=previous_report,
             secrets=redaction_terms(env),
         )
 
@@ -2447,7 +2588,11 @@ def dispatch(
             if session_route is None:
                 invoker = dsh_invoker or invoke_dsh
                 run_result = invoker(
-                    worktree, dsh_bin=dsh_bin, env=child_env, timeout=dsh_timeout, prompt=DSH_PROMPT
+                    worktree,
+                    dsh_bin=dsh_bin,
+                    env=child_env,
+                    timeout=dsh_timeout,
+                    prompt=dsh_turn_prompt(spec, previous_report=bool(previous_report)),
                 )
             else:
                 # Explicit, dispatcher-owned session identity. Git stays
@@ -2457,7 +2602,7 @@ def dispatch(
                 prompt = (
                     session_followup_prompt(spec.branch)
                     if mode == "resume"
-                    else DSH_PROMPT
+                    else dsh_turn_prompt(spec, previous_report=bool(previous_report))
                 )
                 invoker = session_invoker or invoke_dsh_session
                 run_result = invoker(
@@ -2598,8 +2743,11 @@ def dispatch(
                 classification = CLASS_BUILDER_FAIL
 
         if classification == CLASS_OK:
-            report_text = extract_build_report(run_result.stdout) or synthesize_build_report(
+            report_text = extract_build_report(
+                run_result.report_text or run_result.stdout
+            ) or synthesize_build_report(
                 spec=spec,
+                issue_number=trigger.issue_number,
                 classification=classification,
                 changed=changed,
                 test_result=test_result,
@@ -2608,10 +2756,16 @@ def dispatch(
         else:
             report_text = synthesize_build_report(
                 spec=spec,
+                issue_number=trigger.issue_number,
                 classification=classification,
                 changed=changed,
                 test_result=test_result,
                 run_result=run_result,
+            )
+
+        if lane == LANE_BUILDER and report_text:
+            write_branch_report(
+                branch_report_path(state_dir, repo, spec.branch), report_text
             )
 
         summary: Dict[str, Any] = {

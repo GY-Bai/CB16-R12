@@ -695,6 +695,212 @@ class PrTimelineTests(DispatchTestCase):
         self.assertIn("One semantic blocker.", text)
 
 
+class SessionAffinityDisabledTests(DispatchTestCase):
+    """Resume is off by policy; rounds pass information through the packet.
+
+    A resumed session carries each earlier round's packet - and each of those
+    contains its own "newest instruction" - so later rounds have to be told in
+    prose which of several contradictory blocks is current. A cold round has no
+    such ambiguity, and measured marginally cheaper.
+    """
+
+    def _affinity_meta(self, branch="ds/disabled-affinity"):
+        meta = self.builder_meta(branch=branch)
+        meta["session_affinity"] = "branch-v1"
+        return meta
+
+    def test_declared_affinity_still_parses_but_does_not_route(self):
+        session = self._session_spy_never_called()
+        legacy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"})
+        outcome = self.dispatch(meta=self._affinity_meta(), dsh_invoker=legacy, session_invoker=session)
+        route = outcome.summary["session_route"]
+        self.assertEqual(route["action"], "declined-affinity-disabled")
+        self.assertEqual(route["declared"], "branch-v1")
+        self.assertIsNone(route["session_id"])
+        self.assertFalse(route["persisted"])
+        self.assertIn("disabled by dispatcher policy", route["detail"])
+        self.assertEqual(outcome.summary["session_profile"], "headless")
+        self.assertTrue(legacy.captured, "the round must run on the legacy fresh path")
+        self.assertEqual(session.calls, [])
+
+    def test_disabled_affinity_writes_no_state(self):
+        legacy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"})
+        self.dispatch(meta=self._affinity_meta(), dsh_invoker=legacy,
+                      session_invoker=self._session_spy_never_called())
+        base = self.tmp / "state" / "session-affinity"
+        self.assertFalse(base.exists(), "a declined round must not create a registry")
+
+    def test_unknown_affinity_contract_is_still_rejected(self):
+        meta = self._affinity_meta()
+        meta["session_affinity"] = "branch-v9"
+        with self.assertRaises(dispatcher.ContractMismatch):
+            self.dispatch(meta=meta)
+
+    def test_science_still_cannot_request_affinity(self):
+        meta = self.science_meta()
+        meta["session_affinity"] = "branch-v1"
+        with self.assertRaises(dispatcher.ContractMismatch):
+            self.dispatch(lane="science", meta=meta)
+
+    def _session_spy_never_called(self):
+        calls = []
+
+        def spy(worktree, **kwargs):
+            calls.append(kwargs)
+            raise AssertionError("the session profile must not run when affinity is off")
+
+        spy.calls = calls  # type: ignore[attr-defined]
+        return spy
+
+
+class FixRoundHandoffTests(DispatchTestCase):
+    """Rounds hand off through the packet, not through a remembered session."""
+
+    def _fix_meta(self, branch="ds/handoff"):
+        meta = self.builder_meta(branch=branch)
+        meta["mode"] = "fix"
+        meta["pr_number"] = 36
+        meta["review_delta"] = "a bounded change"
+        return meta
+
+    def test_fix_round_prompt_states_the_ranking(self):
+        captured = {}
+
+        def spy(worktree, **kwargs):
+            captured.update(kwargs)
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
+
+        meta = self._fix_meta()
+        original = dispatcher.github_api
+        dispatcher.github_api = lambda *a, **k: (404, {})
+        try:
+            self.dispatch(meta=meta, dsh_invoker=spy)
+        finally:
+            dispatcher.github_api = original
+        prompt = captured["prompt"]
+        self.assertIn("fix round on an existing branch", prompt)
+        self.assertIn("Nothing from an earlier round", prompt)
+        self.assertIn("newest unaddressed reviewer instruction", prompt)
+        self.assertIn("no previous BUILD_REPORT is recorded", prompt)
+
+    def test_second_round_receives_the_first_rounds_report(self):
+        first = self.builder_spy(
+            {"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"},
+            report="BUILD_REPORT\n- round one settled the dataclass shape\n",
+        )
+        meta = self._fix_meta()
+        original = dispatcher.github_api
+        dispatcher.github_api = lambda *a, **k: (404, {})
+        try:
+            self.dispatch(meta=meta, dsh_invoker=first)
+            captured = {}
+
+            def spy(worktree, **kwargs):
+                captured.update(kwargs)
+                target = Path(worktree) / "docs" / "dispatch_smoke"
+                target.mkdir(parents=True, exist_ok=True)
+                (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+                return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
+
+            outcome = self.dispatch(meta=meta, dsh_invoker=spy)
+        finally:
+            dispatcher.github_api = original
+
+        packet = (self.tmp / "worktrees" / "ds__handoff" / ".cb16" / "TASK_PACKET.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("## Previous round report", packet)
+        self.assertIn("round one settled the dataclass shape", packet)
+        self.assertIn("do not redo what it reports as done", packet)
+        self.assertIn("previous round's BUILD_REPORT is reproduced in the packet", captured["prompt"])
+        self.assertNotIn("no previous BUILD_REPORT", captured["prompt"])
+
+    def test_first_round_has_no_previous_report(self):
+        spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"})
+        self.dispatch(meta=self.builder_meta(), dsh_invoker=spy)
+        packet = (self.tmp / "worktrees" / "ds__test-task" / ".cb16" / "TASK_PACKET.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("## Previous round report", packet)
+
+    def test_report_round_trips_through_the_state_dir(self):
+        path = dispatcher.branch_report_path(self.tmp / "state", TRUSTED_REPO, "ds/handoff")
+        self.assertIsNone(dispatcher.read_branch_report(path))
+        dispatcher.write_branch_report(path, "BUILD_REPORT\n- settled\n")
+        self.assertIn("settled", dispatcher.read_branch_report(path))
+        leftovers = [p.name for p in path.parent.iterdir() if ".tmp-" in p.name]
+        self.assertEqual(leftovers, [], "the report must be written atomically")
+
+    def test_previous_report_is_redacted(self):
+        lines = dispatcher.render_previous_report("host /home/bgy/secret", secrets=("/home/bgy",))
+        self.assertNotIn("/home/bgy", "\n".join(lines))
+
+    def test_long_previous_report_is_truncated(self):
+        lines = dispatcher.render_previous_report("x" * (dispatcher.PREVIOUS_REPORT_CHARS + 99))
+        self.assertIn("truncated at", "\n".join(lines))
+
+
+class BuildReportHandoffTests(DispatchTestCase):
+    """The report is the cross-round carrier once sessions stop being reused."""
+
+    def test_session_runner_report_is_extracted_from_the_payload_not_stdout(self):
+        """A JSON stdout escapes newlines, so a line-anchored scan cannot work."""
+
+        agent_report = "BUILD_REPORT\n\n## Task identity\n- settled the shape\n"
+        payload = {"success": True, "session_id": "s", "session_action": "new",
+                   "text": agent_report}
+        result = dispatcher.RunResult(
+            exit_code=0, stdout=json.dumps(payload) + "\n", payload=payload,
+            report_text=payload["text"],
+        )
+        self.assertIsNone(
+            dispatcher.extract_build_report(result.stdout),
+            "the JSON record itself must not match",
+        )
+        self.assertIsNotNone(
+            dispatcher.extract_build_report(result.report_text),
+            "the payload text is where the agent's report lives",
+        )
+
+    def test_synthesized_report_names_the_issue_not_the_branch(self):
+        spec = dispatcher.TaskSpec(
+            lane="builder", mode="fix", sha="0" * 40, branch="ds/some-branch",
+        )
+        text = dispatcher.synthesize_build_report(
+            spec=spec, issue_number=35, classification="OK", changed=[],
+            test_result=None, run_result=dispatcher.RunResult(exit_code=0),
+        )
+        self.assertIn("Issue #35", text)
+        self.assertNotIn("Issue #ds/", text)
+
+    def test_agent_report_reaches_the_next_round_instead_of_the_stub(self):
+        agent_report = "BUILD_REPORT\n\n## Task identity\n- round one chose approach A\n"
+        first = self.builder_spy(
+            {"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"}, report=agent_report
+        )
+        meta = self.builder_meta(branch="ds/handoff-two")
+        meta["mode"] = "fix"
+        meta["pr_number"] = 36
+        meta["review_delta"] = "bounded"
+        original = dispatcher.github_api
+        dispatcher.github_api = lambda *a, **k: (404, {})
+        try:
+            self.dispatch(meta=meta, dsh_invoker=first)
+            self.dispatch(meta=meta, dsh_invoker=self.builder_spy(
+                {"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"}))
+        finally:
+            dispatcher.github_api = original
+        packet = (self.tmp / "worktrees" / "ds__handoff-two" / ".cb16" / "TASK_PACKET.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("round one chose approach A", packet)
+        self.assertNotIn("Known unresolved: see Actions log", packet,
+                         "the synthesized stub must not displace the agent's report")
+
+
 class SessionPluginPackagingTests(unittest.TestCase):
     """The profile is only reproducible if its declared files are in Git.
 
@@ -753,6 +959,17 @@ class SessionAffinityTests(DispatchTestCase):
     Git is authority; a session is a cache. These tests pin both the new
     behaviour and, just as importantly, everything that must stay legacy.
     """
+
+    def setUp(self):
+        super().setUp()
+        # Affinity is off by default. This class covers the machinery itself so
+        # that re-enabling it does not run against untested code.
+        self._affinity_default = dispatcher.SESSION_AFFINITY_ENABLED
+        dispatcher.SESSION_AFFINITY_ENABLED = True
+
+    def tearDown(self):
+        dispatcher.SESSION_AFFINITY_ENABLED = self._affinity_default
+        super().tearDown()
 
     def _session_spy(self, *, action="new", session_id="session-fixed-0001", resume_succeeded=None):
         """Stand-in for the session runner: records calls, returns its JSON record."""
@@ -882,10 +1099,13 @@ class SessionAffinityTests(DispatchTestCase):
         for name, *_ in dispatcher.INSTRUCTION_RANKS:
             self.assertIn(name, prompt)
 
-    def test_first_turn_uses_the_standard_packet_prompt(self):
+    def test_first_turn_uses_the_packet_prompt(self):
         session = self._session_spy()
         self.dispatch(meta=self._affinity_meta(), session_invoker=session)
-        self.assertEqual(session.calls[0]["prompt"], dispatcher.DSH_PROMPT)
+        prompt = session.calls[0]["prompt"]
+        self.assertIn(".cb16/TASK_PACKET.md", prompt)
+        self.assertIn("highest", prompt)
+        self.assertIn("newest unaddressed reviewer instruction", prompt)
 
     # ---- fallback --------------------------------------------------------
 
