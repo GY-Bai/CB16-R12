@@ -413,6 +413,155 @@ class LabelAndLaneTests(DispatchTestCase):
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "PR_SET_PDEATHSIG is Linux only")
+class PrTimelineTests(DispatchTestCase):
+    """PR commits and reviewer instructions must share one clock.
+
+    Reviewer instructions arrive as review/comment text, which never enters Git,
+    and the confined agent has no GitHub credentials - so without this the agent
+    only sees a terse label and has to guess which instruction is newest.
+    """
+
+    REPO = "GY-Bai/CB16-R12"
+
+    def _api(self, *, commits=None, reviews=None, comments=None, inline=None, fail=()):
+        def fake(method, path, *, token=None, payload=None, timeout=30):
+            if any(f in path for f in fail):
+                raise OSError("boom")
+            if path.endswith("/commits"):
+                return 200, commits or []
+            if path.endswith("/reviews"):
+                return 200, reviews or []
+            if path.endswith("/issues/36/comments"):
+                return 200, comments or []
+            if path.endswith("/pulls/36/comments"):
+                return 200, inline or []
+            return 404, {}
+        return fake
+
+    def _commit(self, sha, at, msg):
+        return {"sha": sha + "0" * 32, "commit": {"message": msg, "committer": {"date": at}},
+                "author": {"login": "GY-Bai"}}
+
+    def _review(self, at, body, state="CHANGES_REQUESTED", login="GY-Bai"):
+        return {"submitted_at": at, "body": body, "state": state, "user": {"login": login}}
+
+    def _timeline(self, **kw):
+        original = dispatcher.github_api
+        dispatcher.github_api = self._api(**kw)
+        try:
+            return dispatcher.fetch_pr_timeline(self.REPO, 36, token="t", trusted_actors=("GY-Bai",))
+        finally:
+            dispatcher.github_api = original
+
+    def test_commits_and_instructions_merge_in_timestamp_order(self):
+        tl = self._timeline(
+            commits=[self._commit("aaa", "2026-09-14T17:02:17Z", "build")],
+            reviews=[self._review("2026-09-14T17:07:50Z", "One semantic blocker.")],
+        )
+        self.assertEqual([e["kind"] for e in tl["entries"]], ["commit", "review"])
+        self.assertEqual(tl["latest_commit"]["sha"], "aaa00000")
+        self.assertEqual(len(tl["unaddressed"]), 1)
+        self.assertEqual(tl["unaddressed"][0]["text"], "One semantic blocker.")
+
+    def test_instruction_older_than_the_latest_commit_is_addressed(self):
+        tl = self._timeline(
+            commits=[self._commit("aaa", "2026-09-14T17:02:17Z", "build"),
+                     self._commit("bbb", "2026-09-14T17:29:28Z", "fix")],
+            reviews=[self._review("2026-09-14T17:07:50Z", "One semantic blocker.")],
+        )
+        self.assertEqual(tl["latest_commit"]["sha"], "bbb00000")
+        self.assertEqual(tl["unaddressed"], [], "a review before the newest commit is addressed")
+
+    def test_instructions_from_untrusted_actors_are_not_instructions(self):
+        tl = self._timeline(
+            commits=[self._commit("aaa", "2026-09-14T17:02:17Z", "build")],
+            reviews=[self._review("2026-09-14T17:07:50Z", "do something", login="random-user")],
+        )
+        self.assertEqual(tl["entries"], [tl["entries"][0]])
+        self.assertEqual(len(tl["entries"]), 1)
+        self.assertEqual(tl["unaddressed"], [])
+
+    def test_all_instruction_sources_are_collected(self):
+        tl = self._timeline(
+            commits=[self._commit("aaa", "2026-09-14T17:02:00Z", "build")],
+            reviews=[self._review("2026-09-14T17:03:00Z", "review body")],
+            comments=[{"created_at": "2026-09-14T17:04:00Z", "body": "issue comment",
+                       "user": {"login": "GY-Bai"}}],
+            inline=[{"created_at": "2026-09-14T17:05:00Z", "body": "inline note", "path": "a.py",
+                     "line": 7, "user": {"login": "GY-Bai"}}],
+        )
+        kinds = [e["kind"] for e in tl["entries"]]
+        self.assertEqual(kinds, ["commit", "review", "comment", "inline"])
+        self.assertEqual(tl["entries"][-1]["path"], "a.py")
+        self.assertEqual(len(tl["unaddressed"]), 3)
+
+    def test_without_any_commit_every_instruction_is_open(self):
+        tl = self._timeline(reviews=[self._review("2026-09-14T17:07:50Z", "start here")])
+        self.assertIsNone(tl["latest_commit"])
+        self.assertEqual(len(tl["unaddressed"]), 1)
+
+    def test_api_failure_is_reported_not_raised(self):
+        tl = self._timeline(fail=("/commits", "/reviews"))
+        self.assertTrue(tl["errors"])
+        self.assertEqual(tl["entries"], [])
+
+    def test_rendered_timeline_names_the_newest_instruction(self):
+        tl = self._timeline(
+            commits=[self._commit("aaa", "2026-09-14T17:02:17Z", "build")],
+            reviews=[self._review("2026-09-14T17:07:50Z", "One semantic blocker.")],
+        )
+        text = "\n".join(dispatcher.render_review_timeline(tl, pr_number=36))
+        self.assertIn("latest Builder commit", text)
+        self.assertIn("### Newest instruction", text)
+        self.assertIn("One semantic blocker.", text)
+        self.assertIn("open instructions in this round: 1", text)
+        self.assertLess(text.index("build"), text.index("One semantic blocker."))
+
+    def test_rendered_timeline_says_so_when_nothing_is_open(self):
+        tl = self._timeline(
+            commits=[self._commit("bbb", "2026-09-14T17:29:28Z", "fix")],
+            reviews=[self._review("2026-09-14T17:07:50Z", "older")],
+        )
+        text = "\n".join(dispatcher.render_review_timeline(tl, pr_number=36))
+        self.assertIn("nothing unaddressed", text)
+
+    def test_rendered_timeline_is_redacted(self):
+        tl = self._timeline(
+            commits=[self._commit("aaa", "2026-09-14T17:02:17Z", "build")],
+            reviews=[self._review("2026-09-14T17:07:50Z", "secret host /home/bgy")],
+        )
+        text = "\n".join(
+            dispatcher.render_review_timeline(tl, secrets=("/home/bgy",), pr_number=36)
+        )
+        self.assertNotIn("/home/bgy", text)
+
+    def test_no_timeline_renders_nothing(self):
+        self.assertEqual(dispatcher.render_review_timeline(None), [])
+
+    def test_task_packet_carries_the_timeline_for_a_fix_round(self):
+        meta = self.builder_meta()
+        meta["mode"] = "fix"
+        meta["pr_number"] = 36
+        meta["review_delta"] = "exact_commit_implementation_test_gate"
+        original = dispatcher.github_api
+        dispatcher.github_api = self._api(
+            commits=[self._commit("aaa", "2026-09-14T17:02:17Z", "build")],
+            reviews=[self._review("2026-09-14T17:07:50Z", "One semantic blocker.")],
+        )
+        try:
+            outcome = self.dispatch(meta=meta, dsh_invoker=self.builder_spy(
+                {"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"}))
+        finally:
+            dispatcher.github_api = original
+        text = (self.tmp / "worktrees" / "ds__test-task" / ".cb16" / "TASK_PACKET.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("## Review delta", text)
+        self.assertIn("exact_commit_implementation_test_gate", text)
+        self.assertIn("## PR review timeline", text)
+        self.assertIn("One semantic blocker.", text)
+
+
 class SessionPluginPackagingTests(unittest.TestCase):
     """The profile is only reproducible if its declared files are in Git.
 

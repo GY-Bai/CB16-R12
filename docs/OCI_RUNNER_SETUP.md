@@ -492,6 +492,51 @@ session profile pins `compaction-basic` to `thresholdRatio 0.75`,
 defaults. See the plugin README for the arithmetic and for why the retry budget,
 not the threshold, is what catches a boundary rejection.
 
+## 1l. The PR review timeline in a fix round
+
+A reviewer's instructions arrive as PR **review/comment text**, which never
+enters Git, and the confined Builder agent has no GitHub credentials (`gh` is
+masked and the child environment carries no token). A `mode: fix` dispatch
+therefore used to hand the agent little more than `review_delta` - a terse label
+such as `exact_commit_implementation_test_gate` - leaving it to guess which
+instruction was newest.
+
+For any Builder dispatch that carries `pr_number`, the dispatcher now fetches,
+with its own token:
+
+| Source | Endpoint |
+| --- | --- |
+| commits | `GET /repos/{repo}/pulls/{n}/commits` |
+| reviews | `GET /repos/{repo}/pulls/{n}/reviews` |
+| issue comments | `GET /repos/{repo}/issues/{n}/comments` |
+| inline review comments | `GET /repos/{repo}/pulls/{n}/comments` |
+
+and merges them with the commit history onto **one clock**, sorted by
+timestamp, in the task packet:
+
+```text
+2026-09-14 17:02:17  COMMIT  2e13afc1  CB16 builder: issue #35 (build)
+2026-09-14 17:07:50  REVIEW CHANGES_REQUESTED  GY-Bai
+    One semantic blocker before merge. ...
+2026-09-14 17:29:28  COMMIT  0079955d  CB16 builder: issue #35 (fix)  <- latest Builder commit
+```
+
+The section then states explicitly which instructions were posted **after** the
+latest Builder commit - those are the unaddressed ones - and repeats the newest
+verbatim under `### Newest instruction`, so "which instruction is current" is
+never inferred from prose.
+
+Properties worth keeping:
+
+* **trusted actors only** - a review or comment from outside the trusted list is
+  not an instruction, so a bystander cannot inject task scope;
+* **best effort** - a GitHub outage records the failing sources in the packet
+  and never blocks the dispatch;
+* **bounded** - the newest 40 entries, bodies truncated, so a long review thread
+  cannot blow up the packet;
+* **redacted** - bodies pass through the same host-identifier scrubbing as the
+  rest of the evidence.
+
 ## 2. Repository variables
 
 Set these as repository Actions **variables** (not secrets) — they are paths,

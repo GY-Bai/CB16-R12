@@ -135,6 +135,12 @@ SESSION_REGISTRY_SCHEMA = "cb16.builder_session_affinity.v1"
 SESSION_ADMISSION_SCHEMA = "cb16.builder_session_admission.v1"
 #: Shared package download cache; each worktree keeps its own .venv.
 DEFAULT_UV_CACHE_DIR = "/cb16/cache/uv"
+#: Reviewer instructions arrive as PR review/comment text, which is not in Git.
+#: The dispatcher merges those with the commit history so a later round can tell
+#: which instruction is newest without guessing.
+PR_TIMELINE_ENTRY_LIMIT = 40
+PR_TIMELINE_BODY_CHARS = 4000
+PR_TIMELINE_INSTRUCTION_CHARS = 12000
 
 
 # --------------------------------------------------------------------------
@@ -868,6 +874,168 @@ def ensure_worktree(repo: Path, work_root: Path, spec: TaskSpec) -> Tuple[Path, 
     return target, False
 
 
+def fetch_pr_timeline(
+    repo: str,
+    pr_number: int,
+    *,
+    token: str,
+    trusted_actors: Sequence[str] = (),
+    timeout: float = 30.0,
+) -> Dict[str, Any]:
+    """Merge PR commits and reviewer instructions into one ordered timeline.
+
+    Git carries the commit timeline but not the review conversation, and the
+    confined agent has no GitHub credentials, so the dispatcher - which does -
+    has to place both on a single clock. Best effort by design: a GitHub outage
+    must not block a dispatch, so failures are reported inside the packet.
+    """
+
+    entries: List[Dict[str, Any]] = []
+    errors: List[str] = []
+
+    def fetch(path: str) -> List[Any]:
+        try:
+            status, payload = github_api("GET", path, token=token, timeout=timeout)
+        except Exception as exc:  # network, DNS, TLS
+            errors.append(f"{path}: {exc.__class__.__name__}")
+            return []
+        if status != 200 or not isinstance(payload, list):
+            errors.append(f"{path}: HTTP {status}")
+            return []
+        return payload
+
+    for commit in fetch(f"/repos/{repo}/pulls/{pr_number}/commits"):
+        info = commit.get("commit") or {}
+        message = (info.get("message") or "").strip()
+        entries.append({
+            "kind": "commit",
+            "at": (info.get("committer") or {}).get("date") or "",
+            "actor": (commit.get("author") or {}).get("login") or "builder",
+            "sha": (commit.get("sha") or "")[:8],
+            "text": message.splitlines()[0] if message else "",
+        })
+
+    def add_instruction(kind: str, entry: Mapping[str, Any], **extra: Any) -> None:
+        actor = ((entry.get("user") or {}).get("login")) or ""
+        # Only the trusted humans can issue instructions; the Builder's own
+        # output is never an instruction to itself.
+        if trusted_actors and actor not in trusted_actors:
+            return
+        body = (entry.get("body") or "").strip()
+        if not body:
+            return
+        entries.append({
+            "kind": kind,
+            "at": entry.get("submitted_at") or entry.get("created_at") or "",
+            "actor": actor,
+            "text": body,
+            **extra,
+        })
+
+    for review in fetch(f"/repos/{repo}/pulls/{pr_number}/reviews"):
+        add_instruction("review", review, state=(review.get("state") or ""))
+    for comment in fetch(f"/repos/{repo}/issues/{pr_number}/comments"):
+        add_instruction("comment", comment)
+    for comment in fetch(f"/repos/{repo}/pulls/{pr_number}/comments"):
+        add_instruction(
+            "inline",
+            comment,
+            path=(comment.get("path") or ""),
+            line=comment.get("line"),
+        )
+
+    entries.sort(key=lambda item: (item.get("at") or "", item.get("kind") or ""))
+    commits = [e for e in entries if e["kind"] == "commit"]
+    latest_commit = commits[-1] if commits else None
+    latest_commit_at = latest_commit.get("at") if latest_commit else None
+    unaddressed = [
+        e for e in entries
+        if e["kind"] != "commit" and latest_commit_at and (e.get("at") or "") > latest_commit_at
+    ]
+    if not commits:
+        # No Builder commit yet: every instruction is still open.
+        unaddressed = [e for e in entries if e["kind"] != "commit"]
+
+    truncated = len(entries) > PR_TIMELINE_ENTRY_LIMIT
+    return {
+        "fetched": not errors or bool(entries),
+        "entries": entries[-PR_TIMELINE_ENTRY_LIMIT:],
+        "truncated": truncated,
+        "latest_commit": latest_commit,
+        "unaddressed": unaddressed,
+        "errors": errors,
+    }
+
+
+def render_review_timeline(
+    timeline: Optional[Mapping[str, Any]],
+    *,
+    secrets: Iterable[str] = (),
+    pr_number: Optional[int] = None,
+) -> List[str]:
+    """Render the merged timeline so "which instruction is newest" is explicit."""
+
+    if not timeline:
+        return []
+    lines = ["", "## PR review timeline", ""]
+    if pr_number is not None:
+        lines.append(f"PR #{pr_number}: Builder commits and reviewer instructions on one clock.")
+    if timeline.get("errors"):
+        lines += [
+            "",
+            "Some sources could not be read this dispatch:",
+            *[f"- {redact(str(e), secrets)}" for e in timeline["errors"]],
+        ]
+    if timeline.get("truncated"):
+        lines += ["", f"(older entries omitted; showing the most recent {PR_TIMELINE_ENTRY_LIMIT})"]
+
+    entries = timeline.get("entries") or []
+    latest = timeline.get("latest_commit") or {}
+    latest_sha = latest.get("sha")
+    if entries:
+        lines += ["", "```text"]
+        for entry in entries:
+            stamp = (entry.get("at") or "")[:19].replace("T", " ").replace("Z", "")
+            if entry["kind"] == "commit":
+                marker = "  <- latest Builder commit" if entry.get("sha") == latest_sha else ""
+                lines.append(f"{stamp}  COMMIT  {entry.get('sha','')}  {redact(entry.get('text',''), secrets)}{marker}")
+                continue
+            where = entry["kind"].upper()
+            if entry.get("state"):
+                where += f" {entry['state']}"
+            if entry.get("path"):
+                where += f" {entry['path']}:{entry.get('line')}"
+            lines.append(f"{stamp}  {where}  {entry.get('actor','')}")
+            for body_line in redact(entry.get("text", ""), secrets).splitlines():
+                lines.append(f"    {body_line}")
+        lines.append("```")
+
+    unaddressed = timeline.get("unaddressed") or []
+    lines += ["", "### Newest instruction", ""]
+    if unaddressed:
+        newest = unaddressed[-1]
+        lines += [
+            "Everything the reviewer posted **after** the latest Builder commit is unaddressed.",
+            "The newest such instruction is below; it supersedes anything earlier.",
+            "",
+            f"- posted: {redact(newest.get('at',''), secrets)}",
+            f"- by: {redact(newest.get('actor',''), secrets)} ({newest.get('kind')}"
+            + (f", {newest['state']}" if newest.get("state") else "")
+            + ")",
+            f"- open instructions in this round: {len(unaddressed)}",
+            "",
+            "```text",
+            redact(newest.get("text", ""), secrets)[:PR_TIMELINE_INSTRUCTION_CHARS],
+            "```",
+        ]
+    else:
+        lines += [
+            "No reviewer instruction is newer than the latest Builder commit, so there is",
+            "nothing unaddressed in this timeline. Follow the task contract and review delta.",
+        ]
+    return lines
+
+
 def write_task_packet(
     worktree: Path,
     spec: TaskSpec,
@@ -877,6 +1045,8 @@ def write_task_packet(
     data_entries: Optional[Mapping[str, Mapping[str, str]]] = None,
     caches: Optional[Mapping[str, str]] = None,
     project_store: Optional[Path] = None,
+    pr_timeline: Optional[Mapping[str, Any]] = None,
+    secrets: Iterable[str] = (),
 ) -> Path:
     """Materialise the deterministic local task packet (never committed)."""
 
@@ -907,6 +1077,9 @@ def write_task_packet(
         lines.append("## Review delta")
         lines.append("")
         lines.append(review_delta.strip())
+        lines += render_review_timeline(
+            pr_timeline, secrets=secrets, pr_number=spec.pr_number
+        )
     if data_entries:
         lines += ["", "## Read-only data available", ""]
         for name, entry in sorted(data_entries.items()):
@@ -2075,6 +2248,15 @@ def dispatch(
         for key in ("UV_CACHE_DIR", "PIP_CACHE_DIR"):
             Path(caches[key]).mkdir(parents=True, exist_ok=True)
 
+        pr_timeline = None
+        if lane == LANE_BUILDER and spec.pr_number:
+            pr_timeline = fetch_pr_timeline(
+                repo,
+                spec.pr_number,
+                token=github_token or "",
+                trusted_actors=trusted_actors,
+            )
+
         packet = write_task_packet(
             worktree,
             spec,
@@ -2083,6 +2265,8 @@ def dispatch(
             data_entries=data_entries,
             caches=caches,
             project_store=project_store,
+            pr_timeline=pr_timeline,
+            secrets=redaction_terms(env),
         )
 
         child_env = scrubbed_env(env)
