@@ -400,6 +400,115 @@ class LabelAndLaneTests(DispatchTestCase):
 # ---------------------------------------------------------------------------
 
 
+class ScienceSandboxTests(DispatchTestCase):
+    """The Science lane must run under the same sandbox profile as the Builder lane."""
+
+    def _fake_sandbox_runner(self):
+        script = self.tmp / "fake-sandbox-runner"
+        script.write_text(
+            "#!/bin/sh\n"
+            "# Record every argument, then execute the command after --.\n"
+            'printf "%s\\n" "$@" > "$CB16_FAKE_LOG"\n'
+            'while [ "$#" -gt 0 ]; do\n'
+            '  if [ "$1" = "--" ]; then shift; break; fi\n'
+            "  shift\n"
+            "done\n"
+            'exec "$@"\n',
+            encoding="utf-8",
+        )
+        script.chmod(0o755)
+        return script
+
+    def test_science_profile_mirrors_the_builder_profile(self):
+        argv = dispatcher.science_sandbox_argv(
+            ["python3", "-m", "cb16_science.noop"], self.repo, sandbox_runner="/x/wrapper"
+        )
+        self.assertEqual(argv[0], "/x/wrapper")
+        self.assertIn("--ro-bind", argv)
+        self.assertEqual(argv[argv.index("--ro-bind") + 1 : argv.index("--ro-bind") + 3], ["/", "/"])
+        self.assertEqual(argv[argv.index("--bind") + 1 : argv.index("--bind") + 3], [str(self.repo), str(self.repo)])
+        self.assertEqual(
+            argv[argv.index("--") + 1 :], ["python3", "-m", "cb16_science.noop"]
+        )
+        # No --unshare-* flags: the wrapper's masks plus the read-only root are
+        # what the Builder lane relies on too.
+        self.assertFalse([a for a in argv if a.startswith("--unshare")])
+
+    def test_entrypoint_is_executed_through_the_sandbox_wrapper(self):
+        allowlist = dispatcher.load_allowlist(ALLOWLIST_PATH)
+        spec = dispatcher.validate_metadata(
+            self.science_meta(result_command="cb16.smoke@v1"), "science", allowlist=allowlist
+        )
+        wrapper = self._fake_sandbox_runner()
+        log = self.tmp / "argv.log"
+        env = {
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "HOME": str(self.home),
+            "CB16_FAKE_LOG": str(log),
+        }
+        result_dir = self.repo / ".cb16" / "results"
+
+        result = dispatcher.run_science_entrypoint(
+            self.repo,
+            spec,
+            allowlist=allowlist,
+            env=env,
+            result_dir=result_dir,
+            sandbox_runner=str(wrapper),
+        )
+
+        self.assertEqual(result.exit_code, 0, result.stderr)
+        self.assertEqual(result.note, "sandboxed")
+        recorded = log.read_text(encoding="utf-8").splitlines()
+        self.assertIn("--ro-bind", recorded)
+        self.assertIn(str(self.repo), recorded)
+        self.assertIn("--", recorded)
+        self.assertTrue((result_dir / "RESULT.json").exists())
+
+    def test_require_mode_fails_closed_without_a_wrapper(self):
+        env = dict(self.base_env)
+        env["CB16_SCIENCE_SANDBOX"] = "require"
+        env["CB16_SANDBOX_RUNNER"] = str(self.tmp / "does-not-exist")
+        with self.assertRaises(dispatcher.ExecutionBlocked):
+            dispatcher.resolve_sandbox_runner(env)
+
+    def test_off_mode_disables_wrapping(self):
+        env = dict(self.base_env)
+        env["CB16_SCIENCE_SANDBOX"] = "off"
+        self.assertIsNone(dispatcher.resolve_sandbox_runner(env))
+
+    def test_science_lane_writes_results_inside_the_worktree(self):
+        captured = {}
+
+        def spy(worktree, spec, **kwargs):
+            captured["result_dir"] = Path(kwargs["result_dir"])
+            captured["worktree"] = Path(worktree)
+            rd = Path(kwargs["result_dir"])
+            rd.mkdir(parents=True, exist_ok=True)
+            (rd / "RESULT.json").write_text('{"status": "DRY_RUN"}\n', encoding="utf-8")
+            (rd / "REPORT.md").write_text("# r\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
+
+        outcome = self.dispatch(lane="science", dry_run=True, science_invoker=spy)
+        self.assertTrue(
+            str(captured["result_dir"]).startswith(str(captured["worktree"])),
+            "the lane must write inside the worktree it is allowed to write to",
+        )
+        published = outcome.evidence["summary"].parent / "results"
+        self.assertTrue((published / "RESULT.json").exists())
+        self.assertTrue((published / "REPORT.md").exists())
+        self.assertEqual(outcome.summary["result_dir"], str(published))
+
+    def test_results_written_outside_the_worktree_are_still_flagged(self):
+        # The produced-artifact check must look at the published copy, not at a
+        # path the lane could not have written to.
+        def spy(worktree, spec, **kwargs):
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
+
+        outcome = self.dispatch(lane="science", dry_run=True, science_invoker=spy)
+        self.assertEqual(outcome.classification, dispatcher.CLASS_EVIDENCE_INSUFFICIENT)
+
+
 class ScienceLaneTests(DispatchTestCase):
     def test_science_lane_never_invokes_dsh(self):
         def forbidden_dsh(*args, **kwargs):

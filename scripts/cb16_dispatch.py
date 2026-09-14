@@ -1046,6 +1046,56 @@ def invoke_dsh(
     return RunResult(exit_code=proc.returncode, stdout=proc.stdout or "", stderr=proc.stderr or "")
 
 
+def resolve_sandbox_runner(env: Mapping[str, str]) -> Optional[str]:
+    """Locate the sandbox wrapper used by both lanes.
+
+    ``CB16_SCIENCE_SANDBOX=require`` fails closed when it is missing, which is
+    what the dispatch workflow sets; ``auto`` degrades with a recorded note and
+    ``off`` disables wrapping explicitly.
+    """
+
+    mode = (env.get("CB16_SCIENCE_SANDBOX") or "auto").strip().lower()
+    if mode == "off":
+        return None
+    explicit = (env.get("CB16_SANDBOX_RUNNER") or "").strip()
+    if explicit:
+        if Path(explicit).exists():
+            return explicit
+        if mode == "require":
+            raise ExecutionBlocked(f"science sandbox wrapper not found: {explicit}")
+        return None
+    found = shutil.which("cb16-sandbox-runner")
+    if found:
+        return found
+    if mode == "require":
+        raise ExecutionBlocked(
+            "science sandbox required but cb16-sandbox-runner is not on PATH",
+            detail="set CB16_SANDBOX_RUNNER or CB16_SCIENCE_SANDBOX=off to override",
+        )
+    return None
+
+
+def science_sandbox_argv(
+    argv: Sequence[str], worktree: Path, *, sandbox_runner: str
+) -> List[str]:
+    """Wrap the Science entrypoint in the same profile the Builder lane uses.
+
+    Mirrors the workspace-write profile the DSH sandbox provider builds, so the
+    Science lane sees the same writable roots and the same masked paths as a
+    sandboxed Builder run.
+    """
+
+    profile = [
+        "--ro-bind", "/", "/",
+        "--dev", "/dev",
+        "--proc", "/proc",
+        "--die-with-parent",
+        "--tmpfs", "/tmp",
+        "--bind", str(worktree), str(worktree),
+    ]
+    return [sandbox_runner, *profile, "--", *argv]
+
+
 def run_science_entrypoint(
     worktree: Path,
     spec: TaskSpec,
@@ -1054,6 +1104,7 @@ def run_science_entrypoint(
     env: Mapping[str, str],
     result_dir: Path,
     timeout: float = 7200,
+    sandbox_runner: Optional[str] = None,
 ) -> RunResult:
     """Run the frozen Science lane.  This function must never invoke DSH.
 
@@ -1073,6 +1124,9 @@ def run_science_entrypoint(
         )
 
     argv = resolve_allowlisted_argv(entrypoint, worktree)
+    wrapped = sandbox_runner is not None
+    if wrapped:
+        argv = science_sandbox_argv(argv, worktree, sandbox_runner=sandbox_runner)
     child_env = dict(env)
     for key, value in (entrypoint.get("env") or {}).items():
         if not re.match(r"^[A-Z][A-Z0-9_]*$", str(key)):
@@ -1095,8 +1149,19 @@ def run_science_entrypoint(
     except FileNotFoundError as exc:
         raise ExecutionBlocked("science entrypoint not found", detail=str(exc))
     except subprocess.TimeoutExpired as exc:
-        return RunResult(exit_code=124, stdout=exc.stdout or "", stderr=exc.stderr or "", timed_out=True)
-    return RunResult(exit_code=proc.returncode, stdout=proc.stdout or "", stderr=proc.stderr or "")
+        return RunResult(
+            exit_code=124,
+            stdout=exc.stdout or "",
+            stderr=exc.stderr or "",
+            timed_out=True,
+            note="sandboxed" if wrapped else "unsandboxed",
+        )
+    return RunResult(
+        exit_code=proc.returncode,
+        stdout=proc.stdout or "",
+        stderr=proc.stderr or "",
+        note="sandboxed" if wrapped else "unsandboxed",
+    )
 
 
 def run_dry_run(worktree: Path, spec: TaskSpec, *, result_dir: Path) -> RunResult:
@@ -1194,6 +1259,24 @@ def synthesize_build_report(
         lines.append(f"Note: {run_result.note}")
     lines.append("Known unresolved: see Actions log and evidence bundle")
     return "\n".join(lines)
+
+
+def publish_science_results(lane_dir: Path, published_dir: Path) -> List[str]:
+    """Copy the Science result package out of the worktree for artifact upload."""
+
+    if not lane_dir.is_dir():
+        return []
+    published_dir.mkdir(parents=True, exist_ok=True)
+    copied: List[str] = []
+    for item in sorted(lane_dir.rglob("*")):
+        if not item.is_file():
+            continue
+        relative = item.relative_to(lane_dir)
+        target = published_dir / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(item, target)
+        copied.append(str(relative))
+    return copied
 
 
 def write_evidence(
@@ -1484,6 +1567,7 @@ def dispatch(
     redactions = redaction_terms(env)
     data_entries, data_missing = load_data_manifest(data_manifest_path)
     project_store = resolve_project_store(env)
+    science_sandbox_runner = resolve_sandbox_runner(env)
 
     with TaskLock(state_dir, trigger.issue_number, lane):
         worktree, reused = ensure_worktree(repo_path, work_root, spec)
@@ -1517,10 +1601,14 @@ def dispatch(
             child_env["CB16_STORE"] = str(project_store)
         if data_entries:
             child_env["CB16_DATA_ROOT"] = str(next(iter(data_entries.values()))["path"])
-        result_dir = report_dir / "results"
+        # The sandbox only permits writes under the worktree, so the Science
+        # lane writes its result package there and the dispatcher copies it out
+        # for artifact upload.
+        lane_result_dir = (worktree / ".cb16" / "results") if lane == LANE_SCIENCE else (report_dir / "results")
+        published_result_dir = report_dir / "results"
 
         if dry_run and lane == LANE_BUILDER:
-            run_result = run_dry_run(worktree, spec, result_dir=result_dir)
+            run_result = run_dry_run(worktree, spec, result_dir=lane_result_dir)
         elif lane == LANE_BUILDER:
             invoker = dsh_invoker or invoke_dsh
             run_result = invoker(
@@ -1539,8 +1627,9 @@ def dispatch(
                 spec,
                 allowlist=allowlist,
                 env=science_env,
-                result_dir=result_dir,
+                result_dir=lane_result_dir,
                 timeout=dsh_timeout,
+                **({"sandbox_runner": science_sandbox_runner} if science_invoker is None else {}),
             )
 
         changed = collect_changed_files(worktree)
@@ -1559,8 +1648,9 @@ def dispatch(
                     "science lane mutated the worktree; frozen runs may not edit source or config",
                     detail=", ".join(changed[:20]),
                 )
+            publish_science_results(lane_result_dir, published_result_dir)
             expected = allowlist["entrypoints"][spec.result_command or ""].get("produces", [])
-            missing = [name for name in expected if not (result_dir / name).exists()]
+            missing = [name for name in expected if not (published_result_dir / name).exists()]
             if missing and classification == CLASS_OK:
                 classification = CLASS_EVIDENCE_INSUFFICIENT
         else:
@@ -1615,6 +1705,7 @@ def dispatch(
             "read_only_data_missing": data_missing,
             "workspace_caches": caches,
             "project_store": str(project_store) if project_store else None,
+            "science_sandbox": science_sandbox_runner or "unsandboxed",
             "host_identifiers_redacted": len(redactions),
             "credential_warnings": warnings,
             "published": False,
@@ -1644,7 +1735,7 @@ def dispatch(
             else:
                 # The Science lane never mutates a branch, so it publishes no PR:
                 # its result package travels as Actions artifacts.
-                summary["result_dir"] = str(result_dir)
+                summary["result_dir"] = str(published_result_dir)
             summary["published"] = True
             set_issue_labels(
                 token=github_token, slug=repo, issue_number=trigger.issue_number, add=[REVIEW_LABEL]
@@ -1668,6 +1759,9 @@ def dispatch(
                 )
             except DispatchError as exc:
                 warnings.append(f"could not comment on Issue #{trigger.issue_number}: {exc.message}")
+
+        if lane == LANE_SCIENCE:
+            summary["result_dir"] = str(published_result_dir)
 
         evidence = write_evidence(
             report_dir,

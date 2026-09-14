@@ -52,6 +52,9 @@ jobs:
           # published path.
           CB16_WORK_ROOT: ${{ vars.CB16_WORK_ROOT }}
           CB16_STATE_DIR: ${{ vars.CB16_STATE_DIR }}
+          # Fail closed when the sandbox wrapper is missing: the Science lane
+          # must run under the same confinement as the Builder lane.
+          CB16_SCIENCE_SANDBOX: require
           PYTHONUNBUFFERED: "1"
         run: |
           set -euo pipefail
