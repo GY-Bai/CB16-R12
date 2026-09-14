@@ -21,9 +21,99 @@ a_t=\pi(Z_t,A_t,X_t)
 
 If execution economics are fixed and identical across the relevant environment, \(X_t\) may be empty. A future learned-memory interface \(S_t\) is reserved, but R12 v1 does not require it.
 
-## 3. Market state
+## 3. Market state and OHLCV normalization
 
-The Trader reacts to relative K-line structure, not BTC/ETH/BNB identity or nominal price scale. Price-bearing inputs are causally normalized before frozen sensory models produce \(Z_t\). Exact normalization is frozen per experiment.
+The Trader reacts to relative K-line structure, not asset identity or nominal price/volume units.
+
+Normalization is deterministic and causal in v1. Do not introduce a learned normalization network, global full-dataset scaler, or hand-engineered technical-indicator stack by default.
+
+Assume the decision at time \(t\) is made only after bar \(t\) is fully observed. Let the causal context window be:
+
+\[
+\tau\in\{t-L+1,\dots,t\}.
+\]
+
+### 3.1 Price channels
+
+Use the latest fully observed close \(C_t\) as the common price anchor for the whole window. For every bar \(\tau\):
+
+\[
+p^{O}_{\tau}=\log\frac{O_{\tau}}{C_t},\qquad
+p^{H}_{\tau}=\log\frac{H_{\tau}}{C_t},
+\]
+
+\[
+p^{L}_{\tau}=\log\frac{L_{\tau}}{C_t},\qquad
+p^{C}_{\tau}=\log\frac{C_{\tau}}{C_t}.
+\]
+
+Therefore:
+
+\[
+p^C_t=0.
+\]
+
+This removes nominal price scale while preserving the relative path, candle geometry, gaps, and percentage move magnitude. For example:
+
+\[
+p^H_{\tau}-p^L_{\tau}=\log\frac{H_{\tau}}{L_{\tau}}.
+\]
+
+Multiplying every price in the window by any positive constant must not change normalized price input.
+
+Do not divide the normalized price window by its own volatility in the v1 baseline. Percentage-volatility amplitude is dimensionless economic market information and should not be erased merely to make different assets look more similar.
+
+### 3.2 Volume channel
+
+Raw base-asset volume is unit-dependent and must not be fed directly to the policy.
+
+Let \(B_t\) be a positive causal volume baseline computed only from the observed context window; the v1 candidate is the window median:
+
+\[
+B_t=\operatorname{median}(V_{t-L+1:t}).
+\]
+
+For \(B_t>0\), use dimensionless relative volume:
+
+\[
+v_{\tau}
+=
+\log\left(\max\left(\frac{V_{\tau}}{B_t},\epsilon_v\right)\right),
+\]
+
+where \(\epsilon_v>0\) is a small dimensionless numerical floor frozen before an experiment.
+
+Multiplying all volumes in the window by any positive unit-conversion constant must not change \(v_{\tau}\).
+
+A zero/invalid volume baseline is a data-quality condition that must be handled explicitly by the data contract; do not silently substitute future statistics.
+
+### 3.3 v1 market tensor
+
+The direct normalized K-line tensor is therefore conceptually:
+
+\[
+K_t^{norm}
+=
+\{p^O_{\tau},p^H_{\tau},p^L_{\tau},p^C_{\tau},v_{\tau}\}_{\tau=t-L+1}^{t}.
+\]
+
+Frozen sensory models transform this relative context into \(Z_t\). The Central Brain does not receive the raw OHLCV values in parallel.
+
+A sensory component that cannot consume the frozen normalized interface is a component-compatibility issue; it is not a reason to reintroduce nominal asset scale into the Central Brain.
+
+### 3.4 Required normalization invariants
+
+The implementation must test at least:
+
+1. **Price-scale invariance** — multiplying all OHLC prices by \(\lambda>0\) leaves normalized price input unchanged.
+2. **Volume-unit invariance** — multiplying all volumes by \(\mu>0\) leaves normalized volume input unchanged.
+3. **Causality** — modifying any bar after \(t\) cannot change the state produced for time \(t\).
+4. **Completed-bar contract** — every value used to form the state was observable before the nominal action was produced.
+5. **Geometry preservation** — OHLC ordering and log-ratio candle relationships are preserved by the monotone transform.
+6. **No trivial identity channel** — symbol, venue, raw nominal price, and raw nominal volume are absent from policy input.
+7. **Finite-output contract** — invalid prices, non-positive prices, non-finite values, and unusable volume baselines fail explicitly rather than being silently repaired with future information.
+
+Alternative normalization families, including per-bar returns, rolling z-scores, RevIN-like transforms, or volatility-normalized returns, are challengers that require a frozen ablation. They are not stacked together in the v1 baseline.
 
 ## 4. AccountState v1
 
@@ -177,6 +267,7 @@ The Pareto Archive stores qualified non-dominated policies. Active Champion is t
 - survival cushion != new-risk capacity
 - transaction cost != carry cost
 - environment parameter != policy state
+- nominal scale != relative market structure
 
 ## 9. Scientific validity
 
@@ -186,7 +277,8 @@ Formal experiments freeze question, data, transforms, metrics, and gates before 
 
 ## 10. Open decisions
 
-- exact K-line normalization;
+- exact context length \(L\) and volume numerical floor \(\epsilon_v\);
+- whether endpoint-anchored log-ratio normalization defeats challengers under frozen ablation;
 - exact numerical scaling/clipping of \(e_t,s_t,c_t\);
 - exact frozen v1 proportional execution convention and whether \(X_t\) can remain empty;
 - whether variable carry/funding/borrow economics are modeled in v1;
