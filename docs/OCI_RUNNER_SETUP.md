@@ -492,6 +492,82 @@ session profile pins `compaction-basic` to `thresholdRatio 0.75`,
 defaults. See the plugin README for the arithmetic and for why the retry budget,
 not the threshold, is what catches a boundary rejection.
 
+## 1l. The PR review timeline in a fix round
+
+A reviewer's instructions arrive as PR **review/comment text**, which never
+enters Git, and the confined Builder agent has no GitHub credentials (`gh` is
+masked and the child environment carries no token). A `mode: fix` dispatch
+therefore used to hand the agent little more than `review_delta` - a terse label
+such as `exact_commit_implementation_test_gate` - leaving it to guess which
+instruction was newest.
+
+For any Builder dispatch that carries `pr_number`, the dispatcher now fetches,
+with its own token:
+
+| Source | Endpoint |
+| --- | --- |
+| commits | `GET /repos/{repo}/pulls/{n}/commits` |
+| reviews | `GET /repos/{repo}/pulls/{n}/reviews` |
+| issue comments | `GET /repos/{repo}/issues/{n}/comments` |
+| inline review comments | `GET /repos/{repo}/pulls/{n}/comments` |
+
+and merges them with the commit history onto **one clock**, sorted by
+timestamp, in the task packet:
+
+```text
+2026-09-14 17:02:17  COMMIT  2e13afc1  CB16 builder: issue #35 (build)
+2026-09-14 17:07:50  REVIEW CHANGES_REQUESTED  GY-Bai
+    One semantic blocker before merge. ...
+2026-09-14 17:29:28  COMMIT  0079955d  CB16 builder: issue #35 (fix)  <- latest Builder commit
+```
+
+The section then states explicitly which instructions were posted **after** the
+latest Builder commit - those are the unaddressed ones - and repeats the newest
+verbatim under `### Newest instruction`, so "which instruction is current" is
+never inferred from prose.
+
+Properties worth keeping:
+
+* **trusted actors only** - a review or comment from outside the trusted list is
+  not an instruction, so a bystander cannot inject task scope;
+* **best effort** - a GitHub outage records the failing sources in the packet
+  and never blocks the dispatch;
+* **bounded** - the newest 40 entries, bodies truncated, so a long review thread
+  cannot blow up the packet;
+* **redacted** - bodies pass through the same host-identifier scrubbing as the
+  rest of the evidence.
+
+## 1m. Which instruction source wins
+
+Five places can look like an instruction, and a fix round can hold several at
+once. The task packet therefore opens with an explicit ranking so the agent
+never has to infer which one is current:
+
+| Rank | Source | Authority |
+| --- | --- | --- |
+| 1 | the `cb16` trusted metadata block | machine-validated envelope (`mode`, `base_sha`, `branch`, `task_file`, `pr_number`, `review_delta`, `session_affinity`); decides what may run at all |
+| 2 | the task contract file at `base_sha` | the task itself - scope, required tests, done-when; version-controlled and pinned |
+| 3 | the newest unaddressed reviewer instruction | what the current fix round must change; narrows scope, never overrides 1-2 |
+| 4 | the Issue description | the operator's framing; context only, never a contract |
+| - | anything from an untrusted actor | not an instruction at all |
+
+If sources 1-3 disagree the packet tells the agent to stop short of the
+conflicting change and report the conflict in `BUILD_REPORT` rather than guess.
+
+The same ranking is repeated in the prompt of every resumed session. A resumed
+turn carries the whole earlier conversation, including an earlier task packet,
+an earlier review delta and an earlier reviewer comment - all of which are
+superseded. The prompt therefore states that history is not the current
+instruction, points at the packet on disk as the current one, and repeats the
+four ranks, so the agent cannot mistake remembered state for present state.
+
+The Issue description is the prose outside the metadata fence. It used to be
+dropped in silence, which cost real instructions - one Issue carried 1,712
+characters of change request outside the fence and the agent never saw a word
+of it. It is now included, truncated at 8,000 characters with a marker, and
+**only when the Issue author is a trusted actor**: an untrusted author's prose
+is omitted with a visible note instead of being obeyed.
+
 ## 2. Repository variables
 
 Set these as repository Actions **variables** (not secrets) — they are paths,
