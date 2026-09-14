@@ -514,6 +514,15 @@ def validate_metadata(
 # --------------------------------------------------------------------------
 
 
+def build_pr_title(issue_title: str, issue_number: int) -> str:
+    """Compose the Draft PR title without doubling an existing task prefix."""
+
+    title = (issue_title or "").strip() or f"Issue #{issue_number}"
+    if not title.lstrip().upper().startswith("[R12]"):
+        title = f"[R12] {title}"
+    return title[:200]
+
+
 def load_allowlist(path: Path) -> Mapping[str, Any]:
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -1443,7 +1452,7 @@ def dispatch(
                     slug=repo,
                     branch=spec.branch,
                     base=trigger.default_branch,
-                    title=f"[R12] {trigger.title or ('Issue #%d' % trigger.issue_number)}"[:200],
+                    title=build_pr_title(trigger.title, trigger.issue_number),
                     body=report_text,
                     pr_number=spec.pr_number,
                 )

@@ -416,6 +416,25 @@ class ScienceLaneTests(DispatchTestCase):
         self.assertNotIn("invoke_dsh", names)
         self.assertNotIn("dsh_bin", names)
 
+    def test_smoke_entrypoint_is_allowed_but_noop_stays_dry_run_only(self):
+        allowlist = dispatcher.load_allowlist(ALLOWLIST_PATH)
+        entrypoints = allowlist["entrypoints"]
+        self.assertTrue(entrypoints["cb16.noop@v1"].get("dry_run_only"))
+        self.assertFalse(entrypoints["cb16.smoke@v1"].get("dry_run_only"))
+        spec = dispatcher.validate_metadata(
+            self.science_meta(result_command="cb16.smoke@v1"), "science", allowlist=allowlist
+        )
+        self.assertEqual(spec.result_command, "cb16.smoke@v1")
+
+    def test_smoke_entrypoint_runs_in_a_dispatched_science_lane(self):
+        allowlist = dispatcher.load_allowlist(ALLOWLIST_PATH)
+        meta = self.science_meta(result_command="cb16.smoke@v1")
+        outcome = self.dispatch(lane="science", meta=meta, dry_run=False)
+        self.assertEqual(outcome.classification, dispatcher.CLASS_OK)
+        result_dir = outcome.evidence["summary"].parent / "results"
+        self.assertTrue((result_dir / "RESULT.json").exists())
+        self.assertTrue((result_dir / "REPORT.md").exists())
+
     def test_science_only_runs_allowlisted_entrypoints(self):
         meta = self.science_meta(result_command="cb16.arbitrary@v1")
         with self.assertRaises(dispatcher.ContractMismatch):
@@ -749,6 +768,15 @@ class PublishFlowTests(DispatchTestCase):
             signature.parameters["author_email"].default,
             "37661207+GY-Bai@users.noreply.github.com",
         )
+
+    def test_pr_title_does_not_double_the_task_prefix(self):
+        self.assertEqual(
+            dispatcher.build_pr_title("[R12] DISPATCH DRY RUN — Builder lane", 3),
+            "[R12] DISPATCH DRY RUN — Builder lane",
+        )
+        self.assertEqual(dispatcher.build_pr_title("Fix the thing", 3), "[R12] Fix the thing")
+        self.assertEqual(dispatcher.build_pr_title("", 42), "[R12] Issue #42")
+        self.assertLessEqual(len(dispatcher.build_pr_title("x" * 400, 1)), 200)
 
     def test_builder_lane_publishes_a_draft_pull_request(self):
         calls = self._patch_api()
