@@ -47,6 +47,10 @@ jobs:
           # final Issue label transition.
           CB16_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CB16_TRUSTED_ACTORS: ${{ github.repository_owner }}
+          # Without this the dispatcher falls back to its default under the
+          # account home, which would put the account name back into every
+          # published path.
+          CB16_WORK_ROOT: ${{ vars.CB16_WORK_ROOT }}
           CB16_STATE_DIR: ${{ vars.CB16_STATE_DIR }}
           PYTHONUNBUFFERED: "1"
         run: |
