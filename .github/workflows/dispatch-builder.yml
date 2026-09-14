@@ -22,7 +22,7 @@ jobs:
     if: >-
       github.event.label.name == 'ds:run' &&
       github.repository == 'GY-Bai/CB16-R12'
-    runs-on: [self-hosted, Linux, ARM64, japan-oci, r12]
+    runs-on: [self-hosted, Linux, ARM64, oci-cpu, r12]
     timeout-minutes: 60
     steps:
       - name: Validate trusted trigger
