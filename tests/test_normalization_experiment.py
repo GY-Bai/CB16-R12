@@ -3,8 +3,10 @@
 Covers the required evidence checks: the five candidate IDs are present in the
 result schema, the three declared artifacts are written, the spec freezes the
 contract values plus the resolved archive basenames and commit SHA, candidates
-with invalid windows stay candidate-local, no winner is promoted, and both new
-Science commands resolve through the repository allowlist.
+with invalid windows stay candidate-local, the interpretation table states the
+frozen invertibility labels (N0/N1 true, N2/N3/N4 false), no winner is
+promoted, and both new Science commands resolve through the repository
+allowlist.
 
     python3 -m unittest discover -s tests -t .
 """
@@ -43,6 +45,7 @@ fixtures = support.fixtures
 
 from cb16_science.normalization import diagnostics, experiment  # noqa: E402
 from cb16_science.normalization.contract import (  # noqa: E402
+    CANDIDATES,
     CANDIDATE_IDS,
     CONTEXT_LENGTH,
     EPS_STD,
@@ -66,6 +69,30 @@ from cb16_science.normalization.reporting import (  # noqa: E402
 )
 
 COMMIT_SHA = "a" * 40
+INTERPRETATION_HEADING = "## Interpretation fields (not a winner)"
+
+
+def _interpretation_rows(report: str):
+    """Parse the REPORT.md interpretation table into per-candidate cell maps."""
+
+    lines = report.splitlines()
+    if INTERPRETATION_HEADING not in lines:
+        raise AssertionError("report has no interpretation section")
+    rows = {}
+    for line in lines[lines.index(INTERPRETATION_HEADING) :]:
+        if not line.startswith("| `"):
+            if rows:
+                break
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        rows[cells[0].strip("`")] = {
+            "scale_invariant": cells[1],
+            "ohlc_order": cells[2],
+            "relative_vol_amplitude": cells[3],
+            "invertible": cells[4],
+            "removed": cells[5],
+        }
+    return rows
 
 
 class SmallExperimentTests(unittest.TestCase):
@@ -232,8 +259,6 @@ class CandidateInvalidWindowTests(unittest.TestCase):
         raw_windows[1, :, 3] = constant
         matrix = diagnostics.projection_matrix()
 
-        from cb16_science.normalization.contract import CANDIDATES
-
         candidates = {candidate["candidate_id"]: candidate for candidate in CANDIDATES}
         for candidate_id in ("N2", "N4"):
             with self.subTest(candidate=candidate_id):
@@ -385,6 +410,82 @@ class AllowlistTests(unittest.TestCase):
                 self.assertEqual(
                     dispatcher.resolve_allowlisted_argv(entry, REPO_ROOT), expected["argv"]
                 )
+
+
+class InterpretationTableTests(unittest.TestCase):
+    """Focused interpretation labels: N0=true N1=true N2=false N3=false N4=false.
+
+    The price channels of N2 and N4 are divided by a window-derived dispersion
+    statistic, so their relative price path is no longer determined up to one
+    positive common scale factor; the labels are declared from the fixed
+    formulas, never fitted to the probes.
+    """
+
+    #: Frozen review table for
+    #: ``invertible_to_relative_price_path_up_to_common_scale``.
+    EXPECTED_INVERTIBLE = {
+        "N0": True,
+        "N1": True,
+        "N2": False,
+        "N3": False,
+        "N4": False,
+    }
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.tmp = Path(tempfile.mkdtemp(prefix="cb16-interpretation-test-"))
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, ignore_errors=True)
+        cls.root = fixtures.build_klines_root(cls.tmp / "klines", months=("2020-01",))
+        cls.result_dir = cls.tmp / "results"
+        cls.outcome = experiment.run_experiment(
+            result_dir=cls.result_dir,
+            klines_root=cls.root,
+            months=("2020-01",),
+            max_windows=32,
+            env={"CB16_COMMIT_SHA": COMMIT_SHA},
+        )
+        cls.report = (cls.result_dir / REPORT_FILENAME).read_text(encoding="utf-8")
+
+    def test_declared_contract_invertibility_table(self):
+        declared = {
+            candidate["candidate_id"]: bool(
+                candidate["invertible_to_relative_price_path_up_to_common_scale"]
+            )
+            for candidate in CANDIDATES
+        }
+        self.assertEqual(declared, self.EXPECTED_INVERTIBLE)
+
+    def test_result_json_invertibility_table(self):
+        emitted = {
+            candidate_id: candidate["interpretation"][
+                "invertible_to_relative_price_path_up_to_common_scale"
+            ]
+            for candidate_id, candidate in self.outcome.result["candidates"].items()
+        }
+        self.assertEqual(emitted, self.EXPECTED_INVERTIBLE)
+
+    def test_report_interpretation_table_states_the_frozen_table(self):
+        rows = _interpretation_rows(self.report)
+        self.assertEqual(sorted(rows), sorted(self.EXPECTED_INVERTIBLE))
+        for candidate_id, expected in self.EXPECTED_INVERTIBLE.items():
+            with self.subTest(candidate=candidate_id):
+                self.assertEqual(
+                    rows[candidate_id]["invertible"], "true" if expected else "false"
+                )
+
+    def test_n2_and_n4_keep_volatility_amplitude_removed(self):
+        for candidate_id in ("N2", "N4"):
+            with self.subTest(candidate=candidate_id):
+                removed = self.outcome.result["candidates"][candidate_id][
+                    "interpretation"
+                ]["known_information_removed"]
+                self.assertEqual(
+                    removed, ["window_location", "window_scale", "volatility_amplitude"]
+                )
+        removed_n3 = self.outcome.result["candidates"]["N3"]["interpretation"][
+            "known_information_removed"
+        ]
+        self.assertIn("per_channel_relative_geometry", removed_n3)
 
 
 class ContractAlignmentTests(unittest.TestCase):

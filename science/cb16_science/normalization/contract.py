@@ -119,7 +119,7 @@ CANDIDATES = (
             "log scale.  sd_C < eps_std invalidates the price channels."
         ),
         "preserves_relative_volatility_amplitude": False,
-        "invertible_to_relative_price_path_up_to_common_scale": True,
+        "invertible_to_relative_price_path_up_to_common_scale": False,
         "known_information_removed": ["window_location", "window_scale", "volatility_amplitude"],
     },
     {
@@ -152,7 +152,7 @@ CANDIDATES = (
             "the price channels."
         ),
         "preserves_relative_volatility_amplitude": False,
-        "invertible_to_relative_price_path_up_to_common_scale": True,
+        "invertible_to_relative_price_path_up_to_common_scale": False,
         "known_information_removed": ["window_location", "window_scale", "volatility_amplitude"],
     },
 )
@@ -179,7 +179,10 @@ INTERPRETATION_LABELS = {
     "invertible_to_relative_price_path_up_to_common_scale": (
         "Declared from the fixed formula: the transformed price channels determine "
         "the raw relative price path up to one positive common scale factor per "
-        "window (not applicable when a channel-specific affine map is applied)."
+        "window.  False when a channel-specific affine map is applied (N3), or when "
+        "the price path is divided by a window-derived dispersion statistic (N2, N4) "
+        "so that the residual ambiguity is an unknown window-dependent exponent and "
+        "the volatility amplitude is removed."
     ),
     "known_information_removed": (
         "Declared from the fixed formula.  Enum values: window_location, "
