@@ -413,6 +413,58 @@ class LabelAndLaneTests(DispatchTestCase):
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "PR_SET_PDEATHSIG is Linux only")
+class SessionPluginPackagingTests(unittest.TestCase):
+    """The profile is only reproducible if its declared files are in Git.
+
+    Regression guard for a real defect: the repository .gitignore carries a
+    template `lib/` rule, which silently excluded this plugin's source from the
+    PR. It still ran on the machine where it was written - and nowhere else.
+    """
+
+    PLUGIN = REPO_ROOT / "infra" / "dsh" / "cb16-builder-session"
+
+    def _declared_paths(self):
+        package = json.loads((self.PLUGIN / "package.json").read_text(encoding="utf-8"))
+        declared = [package["main"]]
+        declared += [v if isinstance(v, str) else v.get("default") for v in package["exports"].values()]
+        declared.append(package["dsh"]["bundle"]["patch"])
+        return [p for p in declared if isinstance(p, str)]
+
+    def test_declared_entry_paths_exist(self):
+        for relative in self._declared_paths():
+            with self.subTest(path=relative):
+                self.assertTrue(
+                    (self.PLUGIN / relative).is_file(),
+                    f"package.json declares {relative} but it does not exist",
+                )
+
+    def test_plugin_sources_are_tracked_by_git(self):
+        import subprocess as sp
+
+        if sp.run(["git", "rev-parse", "--git-dir"], cwd=str(REPO_ROOT),
+                  capture_output=True).returncode != 0:
+            self.skipTest("not a git checkout")
+        required = [
+            "package.json",
+            "cordis.patch.yml",
+            "README.md",
+            "NOTICE",
+            "lib/index.js",
+            "lib/startup.js",
+        ]
+        for relative in required:
+            with self.subTest(path=relative):
+                proc = sp.run(
+                    ["git", "ls-files", "--error-unmatch", f"infra/dsh/cb16-builder-session/{relative}"],
+                    cwd=str(REPO_ROOT), capture_output=True, text=True,
+                )
+                self.assertEqual(
+                    proc.returncode, 0,
+                    f"{relative} is not tracked by git - a clean checkout would not have it "
+                    f"(check .gitignore; the template 'lib/' rule is a known trap)",
+                )
+
+
 class SessionAffinityTests(DispatchTestCase):
     """Opt-in branch <-> DSH session affinity.
 
@@ -579,6 +631,99 @@ class SessionAffinityTests(DispatchTestCase):
         self.assertIn("no machine-readable session record", route["detail"])
         self.assertFalse(self._registry_path("ds/affinity-task").exists())
 
+    # ---- registry loss after the branch was published --------------------
+
+    def _publish_branch(self, branch):
+        """Simulate the push the first dispatch performs."""
+        git(self.repo, "update-ref", f"refs/remotes/origin/{branch}", self.sha)
+
+    def test_registry_loss_after_first_dispatch_recovers_instead_of_declining(self):
+        """The regression the reviewer found.
+
+        Turn 1 admits the branch and the dispatcher then pushes it. If the
+        registry is corrupted afterwards, the branch is no longer "new", so a
+        branch-existence test alone would decline it forever and silently drop
+        the affinity the Issue asked for.
+        """
+        first = self.dispatch(meta=self._affinity_meta(), session_invoker=self._session_spy(session_id="session-one"))
+        self.assertEqual(first.summary["session_route"]["action"], "new")
+        self._publish_branch("ds/affinity-task")
+
+        # The registry is lost; the admission marker is not.
+        self._registry_path("ds/affinity-task").write_text("{corrupt", encoding="utf-8")
+
+        session = self._session_spy(action="new", session_id="session-two")
+        outcome = self.dispatch(meta=self._affinity_meta(), session_invoker=session)
+        route = outcome.summary["session_route"]
+        self.assertEqual(route["action"], "fallback-new")
+        self.assertEqual(route["resume_failure_class"], "registry-lost")
+        self.assertEqual(route["session_id"], "session-two")
+        self.assertEqual(route["generation"], 2)
+        self.assertTrue(route["persisted"])
+        self.assertEqual(session.calls[0]["mode"], "new", "no id existed to resume")
+        self.assertEqual(self._registry_record("ds/affinity-task")["session_id"], "session-two")
+
+    def test_deleted_registry_also_recovers(self):
+        self.dispatch(meta=self._affinity_meta(), session_invoker=self._session_spy(session_id="session-one"))
+        self._publish_branch("ds/affinity-task")
+        self._registry_path("ds/affinity-task").unlink()
+        outcome = self.dispatch(meta=self._affinity_meta(),
+                                session_invoker=self._session_spy(action="new", session_id="session-two"))
+        route = outcome.summary["session_route"]
+        self.assertEqual(route["action"], "fallback-new")
+        self.assertEqual(route["resume_failure_class"], "registry-lost")
+        self.assertEqual(route["generation"], 2)
+
+    def test_never_admitted_published_branch_is_still_declined(self):
+        """The legacy protection must survive the recovery path."""
+        self._publish_branch("ds/affinity-task")
+        session = self._session_spy()
+        legacy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"})
+        outcome = self.dispatch(meta=self._affinity_meta(), dsh_invoker=legacy, session_invoker=session)
+        self.assertEqual(outcome.summary["session_route"]["action"], "declined-existing-branch")
+        self.assertEqual(session.calls, [])
+        self.assertFalse(self._admission_path("ds/affinity-task").exists())
+
+    def test_admission_is_recorded_at_decision_time_so_a_failed_turn_keeps_affinity(self):
+        def no_payload(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n", payload=None)
+
+        self.dispatch(meta=self._affinity_meta(), session_invoker=no_payload)
+        self.assertFalse(self._registry_path("ds/affinity-task").exists())
+        admission = json.loads(self._admission_path("ds/affinity-task").read_text(encoding="utf-8"))
+        self.assertEqual(admission["schema"], dispatcher.SESSION_ADMISSION_SCHEMA)
+        self.assertEqual(admission["last_generation"], 0)
+
+        # Now the branch is published and the registry never existed: the
+        # admission marker alone must let a fresh session start.
+        self._publish_branch("ds/affinity-task")
+        outcome = self.dispatch(meta=self._affinity_meta(),
+                                session_invoker=self._session_spy(action="new", session_id="session-later"))
+        self.assertEqual(outcome.summary["session_route"]["action"], "fallback-new")
+        self.assertEqual(outcome.summary["session_route"]["session_id"], "session-later")
+
+    def test_malformed_admission_marker_does_not_admit_an_unknown_branch(self):
+        self._publish_branch("ds/affinity-task")
+        path = self._admission_path("ds/affinity-task")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{not json", encoding="utf-8")
+        session = self._session_spy()
+        legacy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"})
+        outcome = self.dispatch(meta=self._affinity_meta(), dsh_invoker=legacy, session_invoker=session)
+        self.assertEqual(outcome.summary["session_route"]["action"], "declined-existing-branch")
+
+    def test_resume_keeps_the_admission_generation_in_step(self):
+        self.dispatch(meta=self._affinity_meta(), session_invoker=self._session_spy(session_id="session-one"))
+        self._publish_branch("ds/affinity-task")
+        self.dispatch(meta=self._affinity_meta(),
+                      session_invoker=self._session_spy(action="resume", session_id="session-one", resume_succeeded=True))
+        admission = json.loads(self._admission_path("ds/affinity-task").read_text(encoding="utf-8"))
+        self.assertEqual(admission["last_generation"], 1)
+        self.assertEqual(admission["last_session_id"], "session-one")
+
     # ---- registry --------------------------------------------------------
 
     def test_malformed_registry_is_treated_as_absent(self):
@@ -643,6 +788,9 @@ class SessionAffinityTests(DispatchTestCase):
 
     def _registry_path(self, branch):
         return dispatcher.session_registry_path(self.tmp / "state", TRUSTED_REPO, branch)
+
+    def _admission_path(self, branch):
+        return dispatcher.session_admission_path(self.tmp / "state", TRUSTED_REPO, branch)
 
     def _registry_record(self, branch):
         return json.loads(self._registry_path(branch).read_text(encoding="utf-8"))

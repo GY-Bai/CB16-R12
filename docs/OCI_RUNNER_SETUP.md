@@ -437,11 +437,20 @@ packet and review delta, and a missing, corrupt, foreign-worktree or
 incompatible session degrades to `fallback-new`: a fresh session in the same
 worktree, with `generation + 1` recorded.
 
-**Legacy protection.** A branch that already existed on the remote with no
-registry record is *never* adopted into a session - the dispatcher records
+**Legacy protection.** A branch that already existed on the remote and was never
+admitted is *never* adopted into a session - the dispatcher records
 `declined-existing-branch` and keeps the legacy behaviour, so editing an old
 Issue's metadata cannot turn it stateful. Only a genuinely new branch
 initialises affinity.
+
+**Registry loss is recoverable.** Two files are kept per branch: the registry
+(`<hash>.json`, rewritten every dispatch) and a durable admission marker
+(`<hash>.admitted.json`, written once). A corrupted or deleted registry on an
+admitted branch therefore yields `fallback-new` with
+`resume_failure_class=registry-lost` and `generation + 1`, rather than being
+mistaken for a never-admitted branch and demoted to the legacy path forever.
+The marker is written before the turn runs, so a failed turn after the push
+cannot cost the branch its affinity.
 
 The dispatcher also records, per run: `session_affinity`, `session_profile`,
 and a `session_route` block (`action`, `session_id`, `generation`,

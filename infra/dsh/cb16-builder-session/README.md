@@ -68,6 +68,35 @@ last.
 `fallback-new` action means the turn continued correctly with a fresh session;
 it is not a task failure.
 
+## Registry loss and the admission marker
+
+The dispatcher keeps two files per branch under
+`<CB16_STATE_DIR>/session-affinity/`:
+
+| File | Holds | Lifetime |
+| --- | --- | --- |
+| `<hash>.json` | the active session id and generation | rewritten every dispatch |
+| `<hash>.admitted.json` | the durable statement "this branch was legitimately admitted" | written once, updated in step |
+
+The admission marker exists because "did this branch already exist on the
+remote?" stops being a usable test the moment the first dispatch pushes the
+branch. Without it, a registry that is later corrupted would look exactly like a
+pre-existing branch that was never admitted, and the branch would be declined
+into the legacy path forever - the opposite of the promised
+"registry problem -> fallback-new -> generation + 1".
+
+Routing is therefore:
+
+```text
+registry readable          -> resume that exact id
+admission marker present   -> fallback-new (registry-lost), generation + 1
+branch existed remotely    -> declined-existing-branch  (true legacy protection)
+otherwise                  -> new, and record the admission marker
+```
+
+The admission marker is written at decision time, before the turn runs, so a
+turn that fails after the branch is pushed cannot cost the branch its affinity.
+
 ## Resume validation
 
 Before continuing, the runner reads the persisted session through the official

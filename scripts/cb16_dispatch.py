@@ -129,6 +129,10 @@ SESSION_AFFINITY_BRANCH_V1 = "branch-v1"
 SESSION_PROFILE = "cb16-builder-session"
 LEGACY_PROFILE = "headless"
 SESSION_REGISTRY_SCHEMA = "cb16.builder_session_affinity.v1"
+#: Written once when a branch is admitted into affinity, and deliberately
+#: independent of the registry file: it is the durable answer to "was this
+#: branch ever legitimately admitted?", which registry corruption cannot erase.
+SESSION_ADMISSION_SCHEMA = "cb16.builder_session_admission.v1"
 #: Shared package download cache; each worktree keeps its own .venv.
 DEFAULT_UV_CACHE_DIR = "/cb16/cache/uv"
 
@@ -1441,6 +1445,39 @@ def session_registry_path(state_dir: Path, repo: str, branch: str) -> Path:
     return state_dir / "session-affinity" / f"{key}.json"
 
 
+def session_admission_path(state_dir: Path, repo: str, branch: str) -> Path:
+    """Deterministic admission marker path for one (repository, branch)."""
+
+    key = hashlib.sha256(f"{repo}\n{branch}".encode("utf-8")).hexdigest()[:32]
+    return state_dir / "session-affinity" / f"{key}.admitted.json"
+
+
+def read_session_admission(path: Path) -> Optional[Dict[str, Any]]:
+    """Return the admission record, or None when this branch was never admitted.
+
+    Unlike the registry, this file is expected to survive registry corruption;
+    a malformed marker is treated as absent, which falls back to the legacy
+    protection rather than admitting an unknown branch.
+    """
+
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(record, dict) or record.get("schema") != SESSION_ADMISSION_SCHEMA:
+        return None
+    return record
+
+
+def write_session_admission(path: Path, record: Mapping[str, Any]) -> None:
+    """Persist the admission marker atomically."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(f".tmp-{os.getpid()}")
+    tmp.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def read_session_registry(path: Path) -> Optional[Dict[str, Any]]:
     """Return a usable registry record, or None when there is nothing to resume.
 
@@ -1947,34 +1984,80 @@ def dispatch(
         }
         if lane == LANE_BUILDER and spec.session_affinity == SESSION_AFFINITY_BRANCH_V1:
             registry_path = session_registry_path(state_dir, repo, spec.branch)
+            admission_path = session_admission_path(state_dir, repo, spec.branch)
             record = read_session_registry(registry_path)
+            admission = read_session_admission(admission_path)
             if record is not None:
                 session_route = {
                     "mode": "resume",
                     "session_id": record["session_id"],
                     "generation": int(record.get("generation") or 1),
                     "registry_path": registry_path,
+                    "admission_path": admission_path,
                     "prior": record,
+                    "admission": admission,
+                    "recovered": False,
                 }
                 affinity_state.update({"action": "resume", "session_id": record["session_id"]})
+            elif admission is not None:
+                # This branch was legitimately admitted before, so the registry
+                # is what was lost - not the branch's right to affinity. Start a
+                # fresh session and keep counting generations instead of
+                # demoting a live affinity branch to the legacy path forever.
+                admitted_generation = int(admission.get("last_generation") or 0)
+                session_route = {
+                    "mode": "new",
+                    "session_id": None,
+                    "generation": admitted_generation,
+                    "registry_path": registry_path,
+                    "admission_path": admission_path,
+                    "prior": {"generation": admitted_generation},
+                    "admission": admission,
+                    "recovered": True,
+                }
+                affinity_state.update({
+                    "action": "new",
+                    "admission_recovered": True,
+                    "detail": (
+                        "registry missing or unreadable after this branch was admitted; "
+                        "starting a fresh session instead of demoting the branch"
+                    ),
+                })
             elif branch_existed_remotely(repo_path, spec.branch):
                 # Strong legacy protection: a branch that was already published
-                # must not become stateful just because its metadata was edited.
+                # before it ever had an admission marker must not become stateful
+                # just because its Issue metadata was edited later.
                 affinity_state.update({
                     "action": "declined-existing-branch",
                     "detail": (
-                        "branch already existed on the remote with no affinity record; "
+                        "branch already existed on the remote and was never admitted; "
                         "refusing to adopt it into a session (legacy fresh behaviour)"
                     ),
                 })
             else:
+                now = datetime.now(timezone.utc).isoformat()
                 session_route = {
                     "mode": "new",
                     "session_id": None,
                     "generation": 0,
                     "registry_path": registry_path,
+                    "admission_path": admission_path,
                     "prior": None,
+                    "admission": None,
+                    "recovered": False,
                 }
+                # Admit now, before the turn runs: if the turn then fails, the
+                # branch is already published but still deserves affinity later.
+                write_session_admission(admission_path, {
+                    "schema": SESSION_ADMISSION_SCHEMA,
+                    "repo": repo,
+                    "branch": spec.branch,
+                    "issue_number": trigger.issue_number,
+                    "first_admitted_at": now,
+                    "updated_at": now,
+                    "last_generation": 0,
+                    "last_session_id": None,
+                })
                 affinity_state["action"] = "new"
 
         # Workspace-local, git-ignored caches: the sandbox only permits writes
@@ -2067,6 +2150,10 @@ def dispatch(
             reported_id = payload.get("session_id")
             action = payload.get("session_action") or "unknown"
             prior = session_route.get("prior") or {}
+            if session_route.get("recovered") and action == "new":
+                # The registry was lost after admission: this is a cold fallback,
+                # not a first session, and the evidence must say so.
+                action = "fallback-new"
             prior_generation = int(prior.get("generation") or 0)
             if action == "new":
                 generation = 1
@@ -2075,13 +2162,18 @@ def dispatch(
             else:
                 generation = prior_generation or 1
 
+            failure_class = payload.get("resume_failure_class")
+            if session_route.get("recovered") and action == "fallback-new" and not failure_class:
+                # The registry was lost after admission: record why the branch
+                # started a fresh session instead of resuming.
+                failure_class = "registry-lost"
             affinity_state.update({
                 "action": action,
                 "session_id": reported_id,
                 "generation": generation,
                 "resume_attempted": bool(payload.get("resume_attempted")),
                 "resume_succeeded": bool(payload.get("resume_succeeded")),
-                "resume_failure_class": payload.get("resume_failure_class"),
+                "resume_failure_class": failure_class,
                 "resume_detail": payload.get("resume_detail"),
                 "turn_outcome": payload.get("turn_outcome"),
             })
@@ -2108,6 +2200,22 @@ def dispatch(
                         "reasoningEffort": payload.get("reasoning_effort"),
                     },
                 })
+                # Keep the durable admission marker in step with the registry:
+                # it is what lets a later registry loss recover instead of
+                # demoting this branch to the legacy path.
+                admission_path = session_route.get("admission_path")
+                if admission_path is not None:
+                    existing = session_route.get("admission") or {}
+                    write_session_admission(admission_path, {
+                        "schema": SESSION_ADMISSION_SCHEMA,
+                        "repo": repo,
+                        "branch": spec.branch,
+                        "issue_number": trigger.issue_number,
+                        "first_admitted_at": existing.get("first_admitted_at") or now,
+                        "updated_at": now,
+                        "last_generation": generation,
+                        "last_session_id": reported_id,
+                    })
                 affinity_state["persisted"] = True
             else:
                 affinity_state["detail"] = (
