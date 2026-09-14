@@ -1117,13 +1117,28 @@ def create_or_update_draft_pr(
             "PATCH", f"/repos/{slug}/pulls/{pr_number}", token=token, payload={"body": body}
         )
         return data
-    status, data = github_api(
-        "POST",
-        f"/repos/{slug}/pulls",
-        token=token,
-        payload={"title": title, "head": branch, "base": base, "body": body, "draft": True},
-    )
-    return data
+    try:
+        status, data = github_api(
+            "POST",
+            f"/repos/{slug}/pulls",
+            token=token,
+            payload={"title": title, "head": branch, "base": base, "body": body, "draft": True},
+        )
+        return data
+    except ExecutionBlocked:
+        # A fix cycle re-dispatches the same branch, so an open PR for this head
+        # may already exist.  Update it instead of failing on the 422.
+        owner = slug.split("/", 1)[0]
+        status, existing = github_api(
+            "GET", f"/repos/{slug}/pulls?state=open&head={owner}:{branch}", token=token
+        )
+        if isinstance(existing, list) and existing:
+            number = existing[0]["number"]
+            status, data = github_api(
+                "PATCH", f"/repos/{slug}/pulls/{number}", token=token, payload={"body": body}
+            )
+            return data
+        raise
 
 
 def set_issue_labels(

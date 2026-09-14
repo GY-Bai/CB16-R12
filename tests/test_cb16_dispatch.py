@@ -656,6 +656,57 @@ class DryRunTests(DispatchTestCase):
 
 
 # ---------------------------------------------------------------------------
+# Publishing helpers
+# ---------------------------------------------------------------------------
+
+
+class PublishingTests(DispatchTestCase):
+    def test_existing_open_pr_is_updated_instead_of_failing(self):
+        calls = []
+
+        def fake_api(method, path, *, token, payload=None, timeout=30):
+            calls.append((method, path))
+            if method == "POST":
+                raise dispatcher.ExecutionBlocked("HTTP 422 validation failed")
+            if method == "GET":
+                return 200, [{"number": 42, "html_url": "https://example.invalid/pr/42"}]
+            return 200, {"number": 42, "html_url": "https://example.invalid/pr/42"}
+
+        original = dispatcher.github_api
+        dispatcher.github_api = fake_api  # type: ignore[assignment]
+        try:
+            result = dispatcher.create_or_update_draft_pr(
+                token="t", slug="owner/repo", branch="ds/x", base="main",
+                title="title", body="body",
+            )
+        finally:
+            dispatcher.github_api = original  # type: ignore[assignment]
+
+        self.assertEqual(result["number"], 42)
+        self.assertIn(("GET", "/repos/owner/repo/pulls?state=open&head=owner:ds/x"), calls)
+        self.assertIn(("PATCH", "/repos/owner/repo/pulls/42"), calls)
+
+    def test_explicit_pr_number_updates_without_creating(self):
+        calls = []
+
+        def fake_api(method, path, *, token, payload=None, timeout=30):
+            calls.append((method, path))
+            return 200, {"number": 7, "html_url": "https://example.invalid/pr/7"}
+
+        original = dispatcher.github_api
+        dispatcher.github_api = fake_api  # type: ignore[assignment]
+        try:
+            dispatcher.create_or_update_draft_pr(
+                token="t", slug="owner/repo", branch="ds/x", base="main",
+                title="title", body="body", pr_number=7,
+            )
+        finally:
+            dispatcher.github_api = original  # type: ignore[assignment]
+
+        self.assertEqual(calls, [("PATCH", "/repos/owner/repo/pulls/7")])
+
+
+# ---------------------------------------------------------------------------
 # Workspace isolation
 # ---------------------------------------------------------------------------
 

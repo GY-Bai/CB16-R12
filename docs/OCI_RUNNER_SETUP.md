@@ -71,16 +71,36 @@ depends on a previous conversation.
 ### Sandbox backends
 
 The headless profile confines file writes: a probe that tried to write outside
-the worktree was denied and produced no file. That confinement is provided by
-`bubblewrap`, which the dispatcher does not manage:
+the worktree was denied and produced no file. Confinement comes from
+`bubblewrap`, which the dispatcher does not manage.
+
+On this host `bwrap` was installed **without root** by unpacking the Oracle
+EPEL RPM into the user prefix:
 
 ```bash
-# Oracle Linux 9 (EPEL repo id is ol9_developer_EPEL)
-sudo dnf install -y --enablerepo=ol9_developer_EPEL bubblewrap
+cd /tmp && dnf download --destdir=. --enablerepo=ol9_developer_EPEL bubblewrap
+rpm2cpio bubblewrap-*.rpm | cpio -idm
+mkdir -p ~/.local/bin && cp usr/bin/bwrap ~/.local/bin/bwrap
 ```
 
-Without a usable sandbox backend, DSH refuses to run unconfined, and a Builder
+`~/.local/bin` is first on the runner's `PATH`, so the dispatcher and DSH both
+find it. The equivalent privileged install is
+`sudo dnf install -y --enablerepo=ol9_developer_EPEL bubblewrap`.
+
+Without a usable sandbox backend DSH refuses to run unconfined, and a Builder
 dispatch fails closed.
+
+### Verified host state
+
+Recorded after the bootstrap dry runs on this host:
+
+| Item | Value |
+| --- | --- |
+| R12 runner name | `japan-oci-r12` (user service `cb16-r12-runner.service`) |
+| Runner labels | `self-hosted, Linux, ARM64, japan-oci, r12` |
+| Work tree root | `/home/bgy/cb16-worktrees` |
+| Dispatch state/locks | `/home/bgy/.cb16/state` |
+| Sandbox binary | `/home/bgy/.local/bin/bwrap` (bubblewrap 0.6.3) |
 
 ## 4. Credential boundary
 
