@@ -2,17 +2,33 @@
   "schema": "cb16.data.manifest.v1",
   "comment": "Read-only host data the dispatcher advertises to lane children. Entries whose path is absent on the host are dropped from the task packet with a note, so the same manifest is harmless on another machine. Nothing listed here may ever be written by a lane.",
   "read_only": {
-    "binance_usdm_1m_raw_vault": {
-      "path": "/home/bgy/CB16_BINANCE_USDM_1M_RAW_VAULT_RUN",
-      "description": "Raw Binance USDM 1m collection vault: work/source/<year> plus yearly bundle tarballs in output/."
+    "binance_um_1m_klines_10pairs": {
+      "path": "/cb16/raw/klines_1m",
+      "description": "PRIMARY market data. 10 Binance USDM pairs (BTC ETH BNB XRP ADA DOGE DOT LINK LTC SOL), 1m klines as monthly zips with .CHECKSUM files, 2020-01..2026-08. Later listings start later (DOGE 2020-07, DOT 2020-08, SOL 2020-09). Verified: a monthly zip holds exactly the minutes of that month. Always pair it with binance_um_funding_rates_10pairs: the two share an identical per-symbol month coverage (verified 1:1, 72-80 months per symbol), so they align row-for-row by symbol and month."
+    },
+    "binance_um_funding_rates_10pairs": {
+      "path": "/cb16/raw/fundingRate",
+      "description": "Funding-rate history for the same 10 pairs, monthly. Same symbols and identical per-symbol month coverage as binance_um_1m_klines_10pairs (verified 1:1), so funding joins the klines directly on symbol + month. Columns: calc_time, funding_interval_hours, last_funding_rate; BTCUSDT 2020-01 holds 94 rows (31 days x 3 eight-hourly settlements + header)."
+    },
+    "cb16_raw_download_manifest": {
+      "path": "/cb16/raw/DOWNLOAD_MANIFEST.json",
+      "description": "Provenance for the raw collection: symbols, range, per-segment counts and coverage. Read this before assuming coverage."
+    },
+    "frozen_weights_r10_lineage": {
+      "path": "/cb16/frozen",
+      "description": "PRIMARY frozen weights, extracted read-only from the R10/R11 archives: central_brain_g0.pt, central_brain_g0_r10_parent.pt, CANONICAL_NONLINEAR48_SEED24680_PORTABLE.npz, operator_reducers_v1{,_PORTABLE}.npz, the frozen sensory canary and the account-physics simulator snapshot. SOURCE_ARCHIVE_SHA256SUMS.txt records the source archive hashes."
     },
     "e4_t1_curated_1m_5m_1h": {
       "path": "/home/bgy/m3-infra/cb16_e4_t1_work/CB16_E4_T1_DATA_1M_5M_1H_20200101_20221019",
       "description": "Curated 1m/5m/1h dataset with manifest, split protocol and SHA256SUMS. raw_1m/ holds per-symbol csv.gz."
     },
+    "binance_usdm_1m_raw_vault": {
+      "path": "/home/bgy/CB16_BINANCE_USDM_1M_RAW_VAULT_RUN",
+      "description": "Raw Binance USDM 1m collection vault: work/source/<year> plus yearly bundle tarballs in output/. (superseded by binance_um_1m_klines_10pairs)"
+    },
     "frozen_body_archives": {
       "path": "/home/bgy/m3-infra",
-      "description": "Frozen body archives (CB16_SHANXI_FROZEN_BODY_*.tar.gz) and R10 return bundles. Treat as immutable inputs."
+      "description": "Frozen body archives (CB16_SHANXI_FROZEN_BODY_*.tar.gz) and R10 return bundles. Treat as immutable inputs. (source archives; extracted copies live in /cb16/frozen)"
     }
   }
 }

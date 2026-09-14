@@ -7,10 +7,15 @@ commands needed to reproduce the state.
 ## Why a dedicated runner is required
 
 GitHub repository-level self-hosted runners serve exactly one repository. The
-pre-existing runner `japan-oci-01` (labels `self-hosted, Linux, ARM64, japan-oci`)
-is registered to `GY-Bai/CB16-R10` and therefore cannot pick up jobs from
+pre-existing R10 runner (the `japan-oci-01` registration on `GY-Bai/CB16-R10`) is
+a different repository and therefore cannot pick up jobs from
 `GY-Bai/CB16-R12`. The dispatch workflows target the additional label `r12`,
 which only a runner registered against `GY-Bai/CB16-R12` can carry.
+
+The R12 runner deliberately carries **no region in its name or labels**. The
+repository is public, so a runner named after its location publishes that
+location; `oci-cpu-r12` / `oci-cpu` describes the platform and the CPU-only
+instance class without naming the region.
 
 ## 1. Register the R12 runner
 
@@ -24,8 +29,8 @@ tar xzf ~/actions-runner-linux-arm64-*.tar.gz
 # or `gh api -X POST repos/GY-Bai/CB16-R12/actions/runners/registration-token`
 ./config.sh --url https://github.com/GY-Bai/CB16-R12 \
             --token <REGISTRATION_TOKEN> \
-            --name japan-oci-r12 \
-            --labels self-hosted,Linux,ARM64,japan-oci,r12 \
+            --name oci-cpu-r12 \
+            --labels self-hosted,Linux,ARM64,oci-cpu,r12 \
             --work _work --unattended
 
 ./svc.sh install && ./svc.sh start     # or run ./run.sh under a user service
@@ -38,8 +43,12 @@ gh api repos/GY-Bai/CB16-R12/actions/runners \
   --jq '.runners[] | "\(.name) \(.status) \([.labels[].name]|join(","))"'
 ```
 
-The workflow `runs-on` list is `[self-hosted, Linux, ARM64, japan-oci, r12]`;
-all five labels must be present on the registered runner.
+The workflow `runs-on` list is `[self-hosted, Linux, ARM64, oci-cpu, r12]`;
+all five labels must be present on the registered runner. Renaming a runner is
+a re-registration, not an edit: stop the service, `./config.sh remove --token
+<REMOVE_TOKEN>`, then `config.sh` again with the new name and labels, and
+restart the service. Until the workflow carrying the new label is on the
+default branch, dispatches find no matching runner and fail to start.
 
 ## 1b. Runner service must carry the user PATH
 
@@ -240,13 +249,38 @@ a note, so the manifest is harmless on another machine. Resolved entries appear
 in `.cb16/TASK_PACKET.md` under "Read-only data available" and in
 `dispatch_summary.json` as `read_only_data`.
 
-Currently declared:
+The two primary inputs are the market data root and the frozen weights:
 
-| Logical name | Path |
-| --- | --- |
-| `binance_usdm_1m_raw_vault` | `/home/bgy/CB16_BINANCE_USDM_1M_RAW_VAULT_RUN` |
-| `e4_t1_curated_1m_5m_1h` | `/home/bgy/m3-infra/cb16_e4_t1_work/CB16_E4_T1_DATA_1M_5M_1H_20200101_20221019` |
-| `frozen_body_archives` | `/home/bgy/m3-infra` |
+| Logical name | Path | What |
+| --- | --- | --- |
+| `binance_um_1m_klines_10pairs` | `/cb16/raw/klines_1m` | 10 USDM pairs, 1m klines, monthly zips with `.CHECKSUM`, 2020-01..2026-08 |
+| `binance_um_funding_rates_10pairs` | `/cb16/raw/fundingRate` | funding history for the same pairs |
+| `cb16_raw_download_manifest` | `/cb16/raw/DOWNLOAD_MANIFEST.json` | provenance: symbols, range, per-segment coverage |
+| `frozen_weights_r10_lineage` | `/cb16/frozen` | Central Brain G0 weights, canonical nonlinear assets, operator reducers, sensory canary |
+
+Secondary/historical entries are kept so an older task can still find them:
+`e4_t1_curated_1m_5m_1h`, `binance_usdm_1m_raw_vault`, `frozen_body_archives`.
+
+### Frozen weights
+
+The R10/R11 frozen bodies ship as tarballs, which are not usable as an input
+root, so they were extracted once into `/cb16/frozen` and the archive hashes
+recorded in `/cb16/frozen/SOURCE_ARCHIVE_SHA256SUMS.txt`:
+
+```bash
+tar xzf CB16_R10_G0_BOOTSTRAP_RETURN_R0.tar.gz
+tar xzf CB16_SHANXI_FROZEN_BODY_G0_BRAIN_R10_1_THIN_V1.tar.gz
+tar xzf CB16_SHANXI_R10_2_REAL_HISTORICAL_G0_LEARNING_V1.tar.gz
+sha256sum ... > /cb16/frozen/SOURCE_ARCHIVE_SHA256SUMS.txt
+```
+
+Weights present: `central_brain_g0.pt`, `central_brain_g0_r10_parent.pt`,
+`CANONICAL_NONLINEAR48_SEED24680_PORTABLE.npz`, `operator_reducers_v1{,_PORTABLE}.npz`,
+`R10_FROZEN_SENSORY_CANARY_V1.npz`, `SIMULATOR_SNAPSHOT_PORTABLE.npz`.
+
+These are R10/R11-lineage artefacts imported explicitly as inputs. Whether a
+given weight becomes canonical for R12 is a Master/Chat-SOL decision, not an
+infrastructure one.
 
 Because the profile currently binds `/` read-only, these paths are already
 reachable. The manifest exists so the agent knows *where* they are and so a
@@ -321,8 +355,8 @@ Recorded after the bootstrap dry runs on this host:
 
 | Item | Value |
 | --- | --- |
-| R12 runner name | `japan-oci-r12` (user service `cb16-r12-runner.service`) |
-| Runner labels | `self-hosted, Linux, ARM64, japan-oci, r12` |
+| R12 runner name | `oci-cpu-r12` (user service `cb16-r12-runner.service`) |
+| Runner labels | `self-hosted, Linux, ARM64, oci-cpu, r12` |
 | Work tree root | `/home/bgy/cb16-worktrees` |
 | Dispatch state/locks | `/home/bgy/.cb16/state` |
 | Sandbox binary | `/home/bgy/.local/bin/bwrap` (bubblewrap 0.6.3) |
