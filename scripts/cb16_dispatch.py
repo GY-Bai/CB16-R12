@@ -255,10 +255,21 @@ def host_identifiers() -> List[str]:
 
 
 def redaction_terms(env: Mapping[str, str]) -> List[str]:
-    """Host identifiers plus any operator-supplied extra terms."""
+    """Host identifiers, the runner user's home path, and operator terms.
 
+    The home path is included because it carries the account name into a
+    world-readable Actions log, for example
+    ``/home/<user>/cb16-worktrees/<task>``.
+    """
+
+    terms = host_identifiers()
+    home = (env.get("HOME") or "").strip()
+    if home and home not in ("/", "/root") and len(home) > 4:
+        terms.append(home.rstrip("/"))
     extra = [term.strip() for term in env.get("CB16_REDACT_TERMS", "").split(",") if term.strip()]
-    return host_identifiers() + extra
+    terms.extend(extra)
+    # Longest first so a nested path is replaced before its parent.
+    return sorted(set(terms), key=len, reverse=True)
 
 
 def redact_hosts(text: str, terms: Sequence[str]) -> str:
@@ -1740,6 +1751,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"classification: {exc.classification}", file=sys.stderr)
         print(f"detail: {redact_hosts(exc.detail, terms)}", file=sys.stderr)
         return exc.exit_code
+    except KeyboardInterrupt:
+        print("interrupted", file=sys.stderr)
+        return EXIT_EXECUTION_BLOCKED
+    except Exception as exc:  # noqa: BLE001 - last line of defence for privacy
+        # An unexpected exception must not print an unredacted traceback into a
+        # world-readable log, so it is captured, scrubbed and reported like any
+        # other execution blocker.
+        import traceback
+
+        terms = redaction_terms(os.environ)
+        detail = redact_hosts(traceback.format_exc(), terms)
+        summary.update({"classification": CLASS_EXECUTION_BLOCKED, "detail": detail})
+        report_dir.mkdir(parents=True, exist_ok=True)
+        (report_dir / "dispatch_summary.json").write_text(
+            redact_hosts(json.dumps(summary, indent=2, sort_keys=True), terms) + "\n",
+            encoding="utf-8",
+        )
+        print(f"classification: {CLASS_EXECUTION_BLOCKED}", file=sys.stderr)
+        print(f"detail: {detail}", file=sys.stderr)
+        return EXIT_EXECUTION_BLOCKED
 
     print(json.dumps(outcome.summary, indent=2, sort_keys=True))
     print(f"classification: {outcome.classification}")
