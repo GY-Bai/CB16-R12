@@ -219,3 +219,7 @@ __marimo__/
 
 # CB16 dispatch runtime artifacts (task packet, evidence, locks)
 .cb16/
+
+# CB16 sandbox-local package caches (workspace-writable inside the DSH sandbox)
+.uv-cache/
+.pip-cache/

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib.util
 import itertools
+import json
 import os
 import shutil
 import subprocess
@@ -841,6 +842,144 @@ class PublishingTests(DispatchTestCase):
             dispatcher.github_api = original  # type: ignore[assignment]
 
         self.assertEqual(calls, [("PATCH", "/repos/owner/repo/pulls/7")])
+
+
+# ---------------------------------------------------------------------------
+# Host-identifier redaction, read-only data, workspace caches
+# ---------------------------------------------------------------------------
+
+
+class RedactionTests(DispatchTestCase):
+    def test_host_identifiers_cover_short_name_and_fqdn(self):
+        terms = dispatcher.host_identifiers()
+        self.assertTrue(terms)
+        self.assertIn(dispatcher.socket.gethostname(), terms)
+        # Longest first so the FQDN is replaced before its short form.
+        self.assertEqual(terms, sorted(terms, key=len, reverse=True))
+
+    def test_redact_hosts_replaces_every_identifier(self):
+        terms = dispatcher.host_identifiers()
+        sample = " ".join(terms)
+        scrubbed = dispatcher.redact_hosts(sample, terms)
+        for term in terms:
+            self.assertNotIn(term, scrubbed)
+        self.assertIn("<host>", scrubbed)
+
+    def test_extra_redaction_terms_come_from_the_environment(self):
+        env = dict(self.base_env)
+        env["CB16_REDACT_TERMS"] = "internal.example.com,  secret-project"
+        terms = dispatcher.redaction_terms(env)
+        self.assertIn("internal.example.com", terms)
+        self.assertIn("secret-project", terms)
+
+    def test_evidence_never_carries_the_host_name(self):
+        hostname = dispatcher.socket.gethostname()
+
+        def noisy_dsh(worktree, **kwargs):
+            return dispatcher.RunResult(
+                exit_code=0,
+                stdout=f"build ran on {hostname} at {dispatcher.socket.getfqdn()}\nBUILD_REPORT: ok\n",
+            )
+
+        outcome = self.dispatch(dsh_invoker=noisy_dsh)
+        for name, path in outcome.evidence.items():
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn(hostname, text, f"{name} leaked the host name")
+        self.assertNotIn(hostname, outcome.build_report)
+
+
+class ReadOnlyDataTests(DispatchTestCase):
+    def _manifest(self, path: Path, entries: dict) -> Path:
+        path.write_text(json.dumps({"read_only": entries}), encoding="utf-8")
+        return path
+
+    def test_missing_paths_are_dropped_and_present_ones_kept(self):
+        manifest = self._manifest(
+            self.tmp / "manifest.json",
+            {
+                "present": {"path": str(self.repo), "description": "here"},
+                "absent": {"path": "/nonexistent/cb16/data", "description": "gone"},
+            },
+        )
+        available, missing = dispatcher.load_data_manifest(manifest)
+        self.assertEqual(list(available), ["present"])
+        self.assertEqual(missing, ["absent"])
+
+    def test_relative_or_missing_path_is_rejected(self):
+        manifest = self._manifest(self.tmp / "bad.json", {"x": {"path": "relative/path"}})
+        with self.assertRaises(dispatcher.ContractMismatch):
+            dispatcher.load_data_manifest(manifest)
+
+    def test_absent_manifest_file_is_not_fatal(self):
+        available, missing = dispatcher.load_data_manifest(self.tmp / "nope.json")
+        self.assertEqual((available, missing), ({}, []))
+
+    def test_task_packet_lists_read_only_data(self):
+        manifest = self._manifest(
+            self.tmp / "manifest.json", {"klines": {"path": str(self.repo), "description": "1m bars"}}
+        )
+        spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# fixture\n"})
+        outcome = dispatcher.dispatch(
+            lane="builder",
+            event=make_event(metadata_body(self.builder_meta()), label="ds:run"),
+            repo_dir=self.repo,
+            work_root=self.tmp / "worktrees",
+            state_dir=self.tmp / "state",
+            report_dir=self.tmp / "report-ro",
+            allowlist_path=ALLOWLIST_PATH,
+            data_manifest_path=manifest,
+            repo=TRUSTED_REPO,
+            trusted_actors=("GY-Bai",),
+            dsh_invoker=spy,
+            base_env=self.base_env,
+        )
+        packet = Path(outcome.summary["worktree"]) / ".cb16" / "TASK_PACKET.md"
+        text = packet.read_text(encoding="utf-8")
+        self.assertIn("Read-only data available", text)
+        self.assertIn("klines", text)
+        self.assertIn("inputs only", text)
+        self.assertEqual(outcome.summary["read_only_data"], {"klines": str(self.repo)})
+
+
+class WorkspaceCacheTests(DispatchTestCase):
+    def test_caches_live_in_the_worktree_and_are_exported(self):
+        captured = {}
+
+        def spy(worktree, **kwargs):
+            captured["env"] = kwargs.get("env") or {}
+            captured["worktree"] = Path(worktree)
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# fixture\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
+
+        self.dispatch(dsh_invoker=spy)
+        env = captured["env"]
+        worktree = captured["worktree"]
+        for key, sub in (
+            ("UV_CACHE_DIR", ".uv-cache"),
+            ("PIP_CACHE_DIR", ".pip-cache"),
+            ("UV_PROJECT_ENVIRONMENT", ".venv"),
+        ):
+            self.assertEqual(env[key], str(worktree / sub))
+        self.assertEqual(env["UV_LINK_MODE"], "copy")
+        self.assertTrue((worktree / ".uv-cache").is_dir())
+        self.assertTrue((worktree / ".pip-cache").is_dir())
+
+    def test_cache_directories_are_git_ignored(self):
+        for entry in (".uv-cache/", ".pip-cache/", ".venv"):
+            with self.subTest(entry=entry):
+                self.assertIn(entry, (REPO_ROOT / ".gitignore").read_text(encoding="utf-8"))
+
+    def test_cache_contents_never_enter_a_commit(self):
+        worktree = self.repo
+        (worktree / ".uv-cache").mkdir(exist_ok=True)
+        (worktree / ".uv-cache" / "blob").write_text("cache\n", encoding="utf-8")
+        (worktree / "docs" / "REAL_CHANGE.md").write_text("# change\n", encoding="utf-8")
+        sha = dispatcher.commit_worktree(worktree, message="cache test", env=dict(self.base_env))
+        self.assertIsNotNone(sha)
+        tracked = git(worktree, "ls-tree", "-r", "--name-only", "HEAD").splitlines()
+        self.assertFalse([path for path in tracked if path.startswith(".uv-cache")])
 
 
 # ---------------------------------------------------------------------------

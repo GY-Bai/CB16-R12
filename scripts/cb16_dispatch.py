@@ -31,6 +31,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 
@@ -230,6 +231,41 @@ def redact(text: str, secrets: Iterable[str]) -> str:
     for secret in secrets:
         if secret and len(secret) >= 8:
             out = out.replace(secret, "***REDACTED***")
+    return out
+
+
+def host_identifiers() -> List[str]:
+    """Host names that must never reach a public log or artifact.
+
+    Actions logs for a public repository are world-readable, and an OCI host's
+    FQDN can encode the cloud provider, region, VCN name and a subscription
+    fragment.  Longest first so the FQDN is replaced before its short form.
+    """
+
+    names = set()
+    for getter in (socket.gethostname, socket.getfqdn):
+        try:
+            value = (getter() or "").strip()
+        except OSError:
+            continue
+        if value and value != "localhost":
+            names.add(value)
+            names.add(value.split(".")[0])
+    return sorted(names, key=len, reverse=True)
+
+
+def redaction_terms(env: Mapping[str, str]) -> List[str]:
+    """Host identifiers plus any operator-supplied extra terms."""
+
+    extra = [term.strip() for term in env.get("CB16_REDACT_TERMS", "").split(",") if term.strip()]
+    return host_identifiers() + extra
+
+
+def redact_hosts(text: str, terms: Sequence[str]) -> str:
+    out = text or ""
+    for term in terms:
+        if term and len(term) >= 4:
+            out = out.replace(term, "<host>")
     return out
 
 
@@ -535,6 +571,37 @@ def load_allowlist(path: Path) -> Mapping[str, Any]:
     return data
 
 
+def load_data_manifest(path: Path) -> Tuple[Dict[str, Dict[str, str]], List[str]]:
+    """Resolve the read-only data manifest against this host.
+
+    Returns the entries whose path exists plus the logical names that are
+    missing here.  A missing file yields an empty manifest rather than an
+    error, so the dispatcher still runs on a host without the data mounted.
+    """
+
+    if not path.exists():
+        return {}, []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ContractMismatch("data manifest is unreadable", detail=str(exc))
+    entries = data.get("read_only")
+    if not isinstance(entries, dict):
+        raise ContractMismatch("data manifest must contain a 'read_only' object")
+
+    available: Dict[str, Dict[str, str]] = {}
+    missing: List[str] = []
+    for name, spec in entries.items():
+        target = (spec or {}).get("path") if isinstance(spec, dict) else None
+        if not isinstance(target, str) or not target.startswith("/"):
+            raise ContractMismatch(f"data manifest entry {name!r} has no absolute path")
+        if Path(target).exists():
+            available[name] = {"path": target, "description": str((spec or {}).get("description", ""))}
+        else:
+            missing.append(name)
+    return available, missing
+
+
 def resolve_allowlisted_argv(entrypoint: Mapping[str, Any], worktree: Path) -> List[str]:
     argv = entrypoint.get("argv")
     if not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
@@ -625,6 +692,8 @@ def write_task_packet(
     trigger: Trigger,
     *,
     review_delta: Optional[str] = None,
+    data_entries: Optional[Mapping[str, Mapping[str, str]]] = None,
+    caches: Optional[Mapping[str, str]] = None,
 ) -> Path:
     """Materialise the deterministic local task packet (never committed)."""
 
@@ -655,6 +724,26 @@ def write_task_packet(
         lines.append("## Review delta")
         lines.append("")
         lines.append(review_delta.strip())
+    if data_entries:
+        lines += ["", "## Read-only data available", ""]
+        for name, entry in sorted(data_entries.items()):
+            lines.append(f"- `{name}` -> `{entry['path']}`")
+            if entry.get("description"):
+                lines.append(f"  {entry['description']}")
+        lines += [
+            "",
+            "These paths are **inputs only**: never write to them, and never copy",
+            "them into the workspace unless the contract asks for it.",
+        ]
+    if caches:
+        lines += ["", "## Package caches (workspace-local)", ""]
+        for key, value in sorted(caches.items()):
+            lines.append(f"- `{key}` -> `{value}`")
+        lines += [
+            "",
+            "These directories persist for the lifetime of this worktree and are",
+            "git-ignored, so package downloads are reused across fix cycles.",
+        ]
     lines += [
         "",
         "## Allowed scope",
@@ -1068,18 +1157,30 @@ def write_evidence(
     payload: Mapping[str, Any],
     build_report: str,
     logs: Mapping[str, str],
+    redactions: Sequence[str] = (),
 ) -> Dict[str, Path]:
+    """Persist evidence with host identifiers scrubbed.
+
+    Actions logs and artifacts for a public repository are world-readable, so
+    nothing written here may carry the runner host's name or FQDN.
+    """
+
+    def scrub(text: str) -> str:
+        return redact_hosts(text, redactions)
+
     report_dir.mkdir(parents=True, exist_ok=True)
     written: Dict[str, Path] = {}
     summary_path = report_dir / "dispatch_summary.json"
-    summary_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary_path.write_text(
+        scrub(json.dumps(payload, indent=2, sort_keys=True)) + "\n", encoding="utf-8"
+    )
     written["summary"] = summary_path
     report_path = report_dir / "BUILD_REPORT.md"
-    report_path.write_text(build_report.rstrip() + "\n", encoding="utf-8")
+    report_path.write_text(scrub(build_report).rstrip() + "\n", encoding="utf-8")
     written["build_report"] = report_path
     for name, text in logs.items():
         path = report_dir / f"{name}.log"
-        path.write_text(bounded(text), encoding="utf-8")
+        path.write_text(scrub(bounded(text)), encoding="utf-8")
         written[name] = path
     return written
 
@@ -1290,6 +1391,7 @@ def dispatch(
     state_dir: Path,
     report_dir: Path,
     allowlist_path: Path,
+    data_manifest_path: Optional[Path] = None,
     repo: str = DEFAULT_REPO,
     repo_url: Optional[str] = None,
     repo_clone_dir: Optional[Path] = None,
@@ -1312,6 +1414,7 @@ def dispatch(
             f"label {trigger.label!r} belongs to the {LABEL_LANE[trigger.label]} lane, not {lane}"
         )
 
+    data_manifest_path = data_manifest_path or (Path(__file__).resolve().parent.parent / "config" / "cb16_data_manifest.json")
     allowlist = load_allowlist(allowlist_path) if lane == LANE_SCIENCE else {"entrypoints": {}}
     meta = parse_metadata_block(extract_metadata_block(trigger.body))
     spec = validate_metadata(meta, lane, allowlist=allowlist)
@@ -1333,12 +1436,38 @@ def dispatch(
         ensure_path_at_sha(repo_path, spec.sha, spec.experiment_spec)
 
     warnings = credential_warnings(Path(env.get("HOME", str(Path.home()))))
+    redactions = redaction_terms(env)
+    data_entries, data_missing = load_data_manifest(data_manifest_path)
 
     with TaskLock(state_dir, trigger.issue_number, lane):
         worktree, reused = ensure_worktree(repo_path, work_root, spec)
-        packet = write_task_packet(worktree, spec, trigger, review_delta=spec.review_delta)
+
+        # Workspace-local, git-ignored caches: the sandbox only permits writes
+        # under the worktree, so this is where package downloads must land to be
+        # reused instead of re-fetched on every dispatch.
+        caches = {
+            "UV_CACHE_DIR": str(worktree / ".uv-cache"),
+            "PIP_CACHE_DIR": str(worktree / ".pip-cache"),
+            "UV_PROJECT_ENVIRONMENT": str(worktree / ".venv"),
+        }
+        for key in ("UV_CACHE_DIR", "PIP_CACHE_DIR"):
+            Path(caches[key]).mkdir(parents=True, exist_ok=True)
+
+        packet = write_task_packet(
+            worktree,
+            spec,
+            trigger,
+            review_delta=spec.review_delta,
+            data_entries=data_entries,
+            caches=caches,
+        )
 
         child_env = scrubbed_env(env)
+        child_env.update(caches)
+        child_env["UV_LINK_MODE"] = "copy"
+        child_env["CB16_DATA_MANIFEST"] = str(data_manifest_path)
+        if data_entries:
+            child_env["CB16_DATA_ROOT"] = str(next(iter(data_entries.values()))["path"])
         result_dir = report_dir / "results"
 
         if dry_run and lane == LANE_BUILDER:
@@ -1433,6 +1562,10 @@ def dispatch(
             "lane_exit_status": run_result.exit_code,
             "changed_files": changed,
             "control_plane_authorised": spec.allow_control_plane,
+            "read_only_data": {name: entry["path"] for name, entry in data_entries.items()},
+            "read_only_data_missing": data_missing,
+            "workspace_caches": caches,
+            "host_identifiers_redacted": len(redactions),
             "credential_warnings": warnings,
             "published": False,
         }
@@ -1453,7 +1586,7 @@ def dispatch(
                     branch=spec.branch,
                     base=trigger.default_branch,
                     title=build_pr_title(trigger.title, trigger.issue_number),
-                    body=report_text,
+                    body=redact_hosts(report_text, redactions),
                     pr_number=spec.pr_number,
                 )
                 summary["pr_number"] = pr.get("number") if isinstance(pr, dict) else None
@@ -1478,7 +1611,10 @@ def dispatch(
                     token=github_token,
                     slug=repo,
                     issue_number=trigger.issue_number,
-                    body=f"CB16 dispatch classified this run as `{classification}`.\n\n```\n{report_text[:2000]}\n```",
+                    body=redact_hosts(
+                        f"CB16 dispatch classified this run as `{classification}`.\n\n```\n{report_text[:2000]}\n```",
+                        redactions,
+                    ),
                 )
             except DispatchError as exc:
                 warnings.append(f"could not comment on Issue #{trigger.issue_number}: {exc.message}")
@@ -1493,6 +1629,7 @@ def dispatch(
                 "tests_stdout": (test_result.stdout if test_result else ""),
                 "tests_stderr": (test_result.stderr if test_result else ""),
             },
+            redactions=redactions,
         )
         exit_code = {
             CLASS_OK: EXIT_OK,
@@ -1538,6 +1675,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path(__file__).resolve().parent.parent / "config" / "cb16_science_allowlist.json",
     )
+    parser.add_argument(
+        "--data-manifest",
+        type=Path,
+        default=Path(__file__).resolve().parent.parent / "config" / "cb16_data_manifest.json",
+    )
     parser.add_argument("--repo", default=os.environ.get("CB16_REPO", DEFAULT_REPO))
     parser.add_argument(
         "--repo-url",
@@ -1577,6 +1719,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             state_dir=args.state_dir.resolve(),
             report_dir=report_dir.resolve(),
             allowlist_path=args.allowlist.resolve(),
+            data_manifest_path=args.data_manifest.resolve(),
             repo=args.repo,
             repo_url=args.repo_url,
             repo_clone_dir=args.repo_clone_dir,
@@ -1593,8 +1736,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         (report_dir / "dispatch_summary.json").write_text(
             json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
+        terms = redaction_terms(os.environ)
         print(f"classification: {exc.classification}", file=sys.stderr)
-        print(f"detail: {exc.detail}", file=sys.stderr)
+        print(f"detail: {redact_hosts(exc.detail, terms)}", file=sys.stderr)
         return exc.exit_code
 
     print(json.dumps(outcome.summary, indent=2, sort_keys=True))

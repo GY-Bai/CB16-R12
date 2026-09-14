@@ -121,6 +121,106 @@ Artifact uploads are immutable from v4 onwards, so both workflows include
 `github.run_attempt` in the artifact name; without it a re-run of the same run
 id is rejected with "an artifact with this name already exists".
 
+## 1f. Host identifiers in a public log
+
+Actions logs and artifacts of a **public** repository are world-readable, and an
+OCI host name leaks more than it looks like. On this host:
+
+```text
+short: agent-vcn-a1-main-jp
+fqdn : agent-vcn-a1-main-jp.sub05031942320.vcna1mainjp.oraclevcn.com
+```
+
+That encodes the cloud provider, the region (`vcna1mainjp`), the VCN name and a
+subscription fragment. The dispatcher therefore scrubs every host identifier
+from everything it publishes:
+
+* the lane stdout/stderr logs and the test logs written as evidence;
+* `BUILD_REPORT.md` and `dispatch_summary.json`;
+* the Draft PR body and any Issue comment;
+* its own console output, including failure details.
+
+`CB16_REDACT_TERMS` adds extra comma-separated terms. `dispatch_summary.json`
+records how many terms were active as `host_identifiers_redacted`.
+
+What this does **not** remove: the runner workspace path, for example
+`/home/bgy/cb16-r12-runner/_work/CB16-R12/CB16-R12`, is printed by
+`actions/checkout` before the dispatcher runs and carries the user name. Moving
+the runner under a neutral path is a host decision.
+
+## 1g. Docker socket and the sandbox boundary
+
+The DSH sandbox profile is `--ro-bind / /` plus a writable workspace, so it
+**binds the whole root read-only, including `/var/run/docker.sock`**. Measured
+from inside that exact profile:
+
+```text
+srw-rw----  /var/run/docker.sock
+daemon reachable: Server=29.4.2
+```
+
+The runner user is in the `docker` group, so a sandboxed agent can reach the
+daemon and mount the host root into a privileged container. **The sandbox
+confines writes, not reads, and it is not a boundary against the Docker socket.**
+
+Masking works if the profile is amended. Appending a `/dev/null` bind over a
+path hides it (verified):
+
+```text
+before: docker.sock 可见 / SSH 私钥可读 / gh token 可读
+after : docker.sock 已遮蔽 / SSH 私钥 0 字节 / gh token 0 字节
+```
+
+```bash
+bwrap --ro-bind / / --dev /dev --proc /proc --die-with-parent --tmpfs /tmp \
+      --bind "$WS" "$WS" \
+      --ro-bind /dev/null /var/run/docker.sock \
+      --ro-bind /dev/null "$HOME/.ssh/id_ed25519" \
+      --ro-bind /dev/null "$HOME/.config/gh/hosts.yml" \
+      -- /bin/sh -c 'true'
+```
+
+There is currently **no configuration hook** for this: `LocalSandboxProvider.Config`
+exposes only `runnerCommand`, `runnerFailureSignatures` and `probeTimeoutMs`, and
+`bwrapProfileArgs` is hard-coded. So masking means either patching
+`@deepseek-ai/dsh-sandbox-local/lib/index.js` (fragile across upgrades) or
+requesting a mask-paths option upstream. The host-level alternative is to remove
+the runner user from the `docker` group.
+
+## 1h. Read-only data and package caches
+
+`config/cb16_data_manifest.json` is the repository-owned list of read-only host
+data advertised to lane children. Entries whose path is absent are dropped with
+a note, so the manifest is harmless on another machine. Resolved entries appear
+in `.cb16/TASK_PACKET.md` under "Read-only data available" and in
+`dispatch_summary.json` as `read_only_data`.
+
+Currently declared:
+
+| Logical name | Path |
+| --- | --- |
+| `binance_usdm_1m_raw_vault` | `/home/bgy/CB16_BINANCE_USDM_1M_RAW_VAULT_RUN` |
+| `e4_t1_curated_1m_5m_1h` | `/home/bgy/m3-infra/cb16_e4_t1_work/CB16_E4_T1_DATA_1M_5M_1H_20200101_20221019` |
+| `frozen_body_archives` | `/home/bgy/m3-infra` |
+
+Because the profile currently binds `/` read-only, these paths are already
+reachable. The manifest exists so the agent knows *where* they are and so a
+future tightened profile has an explicit list to bind `--ro-bind`.
+
+Package caches are workspace-local, because the sandbox only permits writes
+under the worktree:
+
+| Variable | Value |
+| --- | --- |
+| `UV_CACHE_DIR` | `<worktree>/.uv-cache` |
+| `PIP_CACHE_DIR` | `<worktree>/.pip-cache` |
+| `UV_PROJECT_ENVIRONMENT` | `<worktree>/.venv` |
+| `UV_LINK_MODE` | `copy` |
+
+All three directories are git-ignored, so a fix cycle reuses its downloads
+instead of re-fetching them. A cache shared across tasks is not possible without
+widening the sandbox profile, since only the worktree is writable.
+
 ## 2. Repository variables
 
 Set these as repository Actions **variables** (not secrets) — they are paths,

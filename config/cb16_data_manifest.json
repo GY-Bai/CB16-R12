@@ -1,0 +1,18 @@
+{
+  "schema": "cb16.data.manifest.v1",
+  "comment": "Read-only host data the dispatcher advertises to lane children. Entries whose path is absent on the host are dropped from the task packet with a note, so the same manifest is harmless on another machine. Nothing listed here may ever be written by a lane.",
+  "read_only": {
+    "binance_usdm_1m_raw_vault": {
+      "path": "/home/bgy/CB16_BINANCE_USDM_1M_RAW_VAULT_RUN",
+      "description": "Raw Binance USDM 1m collection vault: work/source/<year> plus yearly bundle tarballs in output/."
+    },
+    "e4_t1_curated_1m_5m_1h": {
+      "path": "/home/bgy/m3-infra/cb16_e4_t1_work/CB16_E4_T1_DATA_1M_5M_1H_20200101_20221019",
+      "description": "Curated 1m/5m/1h dataset with manifest, split protocol and SHA256SUMS. raw_1m/ holds per-symbol csv.gz."
+    },
+    "frozen_body_archives": {
+      "path": "/home/bgy/m3-infra",
+      "description": "Frozen body archives (CB16_SHANXI_FROZEN_BODY_*.tar.gz) and R10 return bundles. Treat as immutable inputs."
+    }
+  }
+}
