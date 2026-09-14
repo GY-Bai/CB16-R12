@@ -75,6 +75,16 @@ EXIT_SCIENTIFIC_FAIL = 5
 EXIT_EVIDENCE_INSUFFICIENT = 6
 EXIT_BUILDER_FAIL = 7
 
+#: Classifications that still publish a reviewable result.  Per
+#: docs/OCI_DSH_DISPATCH_CONTRACT.md section 12, a Builder failure with a
+#: functioning execution path must remain reviewable, and a formal experiment
+#: that executes correctly but misses its gate keeps its evidence (negative
+#: results are preserved).
+PUBLISHABLE_CLASSIFICATIONS = {
+    "builder": (CLASS_OK, CLASS_BUILDER_FAIL),
+    "science": (CLASS_OK, CLASS_SCIENTIFIC_FAIL),
+}
+
 #: Files that belong to the dispatch control plane.  A Builder task may only
 #: touch them when the trusted metadata sets ``allow_control_plane: true``.
 CONTROL_PLANE_PATTERNS: Tuple[str, ...] = (
@@ -1347,24 +1357,32 @@ def dispatch(
             "published": False,
         }
 
-        if publish and classification == CLASS_OK and not dry_run:
+        publishable = classification in PUBLISHABLE_CLASSIFICATIONS.get(lane, ())
+        if publish and publishable and not dry_run:
             if not github_token:
                 raise ExecutionBlocked("publish requested but no GitHub token was provided")
-            if changed:
-                commit_worktree(worktree, message=f"CB16 {lane}: issue #{trigger.issue_number} ({spec.mode})")
-                push_branch(worktree, branch=spec.branch, token=github_token, slug=repo, env=env)
-            pr = create_or_update_draft_pr(
-                token=github_token,
-                slug=repo,
-                branch=spec.branch,
-                base=trigger.default_branch,
-                title=f"[R12] {trigger.title or ('Issue #%d' % trigger.issue_number)}"[:200],
-                body=report_text,
-                pr_number=spec.pr_number,
-            )
+            if lane == LANE_BUILDER:
+                if changed:
+                    commit_worktree(
+                        worktree, message=f"CB16 {lane}: issue #{trigger.issue_number} ({spec.mode})"
+                    )
+                    push_branch(worktree, branch=spec.branch, token=github_token, slug=repo, env=env)
+                pr = create_or_update_draft_pr(
+                    token=github_token,
+                    slug=repo,
+                    branch=spec.branch,
+                    base=trigger.default_branch,
+                    title=f"[R12] {trigger.title or ('Issue #%d' % trigger.issue_number)}"[:200],
+                    body=report_text,
+                    pr_number=spec.pr_number,
+                )
+                summary["pr_number"] = pr.get("number") if isinstance(pr, dict) else None
+                summary["pr_url"] = pr.get("html_url") if isinstance(pr, dict) else None
+            else:
+                # The Science lane never mutates a branch, so it publishes no PR:
+                # its result package travels as Actions artifacts.
+                summary["result_dir"] = str(result_dir)
             summary["published"] = True
-            summary["pr_number"] = pr.get("number") if isinstance(pr, dict) else None
-            summary["pr_url"] = pr.get("html_url") if isinstance(pr, dict) else None
             set_issue_labels(
                 token=github_token, slug=repo, issue_number=trigger.issue_number, add=[REVIEW_LABEL]
             )

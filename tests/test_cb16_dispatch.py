@@ -660,6 +660,71 @@ class DryRunTests(DispatchTestCase):
 # ---------------------------------------------------------------------------
 
 
+class PublishFlowTests(DispatchTestCase):
+    def _patch_api(self):
+        calls = []
+
+        def fake_api(method, path, *, token, payload=None, timeout=30):
+            calls.append((method, path, tuple(sorted((payload or {}).get("labels", [])))))
+            if method == "POST" and path.endswith("/pulls"):
+                return 201, {"number": 11, "html_url": "https://example.invalid/pr/11"}
+            return 200, {}
+
+        original = dispatcher.github_api
+        dispatcher.github_api = fake_api  # type: ignore[assignment]
+        self.addCleanup(setattr, dispatcher, "github_api", original)
+        return calls
+
+    def test_builder_failure_still_publishes_a_reviewable_pr(self):
+        calls = self._patch_api()
+        spy = self.builder_spy(exit_code=4, report="tests failed\nBUILD_REPORT\nTask: x\n")
+        outcome = self.dispatch(publish=True, token="t", dsh_invoker=spy)
+        self.assertEqual(outcome.classification, dispatcher.CLASS_BUILDER_FAIL)
+        self.assertIn(("POST", "/repos/GY-Bai/CB16-R12/pulls", ()), calls)
+        self.assertIn(("POST", "/repos/GY-Bai/CB16-R12/issues/7/labels", ("sol:review",)), calls)
+        self.assertNotIn(("POST", "/repos/GY-Bai/CB16-R12/issues/7/labels", ("blocked",)), calls)
+
+    def test_hardware_limit_marks_blocked_and_publishes_nothing(self):
+        calls = self._patch_api()
+
+        def timing_out(worktree, **kwargs):
+            return dispatcher.RunResult(exit_code=124, timed_out=True)
+
+        outcome = self.dispatch(publish=True, token="t", dsh_invoker=timing_out)
+        self.assertEqual(outcome.classification, dispatcher.CLASS_HARDWARE_LIMIT)
+        self.assertFalse([c for c in calls if c[1].endswith("/pulls")])
+        self.assertIn(("POST", "/repos/GY-Bai/CB16-R12/issues/7/labels", ("blocked",)), calls)
+        self.assertFalse(outcome.summary["published"])
+
+    def test_scientific_failure_still_reports_result_for_review(self):
+        calls = self._patch_api()
+        spy = self.science_spy(exit_code=3)
+        outcome = self.dispatch(lane="science", dry_run=False, publish=True, token="t", science_invoker=spy)
+        self.assertEqual(outcome.classification, dispatcher.CLASS_SCIENTIFIC_FAIL)
+        self.assertFalse([c for c in calls if c[1].endswith("/pulls")])
+        self.assertIn(("POST", "/repos/GY-Bai/CB16-R12/issues/7/labels", ("sol:review",)), calls)
+        self.assertTrue(outcome.summary["published"])
+
+    def test_science_lane_publishes_no_pull_request(self):
+        calls = self._patch_api()
+        spy = self.science_spy()
+        outcome = self.dispatch(lane="science", dry_run=False, publish=True, token="t", science_invoker=spy)
+        self.assertEqual(outcome.classification, dispatcher.CLASS_OK)
+        self.assertFalse([c for c in calls if c[1].endswith("/pulls")])
+        self.assertIn(("POST", "/repos/GY-Bai/CB16-R12/issues/7/labels", ("sol:review",)), calls)
+        self.assertTrue(outcome.summary["published"])
+        self.assertIsNone(outcome.summary.get("pr_number"))
+
+    def test_builder_lane_publishes_a_draft_pull_request(self):
+        calls = self._patch_api()
+        spy = self.builder_spy()  # no file changes, so no push is attempted
+        outcome = self.dispatch(publish=True, token="t", dsh_invoker=spy)
+        self.assertEqual(outcome.classification, dispatcher.CLASS_OK)
+        self.assertIn(("POST", "/repos/GY-Bai/CB16-R12/pulls", ()), calls)
+        self.assertEqual(outcome.summary["pr_number"], 11)
+        self.assertIn(("POST", "/repos/GY-Bai/CB16-R12/issues/7/labels", ("sol:review",)), calls)
+
+
 class PublishEnvironmentTests(DispatchTestCase):
     def test_publish_env_isolates_host_git_configuration(self):
         env = dispatcher.publish_env(self.base_env)
