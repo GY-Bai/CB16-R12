@@ -300,6 +300,41 @@ All three directories are git-ignored, so a fix cycle reuses its downloads
 instead of re-fetching them. A cache shared across tasks is not possible without
 widening the sandbox profile, since only the worktree is writable.
 
+## 1i. Canonical path set and sandbox/runner parity
+
+Every path advertised to a lane child must be a **real host path**, never a
+sandbox-only mount. Code written in the sandboxed Builder lane is later executed
+by the unconfined Science lane and, often enough, by an operator in an ordinary
+shell; a path that exists in only one of those contexts is a latent break.
+
+Canonical paths, all host-level:
+
+| Path | Kind | Purpose |
+| --- | --- | --- |
+| `/cb16/raw/klines_1m` | read-only | 10 USDM pairs, 1m klines, 2020-01..2026-08 |
+| `/cb16/raw/fundingRate` | read-only | funding history, verified 1:1 with the klines |
+| `/cb16/frozen` | read-only | R10/R11 frozen weights and assets |
+| `/cb16/brain_assets` | read-only (symlink) | Kronos / TimesFM operator and medium weights |
+| `/cb16/store` | **writable, persistent** | project-level storage for checkpoints and data intermediates |
+
+`/cb16/brain_assets` is a symlink to the real tree
+(`/home/<user>/cb16_brain_assets`), so the canonical name resolves identically
+inside the sandbox, in a bare runner step and in an interactive shell. Refer to
+the canonical name, never to the underlying home path.
+
+### Project store
+
+`CB16_STORE` (default `/cb16/store`, override with `CB16_PROJECT_STORE`) is the
+only writable location outside the task worktree. The dispatcher creates it if
+absent and exports it to both lanes, and the task packet documents it. Use
+subdirectories named after the task or issue so concurrent tasks do not collide.
+The sandbox reaches it because `cb16-sandbox-runner` appends
+`--bind "$CB16_STORE" "$CB16_STORE"` — a bind onto the real directory, not a
+private mount, which is what keeps the path identical outside the sandbox.
+
+Both lanes receive the same `CB16_STORE` and `CB16_DATA_MANIFEST` values; a test
+asserts that, so the two lanes cannot drift apart silently.
+
 ## 2. Repository variables
 
 Set these as repository Actions **variables** (not secrets) — they are paths,

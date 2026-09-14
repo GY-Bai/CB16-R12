@@ -102,6 +102,7 @@ class DispatchTestCase(unittest.TestCase):
             "SSH_AUTH_SOCK": "/tmp/cb16-test-agent.sock",
             "MY_SERVICE_API_KEY": "service-not-a-real-key",
             "DEEPSEEK_API_KEY": "deepseek-not-a-real-key",
+            "CB16_PROJECT_STORE": str(self.tmp / "project-store"),
         }
 
     # -- fixtures ---------------------------------------------------------
@@ -1016,6 +1017,113 @@ class ReadOnlyDataTests(DispatchTestCase):
         self.assertIn("klines", text)
         self.assertIn("inputs only", text)
         self.assertEqual(outcome.summary["read_only_data"], {"klines": str(self.repo)})
+
+
+class ProjectStoreTests(DispatchTestCase):
+    def test_store_is_a_real_host_path_and_is_exported(self):
+        captured = {}
+
+        def spy(worktree, **kwargs):
+            captured["env"] = kwargs.get("env") or {}
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# fixture\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
+
+        self.dispatch(dsh_invoker=spy)
+        store = Path(captured["env"]["CB16_STORE"])
+        self.assertEqual(store, self.tmp / "project-store")
+        # A real directory on the host, not a sandbox-only mount.
+        self.assertTrue(store.is_dir())
+
+    def test_store_is_documented_in_the_task_packet(self):
+        spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# fixture\n"})
+        outcome = self.dispatch(dsh_invoker=spy)
+        packet = Path(outcome.summary["worktree"]) / ".cb16" / "TASK_PACKET.md"
+        text = packet.read_text(encoding="utf-8")
+        self.assertIn("Project store", text)
+        self.assertIn("CB16_STORE", text)
+        self.assertIn("host directory", text)
+        self.assertEqual(outcome.summary["project_store"], str(self.tmp / "project-store"))
+
+    def test_store_is_created_when_absent(self):
+        nested = self.tmp / "made" / "up" / "store"
+        env = dict(self.base_env)
+        env["CB16_PROJECT_STORE"] = str(nested)
+        store = dispatcher.resolve_project_store(env)
+        self.assertEqual(store, nested)
+        self.assertTrue(nested.is_dir())
+
+
+class LanePathParityTests(DispatchTestCase):
+    """Both lanes must observe the same advertised paths.
+
+    Code written in the sandboxed Builder lane is later executed by the
+    unconfined Science lane, so any path or environment variable that exists in
+    only one of them is a latent break.
+    """
+
+    def _lane_env(self, lane):
+        captured = {}
+
+        def builder(worktree, **kwargs):
+            captured["env"] = kwargs.get("env") or {}
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# fixture\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
+
+        def science(worktree, spec, **kwargs):
+            captured["env"] = kwargs.get("env") or {}
+            result_dir = Path(kwargs["result_dir"])
+            result_dir.mkdir(parents=True, exist_ok=True)
+            (result_dir / "RESULT.json").write_text("{}\n", encoding="utf-8")
+            (result_dir / "REPORT.md").write_text("# r\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
+
+        if lane == "builder":
+            self.dispatch(dsh_invoker=builder)
+        else:
+            self.dispatch(lane="science", dry_run=True, science_invoker=science)
+        return captured["env"]
+
+    def test_both_lanes_receive_the_same_path_variables(self):
+        builder_env = self._lane_env("builder")
+        science_env = self._lane_env("science")
+        keys = ("CB16_STORE", "CB16_DATA_MANIFEST")
+        for key in keys:
+            with self.subTest(key=key):
+                self.assertIn(key, builder_env)
+                self.assertIn(key, science_env)
+                self.assertEqual(builder_env[key], science_env[key])
+
+    def test_path_variables_point_at_real_host_directories(self):
+        for lane in ("builder", "science"):
+            env = self._lane_env(lane)
+            with self.subTest(lane=lane):
+                self.assertTrue(Path(env["CB16_STORE"]).is_dir())
+                self.assertTrue(Path(env["CB16_DATA_MANIFEST"]).is_file())
+
+    def test_every_advertised_read_only_path_exists_on_the_host(self):
+        entries, _missing = dispatcher.load_data_manifest(
+            REPO_ROOT / "config" / "cb16_data_manifest.json"
+        )
+        self.assertTrue(entries)
+        for name, entry in entries.items():
+            with self.subTest(entry=name):
+                self.assertTrue(
+                    Path(entry["path"]).exists(),
+                    f"{name} advertises {entry['path']} which is not a host path",
+                )
+
+    def test_brain_assets_are_reachable_at_the_canonical_path(self):
+        entries, _ = dispatcher.load_data_manifest(
+            REPO_ROOT / "config" / "cb16_data_manifest.json"
+        )
+        brain = entries.get("cb16_brain_assets")
+        self.assertIsNotNone(brain, "brain assets must be advertised")
+        self.assertEqual(brain["path"], "/cb16/brain_assets")
+        self.assertTrue(Path(brain["path"]).is_dir())
 
 
 class WorkspaceCacheTests(DispatchTestCase):

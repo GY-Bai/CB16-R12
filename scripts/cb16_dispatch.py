@@ -582,6 +582,26 @@ def load_allowlist(path: Path) -> Mapping[str, Any]:
     return data
 
 
+DEFAULT_PROJECT_STORE = "/cb16/store"
+
+
+def resolve_project_store(env: Mapping[str, str]) -> Optional[Path]:
+    """Return the project-level persistent store, creating it if needed.
+
+    It is deliberately a real host directory rather than a sandbox-only mount:
+    a path that only exists inside the sandbox would let code developed there
+    fail as soon as it runs without one.
+    """
+
+    raw = (env.get("CB16_PROJECT_STORE") or "").strip() or DEFAULT_PROJECT_STORE
+    store = Path(raw)
+    try:
+        store.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
+    return store if store.is_dir() else None
+
+
 def load_data_manifest(path: Path) -> Tuple[Dict[str, Dict[str, str]], List[str]]:
     """Resolve the read-only data manifest against this host.
 
@@ -705,6 +725,7 @@ def write_task_packet(
     review_delta: Optional[str] = None,
     data_entries: Optional[Mapping[str, Mapping[str, str]]] = None,
     caches: Optional[Mapping[str, str]] = None,
+    project_store: Optional[Path] = None,
 ) -> Path:
     """Materialise the deterministic local task packet (never committed)."""
 
@@ -745,6 +766,19 @@ def write_task_packet(
             "",
             "These paths are **inputs only**: never write to them, and never copy",
             "them into the workspace unless the contract asks for it.",
+        ]
+    if project_store is not None:
+        lines += [
+            "",
+            "## Project store (persistent, writable)",
+            "",
+            f"- `CB16_STORE` -> `{project_store}`",
+            "",
+            "Use this for artefacts that must outlive a single task: model",
+            "checkpoints, prepared data intermediates, trained weights. It is a real",
+            "host directory, so the same path works inside the sandbox, in a bare",
+            "runner step and in an interactive shell. Prefer subdirectories named",
+            "after the task or issue so concurrent tasks do not collide.",
         ]
     if caches:
         lines += ["", "## Package caches (workspace-local)", ""]
@@ -1449,6 +1483,7 @@ def dispatch(
     warnings = credential_warnings(Path(env.get("HOME", str(Path.home()))))
     redactions = redaction_terms(env)
     data_entries, data_missing = load_data_manifest(data_manifest_path)
+    project_store = resolve_project_store(env)
 
     with TaskLock(state_dir, trigger.issue_number, lane):
         worktree, reused = ensure_worktree(repo_path, work_root, spec)
@@ -1471,12 +1506,15 @@ def dispatch(
             review_delta=spec.review_delta,
             data_entries=data_entries,
             caches=caches,
+            project_store=project_store,
         )
 
         child_env = scrubbed_env(env)
         child_env.update(caches)
         child_env["UV_LINK_MODE"] = "copy"
         child_env["CB16_DATA_MANIFEST"] = str(data_manifest_path)
+        if project_store is not None:
+            child_env["CB16_STORE"] = str(project_store)
         if data_entries:
             child_env["CB16_DATA_ROOT"] = str(next(iter(data_entries.values()))["path"])
         result_dir = report_dir / "results"
@@ -1576,6 +1614,7 @@ def dispatch(
             "read_only_data": {name: entry["path"] for name, entry in data_entries.items()},
             "read_only_data_missing": data_missing,
             "workspace_caches": caches,
+            "project_store": str(project_store) if project_store else None,
             "host_identifiers_redacted": len(redactions),
             "credential_warnings": warnings,
             "published": False,
