@@ -184,6 +184,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-c-joint-confirmation-r3@v1": {
+      "description": "R12 VS-C R3 fresh-seed joint Task-A/Task-B confirmation with categorical-direction entropy 0.005, Beta entropy zero, matched controls, exact-commit implementation-test gate and at most four one-thread CPU seed workers.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.joint_confirmation_r3"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-c-joint-confirmation-r3-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-c-joint-confirmation-r3-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }

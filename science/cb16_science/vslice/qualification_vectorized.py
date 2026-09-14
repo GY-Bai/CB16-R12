@@ -58,6 +58,8 @@ def run_paired_seed_vectorized(
     optimizer: q.OptimizerSettings,
     env_a: tasks.TaskAEnvironment,
     env_b: tasks.TaskBEnvironment,
+    *,
+    direction_entropy_coefficient: float = 0.0,
 ) -> Dict[str, Any]:
     task_a = q.task_section(spec, "task_a")
     task_b = q.task_section(spec, "task_b")
@@ -67,9 +69,9 @@ def run_paired_seed_vectorized(
     gate_b = q.gate_section(spec, "task_b", "seed_pass_gate")
 
     torch.manual_seed(seed)
-    positive_a = q.build_learner(authority, optimizer)
+    positive_a = q.build_learner(authority, optimizer, direction_entropy_coefficient=direction_entropy_coefficient)
     torch.manual_seed(seed)
-    control_a = q.build_learner(authority, optimizer)
+    control_a = q.build_learner(authority, optimizer, direction_entropy_coefficient=direction_entropy_coefficient)
     q.require_identical_parameters(positive_a, control_a)
     pre_positive_a = tasks.evaluate_task_a(positive_a, env_a)
     pre_control_a = tasks.evaluate_task_a(control_a, env_a)
@@ -98,9 +100,9 @@ def run_paired_seed_vectorized(
     }
 
     torch.manual_seed(seed)
-    positive_b = q.build_learner(authority, optimizer)
+    positive_b = q.build_learner(authority, optimizer, direction_entropy_coefficient=direction_entropy_coefficient)
     torch.manual_seed(seed)
-    control_b = q.build_learner(authority, optimizer)
+    control_b = q.build_learner(authority, optimizer, direction_entropy_coefficient=direction_entropy_coefficient)
     q.require_identical_parameters(positive_b, control_b)
     pre_positive_b = tasks.evaluate_task_b(positive_b, env_b)
     pre_control_b = tasks.evaluate_task_b(control_b, env_b)
