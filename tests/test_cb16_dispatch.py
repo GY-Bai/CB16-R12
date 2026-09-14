@@ -843,6 +843,151 @@ class FixRoundHandoffTests(DispatchTestCase):
         self.assertIn("truncated at", "\n".join(lines))
 
 
+class RoundVisibilityTests(DispatchTestCase):
+    """A round must leave a readable trace on its PR, and must not read it back."""
+
+    def _ok_round(self, *, pr_number=36, branch="ds/visible"):
+        meta = self.builder_meta(branch=branch)
+        meta["mode"] = "fix"
+        meta["pr_number"] = pr_number
+        meta["review_delta"] = "bounded"
+        return meta
+
+    def test_successful_round_posts_its_report_to_the_pull_request(self):
+        posted = []
+        original_comment = dispatcher.comment_on_issue
+        original_api = dispatcher.github_api
+        dispatcher.comment_on_issue = lambda **kw: posted.append(kw)
+
+        def fake_api(method, path, *, token=None, payload=None, timeout=30):
+            if method == "POST" and path.endswith("/pulls"):
+                return 201, {"number": 36, "html_url": "https://example.invalid/pr/36"}
+            if method == "PATCH" and "/pulls/" in path:
+                return 200, {"number": 36, "html_url": "https://example.invalid/pr/36"}
+            return 200, {}
+
+        dispatcher.github_api = fake_api
+        try:
+            def no_file_changes(worktree, **kwargs):
+                # No changed files, so publish skips the commit/push and the
+                # test exercises the reporting path alone.
+                return dispatcher.RunResult(
+                    exit_code=0,
+                    stdout="BUILD_REPORT\n- settled the dataclass shape\n",
+                )
+
+            self.dispatch(
+                meta=self._ok_round(),
+                publish=True,
+                token="t",
+                dsh_invoker=no_file_changes,
+            )
+        finally:
+            dispatcher.comment_on_issue = original_comment
+            dispatcher.github_api = original_api
+        self.assertEqual(len(posted), 1, "a successful round must not be silent")
+        self.assertEqual(posted[0]["issue_number"], 36, "the report goes on the PR")
+        body = posted[0]["body"]
+        self.assertIn(dispatcher.BUILDER_REPORT_TAG, body)
+        self.assertIn("settled the dataclass shape", body)
+        self.assertIn("`OK`", body)
+        self.assertIn("ds/visible", body)
+
+    def test_failed_round_also_posts_to_the_pull_request(self):
+        posted = []
+        original_comment = dispatcher.comment_on_issue
+        original_api = dispatcher.github_api
+        dispatcher.comment_on_issue = lambda **kw: posted.append(kw)
+
+        def fake_api(method, path, *, token=None, payload=None, timeout=30):
+            if method == "POST" and path.endswith("/pulls"):
+                return 201, {"number": 36, "html_url": "https://example.invalid/pr/36"}
+            if method == "PATCH" and "/pulls/" in path:
+                return 200, {"number": 36, "html_url": "https://example.invalid/pr/36"}
+            return 200, {}
+
+        dispatcher.github_api = fake_api
+        try:
+            outcome = self.dispatch(
+                meta=self._ok_round(),
+                publish=True,
+                token="t",
+                dsh_invoker=self.builder_spy(exit_code=4, report="boom\nBUILD_REPORT\nTask: x\n"),
+            )
+        finally:
+            dispatcher.comment_on_issue = original_comment
+            dispatcher.github_api = original_api
+        self.assertEqual(outcome.classification, dispatcher.CLASS_BUILDER_FAIL)
+        pr_comments = [p for p in posted if p["issue_number"] == 36]
+        self.assertEqual(len(pr_comments), 1, "a failed round must be visible on its PR too")
+        self.assertIn(dispatcher.BUILDER_REPORT_TAG, pr_comments[0]["body"])
+
+    def test_round_comment_names_the_model(self):
+        meta = self._ok_round()
+        spec = dispatcher.TaskSpec(lane="builder", mode="fix", sha="0" * 40,
+                                   branch="ds/visible", pr_number=36)
+        body = dispatcher.render_round_comment(
+            spec=spec, issue_number=35, classification="OK", report_text="BUILD_REPORT\n",
+            changed=["a.py", "b.py"], run_result=dispatcher.RunResult(exit_code=0),
+            model={"model": "deepseek-flash", "reasoningEffort": "max"},
+        )
+        self.assertIn("deepseek-flash", body)
+        self.assertIn("effort `max`", body)
+        self.assertIn("2 file(s)", body)
+
+    def test_round_report_is_not_read_back_as_an_instruction(self):
+        """The Builder's own comment must never become the newest instruction."""
+
+        def fake_api(method, path, *, token=None, payload=None, timeout=30):
+            if path.endswith("/commits"):
+                return 200, [{"sha": "a" * 40, "commit": {"message": "build",
+                               "committer": {"date": "2026-09-14T17:02:17Z"}},
+                              "author": {"login": "GY-Bai"}}]
+            if path.endswith("/reviews"):
+                return 200, []
+            if path.endswith("/issues/36/comments"):
+                return 200, [{
+                    "created_at": "2026-09-14T17:29:28Z",
+                    "body": dispatcher.BUILDER_REPORT_TAG + "\n## CB16 Builder round\nBUILD_REPORT",
+                    "user": {"login": "GY-Bai"},
+                }]
+            return 200, []
+
+        original = dispatcher.github_api
+        dispatcher.github_api = fake_api
+        try:
+            timeline = dispatcher.fetch_pr_timeline(
+                "GY-Bai/CB16-R12", 36, token="t", trusted_actors=("GY-Bai",)
+            )
+        finally:
+            dispatcher.github_api = original
+        self.assertEqual(timeline["unaddressed"], [], "our own report is not an instruction")
+        kinds = [e["kind"] for e in timeline["entries"]]
+        self.assertNotIn("comment", kinds)
+
+    def test_a_real_reviewer_comment_is_still_an_instruction(self):
+        def fake_api(method, path, *, token=None, payload=None, timeout=30):
+            if path.endswith("/commits"):
+                return 200, [{"sha": "a" * 40, "commit": {"message": "build",
+                               "committer": {"date": "2026-09-14T17:02:17Z"}},
+                              "author": {"login": "GY-Bai"}}]
+            if path.endswith("/issues/36/comments"):
+                return 200, [{"created_at": "2026-09-14T17:40:00Z", "body": "please fix X",
+                              "user": {"login": "GY-Bai"}}]
+            return 200, []
+
+        original = dispatcher.github_api
+        dispatcher.github_api = fake_api
+        try:
+            timeline = dispatcher.fetch_pr_timeline(
+                "GY-Bai/CB16-R12", 36, token="t", trusted_actors=("GY-Bai",)
+            )
+        finally:
+            dispatcher.github_api = original
+        self.assertEqual(len(timeline["unaddressed"]), 1)
+        self.assertEqual(timeline["unaddressed"][0]["text"], "please fix X")
+
+
 class BuildReportHandoffTests(DispatchTestCase):
     """The report is the cross-round carrier once sessions stop being reused."""
 

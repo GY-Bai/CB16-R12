@@ -581,7 +581,40 @@ Two defects fixed while wiring this up:
   report on the session path was silently replaced by the stub;
 * the synthesized report used the branch name in the `Issue #` field.
 
-## 1m. Which instruction source wins
+## 1m. What a round leaves on its PR
+
+A successful round used to leave the PR silent: the only GitHub write was a
+label on the Issue, and the report went to an Actions artifact that expires.
+
+The PR body does carry the report, but a fix round **overwrites** it, so the body
+only ever shows the latest round - there is no way to read what round 2
+concluded after round 3 has run.
+
+Every published Builder round now also posts its report as a **comment** on its
+own PR, giving the PR an append-only history:
+
+```markdown
+<!-- cb16-builder-report -->
+## CB16 Builder round — `ds/example` (`fix`)
+
+| | |
+| --- | --- |
+| issue | #35 |
+| classification | `OK` |
+| changed | 3 file(s) |
+| model | `deepseek-flash` (effort `max`) |
+| pull request | #36 |
+
+<details><summary>BUILD_REPORT</summary> ... </details>
+```
+
+The hidden `<!-- cb16-builder-report -->` marker matters for more than tidiness:
+the PR timeline treats a trusted actor's comment as an instruction, and the
+Builder posts as the token owner. Without the marker a round would read its own
+report back as the newest thing a reviewer asked for. Timeline collection skips
+tagged comments for exactly that reason.
+
+## 1n. Which instruction source wins
 
 Five places can look like an instruction, and a fix round can hold several at
 once. The task packet therefore opens with an explicit ranking so the agent

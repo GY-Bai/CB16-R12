@@ -101,6 +101,9 @@ CONTROL_PLANE_PATTERNS: Tuple[str, ...] = (
 
 LOG_LIMIT = 20000
 BUILD_REPORT_MARKER = "BUILD_REPORT"
+#: Hidden marker on the comment a round posts about itself, so the PR timeline
+#: can tell the Builder's own output from a reviewer instruction.
+BUILDER_REPORT_TAG = "<!-- cb16-builder-report -->"
 #: A report section starts the line (optionally behind markdown decoration),
 #: which keeps prose mentions from being mistaken for the section itself.
 _BUILD_REPORT_LINE_RE = re.compile(r"^[ \t>*#_`-]*BUILD_REPORT\b", re.MULTILINE)
@@ -1044,6 +1047,11 @@ def fetch_pr_timeline(
             return
         body = (entry.get("body") or "").strip()
         if not body:
+            return
+        # The Builder posts its own round reports as comments. Those are output,
+        # not instruction: without this filter a round would read its own report
+        # back as the newest thing a reviewer asked for.
+        if BUILDER_REPORT_TAG in body:
             return
         entries.append({
             "kind": kind,
@@ -2339,6 +2347,55 @@ def comment_on_issue(*, token: str, slug: str, issue_number: int, body: str) -> 
     )
 
 
+def render_round_comment(
+    *,
+    spec: TaskSpec,
+    issue_number: int,
+    classification: str,
+    report_text: str,
+    changed: Sequence[str],
+    run_result: RunResult,
+    model: Optional[Mapping[str, Any]] = None,
+) -> str:
+    """The comment a round posts about itself on its PR.
+
+    A round that succeeds used to leave no trace on the PR at all: the report
+    went to an Actions artifact and the only GitHub write was a label. A reader
+    could see that the branch moved but not what the round concluded.
+    """
+
+    lines = [
+        BUILDER_REPORT_TAG,
+        f"## CB16 Builder round — `{spec.branch}` (`{spec.mode}`)",
+        "",
+        "| | |",
+        "| --- | --- |",
+        f"| issue | #{issue_number} |",
+        f"| classification | `{classification}` |",
+        f"| changed | {len(changed)} file(s) |",
+    ]
+    if model:
+        effort = model.get("reasoningEffort")
+        lines.append(
+            f"| model | `{model.get('model')}`"
+            + (f" (effort `{effort}`)" if effort else "")
+            + " |"
+        )
+    if spec.pr_number is not None:
+        lines.append(f"| pull request | #{spec.pr_number} |")
+    lines += [
+        "",
+        "<details><summary>BUILD_REPORT</summary>",
+        "",
+        "```text",
+        report_text,
+        "```",
+        "",
+        "</details>",
+    ]
+    return "\n".join(lines)
+
+
 # --------------------------------------------------------------------------
 # Orchestration
 # --------------------------------------------------------------------------
@@ -2830,6 +2887,30 @@ def dispatch(
                 )
                 summary["pr_number"] = pr.get("number") if isinstance(pr, dict) else None
                 summary["pr_url"] = pr.get("html_url") if isinstance(pr, dict) else None
+                # The PR body carries only the current round, because a fix
+                # round overwrites it. Post the round as a comment as well, so
+                # the PR keeps an append-only history of what each round did
+                # and why - and so a reader can tell the rounds apart at all.
+                try:
+                    comment_on_issue(
+                        token=github_token,
+                        slug=repo,
+                        issue_number=summary["pr_number"] or trigger.issue_number,
+                        body=redact_hosts(
+                            render_round_comment(
+                                spec=spec,
+                                issue_number=trigger.issue_number,
+                                classification=classification,
+                                report_text=report_text,
+                                changed=changed,
+                                run_result=run_result,
+                                model=builder_model,
+                            ),
+                            redactions,
+                        ),
+                    )
+                except DispatchError as exc:
+                    warnings.append(f"could not post the round report: {exc.message}")
             else:
                 # The Science lane never mutates a branch, so it publishes no PR:
                 # its result package travels as Actions artifacts.
