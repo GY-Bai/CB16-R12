@@ -286,19 +286,18 @@ Because the profile currently binds `/` read-only, these paths are already
 reachable. The manifest exists so the agent knows *where* they are and so a
 future tightened profile has an explicit list to bind `--ro-bind`.
 
-Package caches are workspace-local, because the sandbox only permits writes
-under the worktree:
+Package state is split: downloads are shared across branches, environments are
+not. See section 1k for the shared cache; the worktree-local pieces remain:
 
 | Variable | Value |
 | --- | --- |
-| `UV_CACHE_DIR` | `<worktree>/.uv-cache` |
+| `UV_CACHE_DIR` | `/cb16/cache/uv` (shared, overridable with `CB16_UV_CACHE_DIR`) |
 | `PIP_CACHE_DIR` | `<worktree>/.pip-cache` |
 | `UV_PROJECT_ENVIRONMENT` | `<worktree>/.venv` |
 | `UV_LINK_MODE` | `copy` |
 
-All three directories are git-ignored, so a fix cycle reuses its downloads
-instead of re-fetching them. A cache shared across tasks is not possible without
-widening the sandbox profile, since only the worktree is writable.
+The worktree-local directories are git-ignored, so a fix cycle reuses them
+without committing anything.
 
 ## 1i. Canonical path set and sandbox/runner parity
 
@@ -415,6 +414,83 @@ The value comes from `agent-default-model` in `$DSH_HOME/settings.yaml`
 (`~/.dsh/settings.yaml` by default), so changing that one file changes every
 lane and every task. `dsh --profile headless --dump-config` is **not** a valid
 source here: it shows the plugin default, not the runtime override.
+
+## 1k. Builder session affinity and the shared uv cache
+
+### Opt-in session affinity
+
+A task branch may opt into conversation continuity with one optional Builder
+metadata field:
+
+```text
+session_affinity: branch-v1
+```
+
+* absent -> the legacy path, unchanged: `dsh --profile headless ...`, a fresh
+  session every dispatch;
+* present -> the dispatcher routes the branch through `cb16-builder-session`
+  and records `branch -> session_id` in
+  `<CB16_STATE_DIR>/session-affinity/<hash>.json`.
+
+Git stays authoritative. A resumed turn's prompt re-asserts the worktree, task
+packet and review delta, and a missing, corrupt, foreign-worktree or
+incompatible session degrades to `fallback-new`: a fresh session in the same
+worktree, with `generation + 1` recorded.
+
+**Legacy protection.** A branch that already existed on the remote and was never
+admitted is *never* adopted into a session - the dispatcher records
+`declined-existing-branch` and keeps the legacy behaviour, so editing an old
+Issue's metadata cannot turn it stateful. Only a genuinely new branch
+initialises affinity.
+
+**Registry loss is recoverable.** Two files are kept per branch: the registry
+(`<hash>.json`, rewritten every dispatch) and a durable admission marker
+(`<hash>.admitted.json`, written once). A corrupted or deleted registry on an
+admitted branch therefore yields `fallback-new` with
+`resume_failure_class=registry-lost` and `generation + 1`, rather than being
+mistaken for a never-admitted branch and demoted to the legacy path forever.
+The marker is written before the turn runs, so a failed turn after the push
+cannot cost the branch its affinity.
+
+The dispatcher also records, per run: `session_affinity`, `session_profile`,
+and a `session_route` block (`action`, `session_id`, `generation`,
+`resume_attempted`, `resume_succeeded`, `resume_failure_class`, `persisted`).
+The profile supports no "resume latest session" form: routing is always the
+exact recorded id.
+
+The profile itself, its command-line contract, resume validation, compaction
+policy and host bootstrap live in
+[`infra/dsh/cb16-builder-session/README.md`](../infra/dsh/cb16-builder-session/README.md).
+
+### Shared uv download cache
+
+Downloads are shared across branches; environments are not:
+
+```text
+/cb16/cache/uv          shared package cache   (CB16_UV_CACHE_DIR)
+<worktree>/.venv        branch-specific environment (UV_PROJECT_ENVIRONMENT)
+```
+
+`/cb16/cache/uv` is outside the worktree, so `cb16-sandbox-runner` binds it
+writable **for the Builder profile only**. Science keeps the frozen read-only
+policy and is refused that write - verified on the host:
+
+```text
+Builder : cache writable YES
+Science : write refused
+```
+
+The dispatcher creates the directory and never edits cache contents; uv's cache
+is built for concurrent readers and writers. Each worktree keeps its own `.venv`
+so branches cannot poison each other's environment.
+
+### Context management for long-lived sessions
+
+A resumed session accumulates context that a one-shot dispatch never did, so the
+session profile pins `compaction-basic` to `thresholdRatio 0.75`,
+`retainRatio 0.10` and `maxOverflowRetries 2`; the legacy profile keeps the DSH
+defaults. See the plugin README for the arithmetic and for why the retry budget,
+not the threshold, is what catches a boundary rejection.
 
 ## 2. Repository variables
 

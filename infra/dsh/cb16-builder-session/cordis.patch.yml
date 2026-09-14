@@ -1,0 +1,62 @@
+# The cb16-builder-session bundle patch: the legacy one-shot headless surface
+# plus one explicit, resumable session identity.
+#
+# It rides over dsh-base exactly as dsh-headless does - no Host, HTTP server, Web
+# runtime or browser plugin - and replaces only the startup/runner pair, so the
+# toolchain, persistence and sandbox composition are inherited unchanged.
+#
+# The legacy `headless` profile is deliberately untouched: it keeps its
+# fresh-session-per-dispatch behaviour and remains the default Builder path.
+
+- id: system-prompt
+  config:
+    persona: >-
+      You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+
+- id: hmr
+  disabled: true
+
+- id: tools
+  config:
+    mode: !!js process.env.DSH_TOOLS_MODE
+
+# Context management for a session that now outlives a single dispatch.
+#
+# dsh-base mounts compaction-basic with plugin defaults (thresholdRatio 0.8,
+# retainRatio 0.16, maxOverflowRetries 1). A fresh-session Builder rarely
+# accumulates enough context to reach them; a resumed affinity session does, so
+# this profile pins a more conservative policy:
+#   thresholdRatio 0.75  - compact at 75% of the window, as the operator asked
+#   retainRatio    0.10  - keep less, so post-compaction pressure is lower
+#   maxOverflowRetries 2 - the actual defence against a rejected request
+#
+# Why the retries matter more than the threshold: a measured failure on this
+# host was rejected at 63.4% of the window (664,648 message tokens plus a
+# 384,000 completion request, 72 tokens over the limit). No threshold below
+# 0.63 would have fired, so only recovery-on-overflow can catch that class.
+# With the configured model (deepseek-flash, maxTokens 131,072) the one-completion
+# bound is (1048576-131072)/1048576 = 0.875, which 0.75 keeps clear.
+#
+# The legacy `headless` profile is deliberately left on the defaults.
+- id: compaction-basic
+  config:
+    thresholdRatio: 0.75
+    retainRatio: 0.10
+    maxOverflowRetries: 2
+
+- insert:
+    - id: code-runtime
+      name: '@deepseek-ai/dsh-code-runtime-worker-thread'
+
+    - id: cb16-session-startup
+      name: 'dsh-cb16-builder-session/startup'
+
+    # Reads its mode, explicit session id and task from the startup provider.
+    - id: cb16-session-runner
+      name: 'dsh-cb16-builder-session'
+      inject: [cb16SessionStartup]
+      config:
+        mode: !!js ctx.cb16SessionStartup.mode
+        sessionId: !!js ctx.cb16SessionStartup.sessionId ?? ''
+        task: !!js ctx.cb16SessionStartup.task
+        outputFormat: !!js ctx.cb16SessionStartup.outputFormat

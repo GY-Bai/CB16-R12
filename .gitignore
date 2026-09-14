@@ -223,3 +223,11 @@ __marimo__/
 # CB16 sandbox-local package caches (workspace-writable inside the DSH sandbox)
 .uv-cache/
 .pip-cache/
+
+# CB16 DSH session plugin: host-linked dependency resolution (bootstrap step)
+infra/dsh/cb16-builder-session/node_modules
+
+# The DSH session plugin's lib/ is source, not a Python build artefact.
+# The template above ignores every lib/ directory, so it must be
+# re-included explicitly or a clean checkout cannot load the profile.
+!infra/dsh/cb16-builder-session/lib/
