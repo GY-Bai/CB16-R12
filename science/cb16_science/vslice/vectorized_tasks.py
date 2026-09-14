@@ -20,7 +20,7 @@ from .contracts import (
     PhysicsConfig,
     account_state_from_truth,
 )
-from .learner import OnPolicyLearner
+from .learner import OnPolicyLearner, OnPolicyOneStepBatch
 from .policy import (
     DIRECTION_INDEX_FLAT,
     DIRECTION_INDEX_SHORT,
@@ -162,21 +162,18 @@ def task_a_reward_batch(
     return rewards
 
 
-def build_task_a_generation(
+def _task_a_generation_tensors(
     learner: OnPolicyLearner,
     env: tasks.TaskAEnvironment,
-    generation_id: int,
     *,
     mode: str,
-) -> Tuple[Trajectory, ...]:
-    """Task A with one batched actor forward and tensorized Physics per generation."""
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     if mode == tasks.ARM_POSITIVE:
         schedule = env.positive_schedule
     elif mode == tasks.ARM_CONTROL:
         schedule = env.control_schedule
     else:
         raise ContractError(f"unknown Task-A arm {mode!r}")
-
     actual_indices = torch.tensor([a for a, _ in schedule], dtype=torch.long)
     observed_indices = torch.tensor([o for _, o in schedule], dtype=torch.long)
     z = learner.encode(torch.from_numpy(env.market)).to(torch.float32)
@@ -184,33 +181,46 @@ def build_task_a_generation(
         [account_state_vector(account_state_from_truth(case.truth, env.config)) for case in env.cases]
     )
     states = torch.cat(
-        (
-            z.expand(len(schedule), z.shape[-1]),
-            account_rows.index_select(0, observed_indices),
-        ),
-        dim=-1,
+        (z.expand(len(schedule), z.shape[-1]), account_rows.index_select(0, observed_indices)), dim=-1
     )
     direction_indices, risks = sample_action_batch(learner, states)
     rewards = task_a_reward_batch(env, actual_indices, direction_indices, risks)
-    directions = _direction_values(direction_indices)
+    return states, direction_indices, risks, rewards
 
+
+def build_task_a_one_step_batch(
+    learner: OnPolicyLearner, env: tasks.TaskAEnvironment, generation_id: int, *, mode: str
+) -> OnPolicyOneStepBatch:
+    """Tensor-native complete one-step Task-A batch for the learner fast path."""
+    states, direction_indices, risks, rewards = _task_a_generation_tensors(learner, env, mode=mode)
+    return OnPolicyOneStepBatch(
+        states=states,
+        direction_indices=direction_indices,
+        requested_risks=risks,
+        rewards=rewards,
+        generation_id=generation_id,
+    )
+
+
+def build_task_a_generation(
+    learner: OnPolicyLearner,
+    env: tasks.TaskAEnvironment,
+    generation_id: int,
+    *,
+    mode: str,
+) -> Tuple[Trajectory, ...]:
+    """Reference object path for Task A; retained as semantic authority/equivalence oracle."""
+    states, direction_indices, risks, rewards = _task_a_generation_tensors(learner, env, mode=mode)
+    directions = _direction_values(direction_indices)
     return tuple(
         Trajectory(
-            steps=(
-                TrajectoryStep(
-                    state=states[i],
-                    direction=directions[i],
-                    requested_risk=float(risks[i]),
-                    reward=float(rewards[i]),
-                    terminal=False,
-                    truncated=False,
-                    generation_id=generation_id,
-                ),
-            ),
-            generation_id=generation_id,
-            complete=True,
+            steps=(TrajectoryStep(
+                state=states[i], direction=directions[i], requested_risk=float(risks[i]),
+                reward=float(rewards[i]), terminal=False, truncated=False, generation_id=generation_id,
+            ),),
+            generation_id=generation_id, complete=True,
         )
-        for i in range(len(schedule))
+        for i in range(states.shape[0])
     )
 
 

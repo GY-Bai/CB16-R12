@@ -61,6 +61,7 @@ from .policy import (
     ValueCritic,
     build_learner_state,
     direction_index,
+    DIRECTION_INDEX_FLAT,
 )
 from .sensory import FrozenSensory
 from .trajectory import Trajectory, validate_trajectory
@@ -89,6 +90,63 @@ class UpdateReport:
     critic_grad_from_actor_max_abs: float
     mean_return_to_go: float
     mean_value: float
+
+
+def _validate_one_step_tensor_contract(
+    states: Any, directions: Any, risks: Any, rewards: Any, generation_id: Any
+) -> torch.Tensor:
+    if not isinstance(states, torch.Tensor) or states.ndim != 2 or states.shape[0] < 1:
+        raise LearnerContractError("one-step states must be a non-empty [N, state_dim] tensor")
+    n = states.shape[0]
+    if not states.dtype.is_floating_point or not bool(torch.isfinite(states).all()):
+        raise LearnerContractError("one-step states must be finite floating values")
+    if not isinstance(directions, torch.Tensor) or directions.ndim != 1 or directions.numel() != n:
+        raise LearnerContractError("one-step direction_indices must be a [N] tensor")
+    if directions.dtype not in (torch.int32, torch.int64):
+        raise LearnerContractError("one-step direction_indices must be integer typed")
+    directions = directions.to(torch.long)
+    if bool(((directions < 0) | (directions > 2)).any()):
+        raise LearnerContractError("one-step direction indices must lie in 0..2")
+    if not isinstance(risks, torch.Tensor) or risks.ndim != 1 or risks.numel() != n:
+        raise LearnerContractError("one-step requested_risks must be a [N] tensor")
+    if not risks.dtype.is_floating_point or not bool(torch.isfinite(risks).all()):
+        raise LearnerContractError("one-step requested_risks must be finite floating values")
+    if bool(((risks < 0.0) | (risks > 1.0)).any()):
+        raise LearnerContractError("one-step requested_risks must lie in [0, 1]")
+    flat = directions == DIRECTION_INDEX_FLAT
+    if bool((flat & (risks != 0.0)).any() | ((~flat) & (risks == 0.0)).any()):
+        raise LearnerContractError("one-step FLAT iff requested_risk == 0 semantic contract failed")
+    if not isinstance(rewards, torch.Tensor) or rewards.ndim != 1 or rewards.numel() != n:
+        raise LearnerContractError("one-step rewards must be a [N] tensor")
+    if not rewards.dtype.is_floating_point or not bool(torch.isfinite(rewards).all()):
+        raise LearnerContractError("one-step rewards must be finite floating values")
+    if isinstance(generation_id, bool) or not isinstance(generation_id, int) or generation_id < 0:
+        raise LearnerContractError("one-step generation_id must be a non-negative int")
+    return directions
+
+
+@dataclass(frozen=True, eq=False)
+class OnPolicyOneStepBatch:
+    """Tensor-native batch of complete one-step trajectories."""
+
+    states: torch.Tensor
+    direction_indices: torch.Tensor
+    requested_risks: torch.Tensor
+    rewards: torch.Tensor
+    generation_id: int
+
+    def __post_init__(self) -> None:
+        directions = _validate_one_step_tensor_contract(
+            self.states, self.direction_indices, self.requested_risks, self.rewards, self.generation_id
+        )
+        object.__setattr__(self, "states", self.states.detach().clone())
+        object.__setattr__(self, "direction_indices", directions.detach().clone())
+        object.__setattr__(self, "requested_risks", self.requested_risks.detach().clone())
+        object.__setattr__(self, "rewards", self.rewards.detach().clone())
+
+    @property
+    def trajectory_count(self) -> int:
+        return int(self.states.shape[0])
 
 
 @dataclass(frozen=True)
@@ -171,7 +229,7 @@ class OnPolicyLearner:
         self._generation_id = 0
         # A consumption ledger keyed by trajectory identity.  Weak references
         # keep no transition data alive, so this is not a replay buffer.
-        self._consumed: "weakref.WeakSet[Trajectory]" = weakref.WeakSet()
+        self._consumed: "weakref.WeakSet[Any]" = weakref.WeakSet()
         # Exact frozen generation snapshot theta_g: detached clones of every
         # actor parameter tensor, refreshed only by a learner-owned update.
         self._actor_snapshot = self._snapshot_actor_parameters()
@@ -251,41 +309,54 @@ class OnPolicyLearner:
     # -- update ------------------------------------------------------------
 
     def update(self, trajectories: Any) -> UpdateReport:
-        """Consume one current-generation batch and commit generation ``g + 1``."""
+        """Consume one current-generation trajectory batch and commit ``g + 1``."""
 
         batch = self._validated_batch(trajectories)
         objectives = self._objectives(batch)
+        return self._commit_update(objectives, trajectory_count=len(batch), consumed=batch)
 
+    def update_one_step_batch(self, batch: OnPolicyOneStepBatch) -> UpdateReport:
+        """Consume a tensor-native batch of complete one-step trajectories.
+
+        This is an execution fast path only.  The actor/critic objectives,
+        generation snapshot, no-replay rule and optimizer steps are shared with
+        :meth:`update`.
+        """
+
+        batch = self._validated_one_step_batch(batch)
+        objectives = self._objectives_from_tensors(
+            batch.states,
+            batch.direction_indices,
+            batch.requested_risks.to(batch.states.dtype),
+            batch.rewards.to(torch.float64),
+        )
+        return self._commit_update(objectives, trajectory_count=batch.trajectory_count, consumed=(batch,))
+
+    def _commit_update(
+        self, objectives: _Objectives, *, trajectory_count: int, consumed: Sequence[Any]
+    ) -> UpdateReport:
         self._actor_optimizer.zero_grad(set_to_none=True)
         self._critic_optimizer.zero_grad(set_to_none=True)
         objectives.actor_loss.backward()
-        # The critic baseline is stop-gradient: the actor backward must leave
-        # every critic gradient untouched.
         critic_grad_from_actor = _max_abs_grad(self._critic)
         objectives.critic_loss.backward()
-
         actor_grad_norm = _grad_norm(self._actor)
         critic_grad_norm = _grad_norm(self._critic)
         if not math.isfinite(actor_grad_norm) or not math.isfinite(critic_grad_norm):
             raise LearnerContractError(
                 "actor and critic gradients must be finite; no optimizer step was taken"
             )
-
         self._actor_optimizer.step()
         self._critic_optimizer.step()
-
-        for trajectory in batch:
-            self._consumed.add(trajectory)
+        for item in consumed:
+            self._consumed.add(item)
         updated_generation = self._generation_id
         self._generation_id += 1
-        # The exact generation snapshot advances only here, after both
-        # learner-owned optimizer steps succeeded.
         self._actor_snapshot = self._snapshot_actor_parameters()
-
         return UpdateReport(
             generation_id=updated_generation,
             next_generation_id=self._generation_id,
-            trajectory_count=len(batch),
+            trajectory_count=trajectory_count,
             step_count=int(objectives.returns.numel()),
             actor_loss=float(objectives.actor_loss.detach()),
             critic_loss=float(objectives.critic_loss.detach()),
@@ -353,6 +424,27 @@ class OnPolicyLearner:
                     )
         return batch
 
+    def _validated_one_step_batch(self, batch: Any) -> OnPolicyOneStepBatch:
+        if not isinstance(batch, OnPolicyOneStepBatch):
+            raise LearnerContractError(
+                f"one-step fast path requires OnPolicyOneStepBatch, got {type(batch).__name__}"
+            )
+        _validate_one_step_tensor_contract(
+            batch.states, batch.direction_indices, batch.requested_risks, batch.rewards, batch.generation_id
+        )
+        if batch in self._consumed:
+            raise LearnerContractError("one-step batch was already consumed; there is no replay")
+        if batch.generation_id != self._generation_id:
+            raise LearnerContractError(
+                f"one-step generation_id {batch.generation_id} does not match learner generation {self._generation_id}"
+            )
+        if batch.states.shape[1] != self.state_dim:
+            raise LearnerContractError(
+                f"one-step state width {batch.states.shape[1]} does not match learner state width {self.state_dim}"
+            )
+        self._require_generation_snapshot()
+        return batch
+
     def _objectives(self, batch: Tuple[Trajectory, ...]) -> _Objectives:
         states = torch.stack([step.state for trajectory in batch for step in trajectory.steps])
         index = torch.tensor(
@@ -368,7 +460,11 @@ class OnPolicyLearner:
             dtype=states.dtype,
         )
         returns = torch.cat([trajectory.returns_to_go() for trajectory in batch])
+        return self._objectives_from_tensors(states, index, risks, returns)
 
+    def _objectives_from_tensors(
+        self, states: torch.Tensor, index: torch.Tensor, risks: torch.Tensor, returns: torch.Tensor
+    ) -> _Objectives:
         log_prob = self._actor.log_prob_batch(states, index, risks)
         values = self._critic(states)
         advantages = returns - values.detach()
@@ -456,5 +552,6 @@ __all__ = [
     "CRITIC_LR",
     "LearnerContractError",
     "OnPolicyLearner",
+    "OnPolicyOneStepBatch",
     "UpdateReport",
 ]
