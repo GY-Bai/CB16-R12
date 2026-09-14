@@ -29,6 +29,13 @@
     "frozen_body_archives": {
       "path": "/home/bgy/m3-infra",
       "description": "Frozen body archives (CB16_SHANXI_FROZEN_BODY_*.tar.gz) and R10 return bundles. Treat as immutable inputs. (source archives; extracted copies live in /cb16/frozen)"
+    },
+    "cb16_brain_assets": {
+      "path": "/cb16/brain_assets",
+      "description": "Frozen operator/medium weights: Kronos small + tokenizer base, TimesFM 2.5 200M sources and the runtime derivatives (kronos_model_l5, kronos_tokenizer_encode, timesfm_layer3). /cb16/brain_assets is a host-level symlink to the real tree, so the same path resolves identically inside the sandbox, in a bare runner step and in an interactive shell."
     }
+  },
+  "sandbox_path_parity": {
+    "principle": "Every path advertised to a lane child must exist on the host, not only inside the sandbox. Sandbox-only paths would let code that works in the sandbox fail once it leaves it."
   }
 }
