@@ -410,6 +410,106 @@ class LabelAndLaneTests(DispatchTestCase):
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "PR_SET_PDEATHSIG is Linux only")
+class BuilderModelEvidenceTests(DispatchTestCase):
+    """The Builder lane's model must be visible in the evidence.
+
+    A task can be dispatched twice with a different model or reasoning effort
+    behind it and nothing on GitHub would show it. Recording the declared value
+    makes the BUILD_REPORT traceable.
+    """
+
+    SETTINGS = (
+        "# user settings\n"
+        "agent-presets:\n"
+        "  default: minimal-safe\n"
+        "agent-default-model:\n"
+        "  provider: deepseek-official\n"
+        "  model: deepseek-flash\n"
+        "  reasoningEffort: max\n"
+        "locale:\n"
+        "  preference: zh\n"
+    )
+
+    def _settings_home(self, text=None):
+        home = self.tmp / "dsh-home"
+        home.mkdir(exist_ok=True)
+        if text is not None:
+            (home / "settings.yaml").write_text(text, encoding="utf-8")
+        return home
+
+    def test_reads_the_declared_model_from_the_settings_file(self):
+        home = self._settings_home(self.SETTINGS)
+        record = dispatcher.read_declared_builder_model({"DSH_HOME": str(home)})
+        self.assertEqual(record["provider"], "deepseek-official")
+        self.assertEqual(record["model"], "deepseek-flash")
+        self.assertEqual(record["reasoningEffort"], "max")
+        self.assertEqual(record["source"], str(home / "settings.yaml"))
+        self.assertTrue(record["declared"])
+
+    def test_only_the_target_block_is_read(self):
+        text = self.SETTINGS.replace("  model: deepseek-flash", "  model: flash-from-block")
+        text += "llm-deepseek:\n  models:\n    - id: other-model\n"
+        home = self._settings_home(text)
+        record = dispatcher.read_declared_builder_model({"DSH_HOME": str(home)})
+        self.assertEqual(record["model"], "flash-from-block")
+
+    def test_dsh_home_falls_back_to_home(self):
+        home = self._settings_home(self.SETTINGS)
+        (home / ".dsh").mkdir()
+        (home / ".dsh" / "settings.yaml").write_text(self.SETTINGS, encoding="utf-8")
+        record = dispatcher.read_declared_builder_model({"HOME": str(home)})
+        self.assertEqual(record["model"], "deepseek-flash")
+        self.assertEqual(record["source"], str(home / ".dsh" / "settings.yaml"))
+
+    def test_quoted_values_are_unquoted(self):
+        home = self._settings_home(
+            "agent-default-model:\n  provider: 'deepseek-official'\n  model: \"deepseek-flash\"\n"
+        )
+        record = dispatcher.read_declared_builder_model({"DSH_HOME": str(home)})
+        self.assertEqual(record["provider"], "deepseek-official")
+        self.assertEqual(record["model"], "deepseek-flash")
+
+    def test_missing_file_is_reported_not_fatal(self):
+        home = self._settings_home()  # no settings.yaml
+        record = dispatcher.read_declared_builder_model({"DSH_HOME": str(home)})
+        self.assertIsNone(record["model"])
+        self.assertIsNone(record["source"])
+        self.assertIn("not readable", record["note"])
+
+    def test_absent_block_is_reported_not_fatal(self):
+        home = self._settings_home("locale:\n  preference: zh\n")
+        record = dispatcher.read_declared_builder_model({"DSH_HOME": str(home)})
+        self.assertIsNone(record["model"])
+        self.assertIn("no agent-default-model block", record["note"])
+
+    def test_summary_and_console_carry_the_model(self):
+        home = self._settings_home(self.SETTINGS)
+        env = dict(self.base_env)
+        env["DSH_HOME"] = str(home)
+        spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# fixture\n"})
+        report_dir = self.tmp / "model-report"
+        outcome = dispatcher.dispatch(
+            lane="builder",
+            event=make_event(metadata_body(self.builder_meta()), label="ds:run"),
+            repo_dir=self.repo,
+            work_root=self.tmp / "worktrees",
+            state_dir=self.tmp / "state",
+            report_dir=report_dir,
+            allowlist_path=ALLOWLIST_PATH,
+            repo=TRUSTED_REPO,
+            trusted_actors=("GY-Bai",),
+            dsh_invoker=spy,
+            base_env=env,
+        )
+        model = outcome.summary["builder_model"]
+        self.assertEqual(model["model"], "deepseek-flash")
+        self.assertEqual(model["reasoningEffort"], "max")
+        # It must survive into the uploaded evidence, not just the return value.
+        written = json.loads((report_dir / "dispatch_summary.json").read_text(encoding="utf-8"))
+        self.assertEqual(written["builder_model"]["model"], "deepseek-flash")
+        self.assertEqual(written["builder_model"]["reasoningEffort"], "max")
+
+
 class LaneChildLifetimeTests(DispatchTestCase):
     """A cancelled dispatch must not leave a live agent behind.
 

@@ -385,6 +385,37 @@ quietly differ. Measured after the change: a headless DSH run still starts and
 writes its file (the provider's profile matches), and the Science lane reports
 `science_sandbox` pointing at the wrapper.
 
+## 1j. Which model a Builder run used
+
+A task can be dispatched twice with a different model or reasoning effort behind
+it and nothing on GitHub would show it. The dispatcher therefore reads the DSH
+settings file and records the value in the dispatch summary:
+
+```json
+"builder_model": {
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "reasoningEffort": "max",
+  "source": "<dsh home>/settings.yaml",
+  "declared": true
+}
+```
+
+It appears in `dispatch_summary.json` (uploaded as evidence) and, because the
+dispatcher prints its summary, in the Actions log too.
+
+`declared: true` is deliberate: this is the configuration the lane is launched
+with, read from the same file the session header reads. The dispatcher does not
+claim to have measured what the API served - that would mean parsing the session
+transcript, which is not worth the fragility. The source path travels with the
+value so a reviewer can check it, and a missing or unreadable settings file is
+reported in a `note` instead of failing the dispatch.
+
+The value comes from `agent-default-model` in `$DSH_HOME/settings.yaml`
+(`~/.dsh/settings.yaml` by default), so changing that one file changes every
+lane and every task. `dsh --profile headless --dump-config` is **not** a valid
+source here: it shows the plugin default, not the runtime override.
+
 ## 2. Repository variables
 
 Set these as repository Actions **variables** (not secrets) — they are paths,
