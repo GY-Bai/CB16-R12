@@ -23,6 +23,7 @@ The canonical N0 input remains one predecessor plus 64 represented bars. Consequ
 - Jan-Feb training has exactly **1375** eligible next-hour consequences;
 - March validation has exactly **744 = 31 x 24** next-hour consequences;
 - March is development validation, **not** final holdout.
+- Validation observations may causally use trailing February history before the March consequence hour, but no March consequence may enter training and no consequence/future bar may enter its own observation.
 
 ## Scientific isolation
 

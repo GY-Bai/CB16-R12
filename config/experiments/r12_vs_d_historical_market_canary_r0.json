@@ -45,10 +45,14 @@
     },
     "train": {
       "role": "development_training",
-      "source_months": ["2020-01", "2020-02"],
+      "source_months": [
+        "2020-01",
+        "2020-02"
+      ],
       "consequence_hour_start_utc": "2020-01-03T17:00:00Z",
       "consequence_hour_end_utc": "2020-02-29T23:00:00Z",
-      "expected_decisions": 1375
+      "expected_decisions": 1375,
+      "validation_consequence_overlap_count": 0
     },
     "validation": {
       "role": "development_validation_not_final_holdout",
@@ -58,7 +62,9 @@
       "expected_decisions": 744,
       "expected_utc_day_blocks": 31,
       "decisions_per_day": 24,
-      "training_updates_forbidden": true
+      "training_updates_forbidden": true,
+      "causal_context_history_carryover": "may use trailing February hourly bars strictly before each March consequence; no future or same-consequence bar may enter the observation",
+      "march_consequence_rows_used_for_training": false
     }
   },
   "authority": {
@@ -108,7 +114,16 @@
     "fixed_points_allowed": false,
     "evaluation": "control learner is evaluated on the same true March chronology as the positive learner"
   },
-  "model_seeds": [3101, 3102, 3103, 3104, 3105, 3106, 3107, 3108],
+  "model_seeds": [
+    3101,
+    3102,
+    3103,
+    3104,
+    3105,
+    3106,
+    3107,
+    3108
+  ],
   "validation_statistics": {
     "unit": "UTC_calendar_day_of_consequence_hour",
     "day_blocks": 31,
@@ -161,5 +176,9 @@
     "not_a_multi_symbol_generalization_result",
     "not_production_authority_for_lambda_dir_0.005"
   ],
-  "required_artifacts": ["experiment_spec.json", "RESULT.json", "REPORT.md"]
+  "required_artifacts": [
+    "experiment_spec.json",
+    "RESULT.json",
+    "REPORT.md"
+  ]
 }
