@@ -1,0 +1,127 @@
+{
+  "experiment_id": "r12.vs_c.task_a_direction_entropy_attribution.r2",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "purpose": "Test whether premature collapse of the categorical direction policy is a material cause of Task-A instability after 10x collection variance reduction proved insufficient.",
+  "authority": {
+    "context_length": 64,
+    "normalization": "N0_ENDPOINT_ANCHORED_V1",
+    "sensory_seed": 12012,
+    "sensory_z_dim": 32,
+    "actor_hidden_width": 64,
+    "actor_hidden_layers": 2,
+    "device": "cpu",
+    "torch_num_threads_per_worker": 1,
+    "max_seed_workers": 4,
+    "deterministic_algorithms": true,
+    "execution_engine": "vectorized-batched-v1",
+    "nominal_exposure_budget": 1.0,
+    "hard_exposure_limit": 1.0
+  },
+  "optimizer": {
+    "actor": "Adam",
+    "actor_lr": 0.001,
+    "critic": "Adam",
+    "critic_lr": 0.001,
+    "discount_factor": 1.0,
+    "replay": false,
+    "beta_risk_entropy_bonus": 0.0
+  },
+  "paired_seeds": [1201, 1202, 1203, 1204, 1205, 1206, 1207, 1208],
+  "task_a": {
+    "name": "ACCOUNT_CONDITIONED_MAINTENANCE_DIRECTION_EXPLORATION",
+    "generations": 256,
+    "trajectory_length": 1,
+    "batch_trajectories": 900,
+    "positive_per_actual_account": 300,
+    "control_per_actual_observed_pair": 100,
+    "market": "identical flat OHLCV: prices 100, volume 10, one predecessor plus 64 represented bars",
+    "initial_truths": [
+      {
+        "name": "SHORT_HALF",
+        "equity": 1000.0,
+        "quantity": -5.0,
+        "mark_price": 100.0,
+        "desired_target_exposure": -0.5
+      },
+      {
+        "name": "FLAT",
+        "equity": 1000.0,
+        "quantity": 0.0,
+        "mark_price": 100.0,
+        "desired_target_exposure": 0.0
+      },
+      {
+        "name": "LONG_HALF",
+        "equity": 1000.0,
+        "quantity": 5.0,
+        "mark_price": 100.0,
+        "desired_target_exposure": 0.5
+      }
+    ],
+    "physics": {
+      "open_next": 100.0,
+      "close_next": 100.0,
+      "proportional_friction_kappa": 0.1,
+      "permission_bisection_iterations": 24
+    },
+    "positive_training_observation": "policy observes the true AccountState derived from each actual AccountTruth",
+    "control": {
+      "name": "ACCOUNT_OBSERVATION_ZERO_RELATION",
+      "construction": "every actual-account x observed-account pair appears equally; actual and observed account marginals are balanced and exactly independent",
+      "reward_physics": "reward always comes from actual AccountTruth and sampled action; only policy-observed AccountState is zero-relation"
+    },
+    "arms": {
+      "baseline_no_entropy": {
+        "direction_entropy_coefficient": 0.0,
+        "direction_entropy_target": "categorical_direction_only"
+      },
+      "direction_entropy_005": {
+        "direction_entropy_coefficient": 0.005,
+        "direction_entropy_target": "categorical_direction_only"
+      }
+    },
+    "entropy_scale_rationale": {
+      "max_three_way_categorical_entropy": 1.0986122886681098,
+      "max_entropy_bonus_at_coefficient": 0.005493061443340549,
+      "half_exposure_flatten_log_loss": 0.05129329438755058,
+      "max_entropy_bonus_fraction_of_half_exposure_flatten_loss": 0.1070925868446257
+    },
+    "evaluation": {
+      "adapter": "deterministic_argmax_direction_plus_beta_mean",
+      "uses_true_account_state": true,
+      "metrics": [
+        "direction_correct_count",
+        "target_exposure_mae",
+        "mean_one_step_log_growth",
+        "all_flat_post"
+      ]
+    },
+    "seed_pass_gate": {
+      "direction_correct_count_min": 3,
+      "target_exposure_mae_max": 0.15
+    }
+  },
+  "attribution_gate": {
+    "baseline_control_seed_pass_count_max": 2,
+    "entropy_positive_seed_pass_count_min": 6,
+    "entropy_control_seed_pass_count_max": 2,
+    "entropy_minus_baseline_positive_pass_count_min": 3
+  },
+  "outcomes": {
+    "direction_exploration_supported": "all attribution_gate conditions pass",
+    "control_invalid": "either control pass count exceeds its preregistered maximum",
+    "direction_entropy_not_sufficient": "controls remain valid but one or more direction-exploration support conditions fail"
+  },
+  "global_gate": {
+    "implementation_tests_must_pass": true,
+    "no_threshold_changes_after_results": true,
+    "scientific_gate_miss_classification": "SCIENTIFIC_FAIL",
+    "contract_violation_classification": "CONTRACT_MISMATCH",
+    "runtime_or_environment_blocker_classification": "EXECUTION_BLOCKED"
+  },
+  "required_artifacts": [
+    "experiment_spec.json",
+    "RESULT.json",
+    "REPORT.md"
+  ]
+}
