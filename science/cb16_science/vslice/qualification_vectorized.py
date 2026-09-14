@@ -29,8 +29,8 @@ def _train_task_a(learner, env, *, seed: int, mode: str, generations: int) -> Di
                 f"learner generation {learner.generation_id} != scheduled {generation}"
             )
         torch.manual_seed(q._collection_seed(seed, "task_a", mode, generation))
-        batch = vt.build_task_a_generation(learner, env, generation, mode=mode)
-        report = learner.update(batch)
+        batch = vt.build_task_a_one_step_batch(learner, env, generation, mode=mode)
+        report = learner.update_one_step_batch(batch)
         records.append({"actor_loss": report.actor_loss, "critic_loss": report.critic_loss})
     return q._diagnostics_summary(records)
 
