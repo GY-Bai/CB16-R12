@@ -1,0 +1,131 @@
+{
+  "experiment_id": "r12.vs_c.controlled_learnability.r0",
+  "status": "PREREGISTERED_BEFORE_QUALIFICATION",
+  "purpose": "Test controlled account-conditioned action learning and delayed economic credit assignment. This is not a historical-profitability claim.",
+  "authority": {
+    "base_commit_before_implementation": "c10a960a4a4f59f1ac12dde1e330269ab535060c",
+    "normalization": "N0_ENDPOINT_ANCHORED_V1",
+    "context_length": 64,
+    "sensory_seed": 12012,
+    "sensory_z_dim": 32,
+    "actor_hidden_width": 64,
+    "actor_hidden_layers": 2,
+    "nominal_exposure_budget": 1.0,
+    "hard_exposure_limit": 1.0,
+    "device": "cpu",
+    "torch_num_threads": 1,
+    "deterministic_algorithms": true
+  },
+  "paired_seeds": [1201, 1202, 1203, 1204, 1205, 1206, 1207, 1208],
+  "optimizer": {
+    "actor": "Adam",
+    "critic": "Adam",
+    "actor_lr": 0.001,
+    "critic_lr": 0.001,
+    "entropy_bonus": 0.0,
+    "discount_factor": 1.0,
+    "replay": false
+  },
+  "task_a": {
+    "name": "ACCOUNT_CONDITIONED_MAINTENANCE",
+    "generations": 256,
+    "batch_trajectories": 90,
+    "trajectory_length": 1,
+    "market": "identical flat OHLCV: prices 100, volume 10, one predecessor plus 64 represented bars",
+    "initial_truths": [
+      {"name": "SHORT_HALF", "equity": 1000.0, "quantity": -5.0, "mark_price": 100.0, "desired_target_exposure": -0.5},
+      {"name": "FLAT", "equity": 1000.0, "quantity": 0.0, "mark_price": 100.0, "desired_target_exposure": 0.0},
+      {"name": "LONG_HALF", "equity": 1000.0, "quantity": 5.0, "mark_price": 100.0, "desired_target_exposure": 0.5}
+    ],
+    "physics": {
+      "open_next": 100.0,
+      "close_next": 100.0,
+      "proportional_friction_kappa": 0.1,
+      "permission_bisection_iterations": 24
+    },
+    "positive_training_observation": "policy observes the true AccountState derived from each actual AccountTruth",
+    "control": {
+      "name": "ACCOUNT_OBSERVATION_ZERO_RELATION",
+      "construction": "each generation contains every actual-account x observed-account pair equally: 9 pairs x 10 trajectories; actual and observed account marginals are both balanced and independent",
+      "reward_physics": "reward always comes from the actual AccountTruth and sampled action; only the policy-observed AccountState is zero-relation"
+    },
+    "evaluation": {
+      "adapter": "deterministic_argmax_direction_plus_beta_mean",
+      "uses_true_account_state": true,
+      "metrics": ["direction_correct_count", "target_exposure_mae", "mean_one_step_log_growth", "pre_to_post_target_mae_improvement"]
+    },
+    "seed_pass_gate": {
+      "direction_correct_count_min": 3,
+      "target_exposure_mae_max": 0.15
+    },
+    "aggregate_gate": {
+      "positive_seed_pass_count_min": 6,
+      "control_seed_pass_count_max": 2,
+      "positive_median_pre_to_post_target_mae_improvement_min": 0.15,
+      "paired_positive_target_mae_strictly_better_than_control_count_min": 6
+    }
+  },
+  "task_b": {
+    "name": "DELAYED_CONSEQUENCE_CREDIT",
+    "generations": 256,
+    "batch_trajectories": 128,
+    "trajectory_length": 2,
+    "cue_market": {
+      "endpoint_price": 100.0,
+      "represented_log_ramp_magnitude": 0.04,
+      "volume": 10.0,
+      "up": "represented closes rise exponentially from 100*exp(-0.04) to 100",
+      "down": "represented closes fall exponentially from 100*exp(+0.04) to 100",
+      "open": "previous represented close; first represented open equals predecessor close",
+      "high": "max(open,close)*1.001",
+      "low": "min(open,close)/1.001"
+    },
+    "step_0": {
+      "initial_truth": {"equity": 1000.0, "quantity": 0.0, "mark_price": 100.0},
+      "open_next": 100.0,
+      "close_next": 100.0,
+      "proportional_friction_kappa": 0.0,
+      "required_immediate_reward": 0.0
+    },
+    "step_1": {
+      "market": "neutral flat OHLCV at price 100 and volume 10",
+      "up_gap_open_and_close": 110.0,
+      "down_gap_open_and_close": 90.0,
+      "description": "the position created by action_0 remains active through the gap before action_1 executes; with zero friction and close_2=open_2, action_1 has no contemporaneous economic effect"
+    },
+    "positive_training": "use each trajectory's own delayed step_1 log-equity reward",
+    "control": {
+      "name": "SHUFFLED_ACTION_TO_CONSEQUENCE",
+      "construction": "within every generation, preserve all collected states/actions and the multiset of delayed step_1 rewards, but assign delayed rewards through a deterministic seed-and-generation-specific non-identity permutation before learner update",
+      "fixed_points_allowed": false
+    },
+    "evaluation": {
+      "adapter": "deterministic_argmax_direction_plus_beta_mean",
+      "true_unshuffled_environment": true,
+      "metrics": ["up_direction_correct", "down_direction_correct", "up_requested_risk", "down_requested_risk", "mean_true_delayed_log_growth", "pre_to_post_true_delayed_log_growth_improvement", "direction_probability_margin"]
+    },
+    "seed_pass_gate": {
+      "up_direction": "LONG",
+      "down_direction": "SHORT",
+      "up_requested_risk_min": 0.5,
+      "down_requested_risk_min": 0.5,
+      "mean_true_delayed_log_growth_min": 0.03
+    },
+    "aggregate_gate": {
+      "positive_seed_pass_count_min": 6,
+      "control_seed_pass_count_max": 2,
+      "positive_median_pre_to_post_true_delayed_log_growth_improvement_min": 0.02,
+      "paired_positive_growth_minus_control_min": 0.02,
+      "paired_positive_growth_minus_control_count_min": 6
+    }
+  },
+  "global_gate": {
+    "pass_requires_task_a_and_task_b": true,
+    "implementation_tests_must_pass": true,
+    "no_threshold_changes_after_results": true,
+    "scientific_gate_miss_classification": "SCIENTIFIC_FAIL",
+    "contract_violation_classification": "CONTRACT_MISMATCH",
+    "runtime_or_environment_blocker_classification": "EXECUTION_BLOCKED"
+  },
+  "required_artifacts": ["experiment_spec.json", "RESULT.json", "REPORT.md"]
+}
