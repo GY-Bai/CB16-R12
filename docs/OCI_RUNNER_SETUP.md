@@ -570,7 +570,9 @@ stub - classification, changed files, test exit code - when the agent did not
 emit one. Observed on the real VS-C rounds: two of three turns produced a
 proper section (5,180 and 8,480 characters), one did not. The synthesized stub
 is not a substitute for the agent's reasoning, so a round that ends without
-`BUILD_REPORT` degrades the next round's context.
+`BUILD_REPORT` degrades the next round's context. Every dispatch records
+`build_report_source: agent | synthesized` in `dispatch_summary.json`, so the
+degradation is visible instead of silent.
 
 Two defects fixed while wiring this up:
 

@@ -2742,17 +2742,23 @@ def dispatch(
             if not test_result.ok and classification == CLASS_OK:
                 classification = CLASS_BUILDER_FAIL
 
+        report_source = "synthesized"
         if classification == CLASS_OK:
-            report_text = extract_build_report(
+            extracted = extract_build_report(
                 run_result.report_text or run_result.stdout
-            ) or synthesize_build_report(
-                spec=spec,
-                issue_number=trigger.issue_number,
-                classification=classification,
-                changed=changed,
-                test_result=test_result,
-                run_result=run_result,
             )
+            if extracted:
+                report_source = "agent"
+                report_text = extracted
+            else:
+                report_text = synthesize_build_report(
+                    spec=spec,
+                    issue_number=trigger.issue_number,
+                    classification=classification,
+                    changed=changed,
+                    test_result=test_result,
+                    run_result=run_result,
+                )
         else:
             report_text = synthesize_build_report(
                 spec=spec,
@@ -2790,6 +2796,7 @@ def dispatch(
             "control_plane_authorised": spec.allow_control_plane,
             "read_only_data": {name: entry["path"] for name, entry in data_entries.items()},
             "read_only_data_missing": data_missing,
+            "build_report_source": report_source,
             "workspace_caches": caches,
             "project_store": str(project_store) if project_store else None,
             "science_sandbox": science_sandbox_runner or "unsandboxed",

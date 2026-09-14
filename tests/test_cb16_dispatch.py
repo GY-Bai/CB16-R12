@@ -876,6 +876,25 @@ class BuildReportHandoffTests(DispatchTestCase):
         self.assertIn("Issue #35", text)
         self.assertNotIn("Issue #ds/", text)
 
+    def test_evidence_says_whether_the_report_was_the_agents_own(self):
+        outcome = self.dispatch(
+            dsh_invoker=self.builder_spy(
+                {"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"},
+                report="BUILD_REPORT\n- mine\n",
+            )
+        )
+        self.assertEqual(outcome.summary["build_report_source"], "agent")
+
+    def test_evidence_marks_a_synthesized_report(self):
+        def silent(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="no report section here\n")
+
+        outcome = self.dispatch(dsh_invoker=silent)
+        self.assertEqual(outcome.summary["build_report_source"], "synthesized")
+
     def test_agent_report_reaches_the_next_round_instead_of_the_stub(self):
         agent_report = "BUILD_REPORT\n\n## Task identity\n- round one chose approach A\n"
         first = self.builder_spy(
