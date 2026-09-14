@@ -54,6 +54,31 @@ For every run:
 
 The runner must evaluate each learner with the frozen deterministic policy adapter **before training and after the final preregistered generation**.
 
+### Locked Python runtime for the immutable Science lane
+
+The Science lane's host `python3` does not carry VS-B PyTorch. Formal qualification must therefore launch from the committed `pyproject.toml` + `uv.lock`; absence of Torch from host Python is not permission to alter the host.
+
+The allowlisted formal command must be argv-based, not shell text, and must be semantically equivalent to:
+
+```text
+uv run --frozen --project . --python 3.12 python -m cb16_science.vslice.qualification
+```
+
+with environment:
+
+```text
+PYTHONPATH=science
+UV_PROJECT_ENVIRONMENT=/tmp/cb16-vs-c-venv
+UV_CACHE_DIR=/tmp/cb16-vs-c-uv-cache
+UV_LINK_MODE=copy
+```
+
+The Science profile already provides per-run writable tmpfs at `/tmp`; source/worktree and `/cb16/store` remain read-only. Thus dependency materialization may occur only in ephemeral `/tmp`, while code/spec remain immutable. Exact package versions come only from `uv.lock`.
+
+Do not point Science at a Builder branch `.venv`. Do not write a virtualenv into the Science worktree. Do not modify host Python. If the locked UV environment cannot be created or resolved, classify the run `EXECUTION_BLOCKED`; do not change scientific gates or dependencies under R0.
+
+Builder itself should continue to use the task packet's branch-local `UV_PROJECT_ENVIRONMENT` and shared writable `/cb16/cache/uv` cache. The formal Science command above intentionally uses its own ephemeral environment.
+
 ## Task A — Account-conditioned maintenance
 
 ### Market
@@ -296,13 +321,7 @@ Builder may add focused tests and may add one Science allowlist entry:
 cb16.vs-c-controlled-learnability@v1
 ```
 
-Recommended command:
-
-```text
-python -m cb16_science.vslice.qualification
-```
-
-with `PYTHONPATH=science`.
+The allowlist entry must use the locked UV argv/runtime defined above, not bare host `python3`.
 
 The formal command must use the repository preregistered spec; no CLI argument may override scientific parameters in R0.
 
@@ -331,7 +350,8 @@ At minimum prove:
 17. Formal runner reads the committed JSON and offers no parameter override path.
 18. Result serialization contains per-seed PRE/POST positive/control metrics and every gate component.
 19. `experiment_spec.json` written to result dir is byte-for-byte equivalent in parsed JSON content to the committed spec.
-20. full repository suite remains green.
+20. allowlist resolves to the frozen UV command and keeps the venv/cache under `/tmp`, never in the read-only Science worktree.
+21. full repository suite remains green.
 
 ## Formal artifacts
 
@@ -384,4 +404,4 @@ Do not:
 
 ## Done when
 
-Builder is done when the synthetic environments, controls, evaluator, formal artifact writer, allowlist entry, and regression tests exist and pass without running formal qualification. Chat-SOL then reviews/merges the implementation and separately triggers the immutable Science run against the exact merged commit and frozen JSON.
+Builder is done when the synthetic environments, controls, evaluator, formal artifact writer, allowlist entry, locked UV launch, and regression tests exist and pass without running formal qualification. Chat-SOL then reviews/merges the implementation and separately triggers the immutable Science run against the exact merged commit and frozen JSON.
