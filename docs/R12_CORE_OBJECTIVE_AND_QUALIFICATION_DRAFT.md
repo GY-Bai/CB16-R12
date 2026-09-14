@@ -2,171 +2,153 @@
 
 Status: **MASTER-ALIGNED DRAFT — NOT YET FINAL AUTHORITY**
 
-Purpose: capture the highest-level product/scientific decisions agreed during the R12 reduction review, while explicitly separating durable CB16 principles from R11 implementation choices. Open items remain open; this document must not invent thresholds merely to make the specification look complete.
+Purpose: define what the R12 Trader is optimizing, what information it acts on, how economic success is evaluated, and how candidate policies are compared. Open decisions remain explicit; no placeholder thresholds are invented.
 
 ---
 
-## 1. Ultimate purpose
+## 1. Product objective
 
-CB16 exists to build an **autonomous Trader**, not a research platform for its own sake.
+CB16 exists to build an **autonomous Trader**.
 
-Scientific rigor, evaluation, infrastructure, and auxiliary models exist to make the Trader learnable, falsifiable, and trustworthy. They are means, not the product.
-
-The Trader is a stateful sequential decision-maker. It must not collapse into a per-bar market-direction predictor.
+The Trader is a stateful sequential decision-maker. It must optimize behavior conditioned on both market state and account state, rather than act as an independent per-bar market-direction predictor.
 
 ---
 
-## 2. Core state model
+## 2. Decision state
 
-### 2.1 R12 v1 state
-
-The first implementation should use:
+R12 v1 uses:
 
 \[
-a_t = \pi(M_t, A_t)
+a_t = \pi(M_t,A_t)
 \]
 
 where:
 
-- \(M_t\) = current causal market information;
-- \(A_t\) = current account state;
-- \(a_t\) = nominal Trader action.
+- \(M_t\): causal market information available at decision time;
+- \(A_t\): current account state;
+- \(a_t\): nominal Trader action.
 
-Account state evolves through the Trader's previous choices and subsequent market movement:
-
-\[
-A_{t+1}=F(A_t,a_t,M_t,M_{t+1},\text{costs},\text{execution})
-\]
-
-Account state is therefore a compressed current economic state produced by the previous decision path. It is not merely an extra market feature.
-
-### 2.2 Future learned memory must remain possible
-
-R12 v1 should **not pay the complexity cost of explicit StrategyMemory yet**, but interfaces must not make it impossible to evolve toward:
+Account state evolves through previous actions, market movement, execution, and costs:
 
 \[
-a_t = \pi(M_t,A_t,S_t)
+A_{t+1}=F(A_t,a_t,M_t,M_{t+1},\text{execution},\text{costs})
 \]
 
-where \(S_t\) is learned internal strategy memory / latent recurrent state.
+Therefore the same market state can legitimately require different actions for different account states.
 
-The reserved memory path must not become a handcrafted cycle engine, rule-activation table, or manually maintained market-regime state machine.
+### Reserved learned memory interface
 
-**Decision:** preserve the interface, defer the mechanism.
+The architecture must leave a clean path toward:
+
+\[
+a_t=\pi(M_t,A_t,S_t)
+\]
+
+where \(S_t\) is optional learned strategy memory / recurrent latent state.
+
+R12 v1 does not require an explicit StrategyMemory implementation. The reserved interface must not become a handcrafted cycle engine, rule-activation table, or manually maintained regime state machine.
 
 ---
 
-## 3. Market prediction is perception, not decision authority
+## 3. Prediction is perception, not action authority
 
-Predictive models may act as the Trader's **eyes**. They may estimate direction, return distributions, volatility, uncertainty, latent market representations, or other useful quantities.
+Predictive or representation models may estimate direction, return distributions, volatility, uncertainty, or latent market structure.
 
-They do not replace the Trader's brain.
-
-Conceptually:
+They are inputs to decision-making, not final decision authority.
 
 ```text
 Market
   -> predictive / representation organs
-  -> learned representation Z_t
-                        + AccountState
-                              -> Trader
-                              -> Action
+  -> representation Z_t
+                       + AccountState
+                             -> Trader
+                             -> Action
 ```
 
-A market prediction can be correct while the corresponding trade is still wrong for the current account. The final action authority therefore belongs to the account-conditioned sequential policy, not to a forecasting model.
+The final action is account-conditioned. A correct market forecast does not imply that the same trade is correct for every account state.
 
 ---
 
 ## 4. Initial market-impact assumption
 
-R12 initially assumes the Trader is a small price taker:
+R12 initially treats the Trader as a price taker:
 
 \[
-P(M_{t+1}\mid M_t,a_t) \approx P(M_{t+1}\mid M_t)
+P(M_{t+1}\mid M_t,a_t)\approx P(M_{t+1}\mid M_t)
 \]
 
-while account transition depends strongly on the action:
+while account transition remains action-dependent:
 
 \[
 P(A_{t+1}\mid A_t,M_t,M_{t+1},a_t)
 \]
 
-This assumption deliberately excludes endogenous market impact from the first R12 system. Market-impact modeling is a later-stage capability, not a prerequisite for learning the core closed loop.
+Endogenous market impact is outside the initial system.
 
 ---
 
-## 5. Highest-level economic objective
+## 5. Economic objective
 
-The Trader should behave like an agent in a continuing single-player economic game:
+The Trader should remain economically viable while compounding capital over a long horizon.
 
-- it must preserve enough capital and legal trading capacity to remain in the game;
-- it must learn from the consequences of previous decisions;
-- it should improve future decisions rather than repeatedly resetting away prior mistakes;
-- survival alone is not sufficient, because a zero-risk permanently-flat policy can survive trivially;
-- growth alone is not sufficient, because unconstrained growth maximization can accept destructive path risk.
-
-The target problem is therefore best expressed as:
-
-> **survival-aware long-run account growth**, with growth and survival/path risk kept conceptually distinct.
-
-A generic mathematical form is:
+The highest-level problem is:
 
 \[
 \max_\pi J_{growth}(\pi)
-\quad\text{subject to acceptable path/survival risk.}
+\quad\text{subject to acceptable survival/path risk.}
 \]
 
-This is a problem definition, not yet a commitment to a specific constrained-RL algorithm.
+Interpretation:
+
+- survival alone is insufficient because permanent inactivity can survive trivially;
+- growth alone is insufficient because unconstrained growth seeking can accept destructive path risk;
+- growth and survival/path risk remain distinct concepts.
+
+This defines the problem, not a specific RL algorithm.
 
 ---
 
 ## 6. Ruin and continuity
 
-### 6.1 Ruin is not an ordinary negative reward
-
-A genuine account-ending state should be treated as a physical/economic failure state, conceptually absorbing:
+A genuine account-ending state is a physical/economic failure state, not an ordinary bad timestep.
 
 \[
 \tau_{ruin}=\inf\{t:A_t\in\mathcal F\}
 \]
 
-where \(\mathcal F\) contains states in which the account can no longer continue legitimate trading.
+where \(\mathcal F\) contains states in which legitimate trading can no longer continue.
 
-R12 should not teach the model that catastrophic failure is merely another bad timestep that is followed by a free restoration of principal.
+### No free principal reset
 
-### 6.2 No free principal reset
+Computational segmentation must not silently erase economic continuity.
 
-Training may be segmented for computational reasons, but segmentation must not silently erase economic continuity.
-
-A computational episode boundary is not automatically an economic reset boundary.
+A training chunk boundary is not automatically an account reset boundary. Previous decisions must continue to affect future account state unless an experiment explicitly defines a new independent trajectory.
 
 ---
 
-## 7. Do not punish inactivity directly
+## 7. Inactivity is not inherently wrong
 
-R12 should **not** add an arbitrary per-step penalty merely because the Trader is FLAT.
+R12 should not apply an arbitrary penalty merely because the Trader is FLAT.
 
-If the market contains no usable edge, FLAT may be the correct action. A forced-activity penalty would reward trading for its own sake and create an avoidable reward-hacking channel.
-
-Therefore:
+If no usable opportunity exists, not taking risk may be the correct action.
 
 > **No opportunity -> not taking risk can be correct.**
 
-The anti-degeneracy mechanism should come from economic comparison and long-run qualification, not from a synthetic "must trade" tax.
+The system must not reward trading activity for its own sake.
 
 ---
 
-## 8. Buy-and-hold benchmark
+## 8. Primary benchmark: Buy & Hold
 
-For a single current asset, R12 should use that asset's **Buy & Hold** path as the primary economic benchmark.
+For a single asset, the primary economic benchmark is that asset's **Buy & Hold** path over the same evaluation interval.
 
-Let Trader equity be \(W_t\). Let benchmark wealth be:
+Let Trader equity be \(W_t\), and benchmark wealth be:
 
 \[
-B_t = W_0\frac{P_t}{P_0}
+B_t=W_0\frac{P_t}{P_0}
 \]
 
-under the same evaluation interval and a clearly specified benchmark execution convention.
+under a frozen benchmark execution convention.
 
 Absolute log growth:
 
@@ -186,27 +168,23 @@ G_{rel}
 \log\frac{W_T}{B_T}
 \]
 
-### Important interpretation
+Buy & Hold is primarily a qualification anchor:
 
-Buy & Hold is primarily an **economic anchor / qualification benchmark**:
+> Did active decision-making create economic value relative to simply holding the same asset?
 
-> Did active decision-making create value relative to simply holding the same asset?
-
-Because the benchmark path is exogenous under the price-taker assumption, subtracting its return from the training objective does not by itself solve the inactivity problem; for a fixed market path it is a policy-independent term. This is acceptable. Its main value is to expose whether the Trader created economically meaningful relative value.
-
-A bearish market is an important example: remaining FLAT while Buy & Hold loses heavily can be a legitimate success. R12 must not force trading merely to imitate benchmark exposure.
+A bearish market can make FLAT economically superior to Buy & Hold. The benchmark must not force benchmark-like exposure.
 
 ---
 
-## 9. Provisional v1 training signal
+## 9. Provisional v1 learning signal
 
-The cleanest initial economic learning signal is:
+The initial economic learning signal is:
 
 \[
 r_t^{growth}=\log\frac{W_{t+1}}{W_t}
 \]
 
-with \(W_t\) representing true net account equity after the frozen account/execution economics relevant to the experiment.
+with \(W_t\) equal to true net account equity under the experiment's execution and cost model.
 
 Then:
 
@@ -216,64 +194,56 @@ Then:
 \log\frac{W_T}{W_0}
 \]
 
-This gives dense local feedback while remaining exactly consistent with compounded terminal wealth.
+This provides dense feedback while remaining exactly consistent with compounded terminal wealth.
 
-**Status:** recommended R12 v1 default, not a permanent algorithm lock. Survival/path-risk terms should not be added to this scalar reward without evidence that doing so is necessary.
+**v1 rule:** do not add survival/path-risk penalties to this scalar reward unless experiments show that qualification-only risk control is insufficient.
 
 ---
 
-## 10. Multi-objective qualification: no universal score
+## 10. Qualification is multi-objective
 
-R12 should not create a universal scalar such as:
+Do not reduce qualification to a universal score such as:
 
 \[
-Score=w_1 Return+w_2 Sharpe-w_3 MDD-w_4 CVaR+\cdots
+Score=w_1Return+w_2Sharpe-w_3MDD-w_4CVaR+\cdots
 \]
 
-Such a score hides value judgments in arbitrary weights, creates scale problems, and increases Goodhart/reward-hacking risk.
+Instead, begin with two conceptual result dimensions:
 
-Instead, qualification should use a small number of distinct semantic dimensions and Pareto dominance.
+1. **Economic Value** — long-run economic value, including performance relative to Buy & Hold.
+2. **Survival / Path Risk** — how dangerous the account path was while generating that value.
 
-### Initial objective space
+The exact authority metric for the second axis is intentionally **OPEN**.
 
-Start with only two conceptual result dimensions:
-
-1. **Economic Value** — did the Trader create meaningful long-run economic value, especially relative to Buy & Hold?
-2. **Survival / Path Risk** — how dangerous was the account path while generating that value?
-
-The exact statistic used for the second axis is intentionally **OPEN**. MDD, CDaR, CVaR, drawdown duration, ruin probability, and other diagnostics must not automatically become authority merely because they are familiar metrics.
+MDD, CDaR, CVaR, drawdown duration, ruin probability, Sharpe, Sortino, Calmar, turnover, and similar statistics may be computed as diagnostics without automatically becoming qualification authority.
 
 ---
 
-## 11. Evidence is not a third tradeable objective
+## 11. Evidence is not a tradeable objective
 
-Evidence quality / robustness is not another objective that can be traded for more return.
+Evidence quality answers:
 
-It answers a different question:
+> **How confident are we that the measured Economic Value and Survival / Path Risk are real?**
 
-> **How confident are we that the Economic Value and Survival/Path Risk estimates are real?**
+It is not a third objective that can be sacrificed for more return.
 
-Examples include:
+Relevant evidence may include:
 
-- paired evaluation on the same frozen market windows;
+- paired evaluation on identical frozen market windows;
 - seed robustness;
-- block/stationary bootstrap or another dependence-aware uncertainty method;
-- shuffle/random/negative controls where appropriate;
-- multiple-testing / strategy-selection correction when many candidates have been tried;
+- dependence-aware uncertainty estimation;
+- negative/random/shuffle controls where appropriate;
+- multiple-testing or strategy-selection correction when many candidates are tried;
 - out-of-sample consistency;
-- uncertainty intervals on the core objective estimates.
-
-This layer governs the strength of a promotion claim. It is not itself something the Trader is allowed to sacrifice for more growth.
+- uncertainty intervals on core objective estimates.
 
 ---
 
-## 12. Machine-executable Pareto qualification
+## 12. Machine-executable Pareto comparison
 
-Routine candidate comparison must not require Chat-SOL or Master judgment.
+Routine candidate comparison must be mechanical.
 
-### 12.1 Deterministic Pareto relation
-
-After converting all objective axes to a common direction (higher = better), candidate \(A\) dominates candidate \(B\) if:
+After orienting all authority objectives so that higher is better, candidate \(A\) Pareto-dominates candidate \(B\) when:
 
 \[
 A_i\ge B_i\quad\forall i
@@ -285,82 +255,71 @@ and:
 A_j>B_j\quad\text{for at least one }j.
 \]
 
-If one policy has higher growth but worse path risk, the two are non-dominated and both may survive.
+If one policy has greater economic value but worse survival/path quality, the policies are non-dominated.
 
-### 12.2 Uncertainty-aware dominance
+### Uncertainty-aware dominance
 
-Financial evaluations are noisy. R12 must not declare superiority from tiny point-estimate differences.
+Tiny point-estimate differences are insufficient for promotion.
 
-The comparison layer should support confidence-aware or probability-of-dominance logic. A deliberately conservative form is:
+The comparator must support confidence-aware or probability-of-dominance logic. A conservative form is:
 
 \[
 LCB_i(A)\ge UCB_i(B)\quad\forall i
 \]
 
-with a meaningful strict improvement in at least one dimension before declaring confident domination.
+with a meaningful strict improvement in at least one authority dimension.
 
-If uncertainty intervals overlap such that reliable domination cannot be established, the result is:
+Machine comparison returns only:
 
 ```text
+DOMINATES
+DOMINATED
 UNRESOLVED / NON_DOMINATED
 ```
 
-not a fabricated first-place ranking.
+It does not fabricate a total ranking.
 
-### 12.3 Automatic evidence escalation
+### Bounded evidence escalation
 
-When a promising comparison is unresolved, the evaluator may automatically spend a predeclared bounded evidence budget on additional seeds/resampling/evaluation before giving up.
+When a promising comparison remains unresolved, the evaluator may spend a predeclared bounded budget on additional seeds, resampling, or evaluation.
 
-If uncertainty remains after the budget is exhausted, both candidates remain eligible in the Pareto archive.
+If the relation remains unresolved when that budget is exhausted, both candidates remain eligible.
 
 ---
 
 ## 13. Pareto Archive and Active Champion
 
-R12 should distinguish two concepts.
-
 ### Pareto Archive
 
-A small machine-maintained set of all currently qualified, statistically non-dominated Trader policies.
-
-Example:
-
-```text
-Pareto Archive
-  P17  higher growth / higher path risk
-  P23  medium growth / lower path risk
-  P31  lower growth / strongest survival properties
-```
+A machine-maintained set of currently qualified, statistically non-dominated Trader policies.
 
 ### Active Champion
 
-The single policy currently selected for the next concrete purpose: continued experimentation, bounded deployment, or parent initialization.
+The single policy currently chosen for a concrete operational purpose such as continued experimentation, bounded deployment, or parent initialization.
 
-A policy does not have to be erased merely because it is not the current Active Champion.
+A policy is not deleted merely because it is not the Active Champion.
 
-Routine archive maintenance is mechanical. Master/SOL intervention is required only when a real-world choice demands one policy and the surviving Pareto candidates encode a genuine preference trade-off not already frozen in authority.
+Human/SOL judgment is required only when a concrete decision demands one policy and the surviving candidates express a genuine preference trade-off that has not already been frozen in authority.
 
 ---
 
-## 14. Epsilon / materiality tolerance
+## 14. Materiality tolerance
 
-The comparison API should reserve per-objective materiality tolerances:
+The comparison interface should reserve per-objective tolerances:
 
 \[
 \epsilon_i
 \]
 
-so that numerically trivial differences do not fill the Pareto archive with effectively identical policies.
+so that numerically meaningless differences do not fill the Pareto Archive with effectively equivalent candidates.
 
-However, R12 must **not invent economic thresholds yet**.
+Do not invent economic thresholds in advance.
 
-Initial implementation may use zero or purely numerical/statistical tolerance. Economic materiality thresholds should be introduced only after evidence shows that they are needed and their meaning can be justified.
+Initial implementation may use zero or purely numerical/statistical tolerance. Economic materiality thresholds require explicit justification.
 
 ---
 
 ## 15. Qualification pipeline
-
-The intended machine flow is:
 
 ```text
 Candidate policy
@@ -384,63 +343,79 @@ Confidence-aware Pareto comparator
     v
 Pareto Archive update
     v
-Active Champion selection only when needed
+Active Champion selection only when operationally required
 ```
 
-The first implementation can remain a small local module. It does not justify a service, agent judge, custom database, or distributed orchestration layer.
+The first implementation should remain a small local module. It does not justify an LLM judge, custom service, custom database, or distributed orchestration layer.
 
 ---
 
-## 16. R11 reduction implications
+## 16. Required semantic separations
 
-R11 remains valuable archaeology, but its frozen mechanisms are not automatically R12 authority.
+The system must preserve these distinctions:
 
-| R11 concept | R12 treatment | Reason |
-|---|---|---|
-| Market + Account as decision input | **CORE** | Defines CB16 as an account-conditioned sequential Trader rather than a market-only predictor. |
-| Truth != Belief != Decision != Permission | **CORE** | Preserves semantic/authority separation. |
-| Nominal action != executed action | **CORE** | Execution/permission/account physics remain distinct from the brain's proposal. |
-| Historical market can be replayed; experience depends on policy/account trajectory | **CORE** | Required for closed-loop learning. |
-| Same-account temporal continuity | **CORE** | Previous actions must change future decision state. |
-| Historical information should not be manually erased by recency | **CORE PRINCIPLE** | Preserve learned historical knowledge without hand-coded expiry. |
-| Hand-engineered cycle/regime activation engine | **DROP / FORBID BY DEFAULT** | Recurrence should primarily live in learned representation/weights. |
-| Final-holdout protection | **CORE** | Scientific validity requirement. |
-| Fixed `AccountState6` dimensionality | **SIMPLIFY / UNFREEZE** | Account information is core; the old six-dimensional encoding is an implementation choice. |
-| Fixed Operator48 / Medium48 sensory stack | **DEFER / REQUALIFY** | Predictive organs are allowed but specific R11 organs are not project essence. |
-| Fixed R11 Central Brain layer sizes / 189052 parameters | **DROP AS AUTHORITY** | Specific architecture is not a highest-level invariant. |
-| Fixed H72 utility | **DROP AS CORE; MAY RESEARCH LATER** | Long-run account objective is core; 72h is one historical horizon choice. |
-| Probabilistic Teacher `P(U | I_t,a)` implementation | **DEFER / REQUALIFY** | A possible learning mechanism, not the definition of the Trader. |
-| Teacher target loss as Champion promotion authority | **REPLACE** | R12 qualification should be based on economic/path outcomes plus evidence, not an auxiliary Teacher metric alone. |
-| requested_risk != confidence | **CORE SEMANTIC GUARD** | Risk request remains an action-control quantity, not epistemic confidence. |
-| Multi-layer authority/receipt chains, custom gate compiler, routine SHA ceremony | **DROP / SIMPLIFY** | Git + tests + bounded artifacts should carry ordinary development authority. |
-| Generalized async/distributed orchestration before observed need | **DEFER** | Infra grows only from demonstrated bottlenecks. |
-| Explicit StrategyMemory implementation | **DEFER, INTERFACE RESERVED** | Preserve future capability without paying complexity now. |
-| Market impact / endogenous market response | **DEFER** | Initial price-taker assumption is sufficient for R12 v1. |
-| CVaR critic, Lagrangian risk optimizer, distributional risk head, complex MORL training | **DEFER** | Do not implement before simple log-growth learning exposes a concrete need. |
+- **Truth != Belief != Decision != Permission**.
+- Nominal Trader action != permitted/executed action.
+- `requested_risk` != epistemic confidence.
+- Market information != account information.
+- Prediction quality != economic decision quality.
+- Training reward != qualification metrics != diagnostics.
+- Computational episode boundary != economic account reset.
+- Evidence strength != economic objective value.
 
 ---
 
-## 17. What remains intentionally open
+## 17. Historical knowledge principle
 
-The following should **not** be silently decided by an implementation agent:
+New observations may recalibrate current behavior without requiring learned historical information to be manually erased.
 
-1. Exact definition of the Survival / Path-Risk axis.
-2. Which path statistics are authority vs diagnostics.
-3. Whether and when survival/risk must enter the training objective rather than qualification only.
+Historical recurrence should primarily be represented through learned model parameters and responses to current inputs.
+
+Do not introduce handcrafted chronological expiry, cycle activation, regime-switch tables, or equivalent manual recurrence machinery unless future evidence establishes a concrete need.
+
+---
+
+## 18. Scientific validity
+
+Claims must remain separated by strength:
+
+```text
+wiring works
+!=
+controlled learning works
+!=
+historical improvement exists
+!=
+economic superiority exists
+!=
+production profitability is established
+```
+
+Final holdout data must remain protected until explicitly authorized for the appropriate scientific claim.
+
+---
+
+## 19. Open decisions
+
+Do not silently decide the following in implementation:
+
+1. Exact definition of the Survival / Path-Risk authority axis.
+2. Which path statistics are authority versus diagnostics.
+3. Whether and when survival/path risk must enter the training objective.
 4. Economic materiality / epsilon thresholds.
-5. Exact statistical confidence and resampling protocol for policy domination.
-6. Exact ruin boundary beyond obvious legal/account-ending states.
-7. Policy for selecting one Active Champion from multiple non-dominated candidates when a single choice is operationally required.
-8. Whether future evidence requires explicit learned StrategyMemory.
+5. Exact confidence and resampling protocol for dominance claims.
+6. Exact ruin boundary beyond obvious account-ending/legal failure states.
+7. Rule for selecting one Active Champion from multiple non-dominated candidates when a single operational choice is required.
+8. Whether evidence eventually justifies explicit learned StrategyMemory.
 9. Whether future scale requires market-impact modeling.
 
-These are future scientific choices, not holes to be filled opportunistically.
+These are explicit scientific choices, not implementation gaps.
 
 ---
 
-## 18. Minimal R12 implementation direction implied by this draft
+## 20. Minimal implementation shape
 
-This document does **not** authorize full training implementation yet. It suggests only a minimal future shape:
+This draft implies only a small initial structure:
 
 ```text
 state/
@@ -451,7 +426,7 @@ state/
 env/
   account_physics
   execution
-  ruin/terminal semantics
+  ruin_terminal_semantics
 
 policy/
   trader
@@ -465,42 +440,19 @@ qualification/
   archive.py
 ```
 
-No multi-agent judge, custom Pareto service, complex MORL framework, or distributed qualification system is justified at this stage.
+No larger infrastructure is justified by this document alone.
 
 ---
 
-## 19. Research basis
+## 21. Research basis
 
-These references support the design direction but do not become CB16 authority by themselves.
+The design is consistent with established work on:
 
-- Busseti, Ryu, Boyd (2016), **Risk-Constrained Kelly Gambling** — long-run log-growth with explicit drawdown-risk constraints rather than collapsing risk and growth into one ad hoc score.  
-  https://stanford.edu/~boyd/papers/pdf/kelly.pdf
+- long-run log-wealth growth and drawdown-constrained Kelly optimization;
+- multi-objective reinforcement learning and Pareto policy sets;
+- Pareto comparison under uncertain/noisy objectives;
+- drawdown-aware risk measures such as CDaR;
+- reward misspecification / Goodhart effects;
+- dependence-aware and selection-bias-aware evaluation of trading strategies.
 
-- Van Moffaert & Nowé (2014), **Multi-Objective Reinforcement Learning using Sets of Pareto Dominating Policies** — maintenance of Pareto-dominating policy sets instead of assuming a total ordering.  
-  https://jmlr.org/papers/v15/vanmoffaert14a.html
-
-- Abdolmaleki et al. (ICML 2020), **A Distributional View on Multi-Objective Policy Optimization** — highlights scale/conflict problems in naive scalarization and develops scale-invariant multi-objective policy optimization.  
-  https://proceedings.mlr.press/v119/abdolmaleki20a.html
-
-- Mlakar, Tušar, Filipič (2014), **Comparing Solutions under Uncertainty in Multiobjective Optimization** — extends Pareto comparison when objectives are uncertain and represented by confidence intervals.  
-  https://doi.org/10.1155/2014/817964
-
-- Budszuhn, Krallmann, Horn (2025), **Adaptive Resampling with Bootstrap for Noisy Multi-Objective Optimization Problems** — uses bootstrap-estimated probability of dominance to allocate extra evaluation only where uncertainty matters.  
-  https://arxiv.org/abs/2503.21495
-
-- Chekhlov, Uryasev, Zabarankin (2003), **Portfolio Optimization with Drawdown Constraints** — motivates path-dependent drawdown risk and CDaR as an alternative to relying on one worst MDD observation.  
-  https://www.cis.upenn.edu/~mkearns/finread/drawdown.pdf
-
-- Karwowski et al. (ICLR 2024), **Goodhart's Law in Reinforcement Learning** — supports treating optimized metrics as imperfect proxies and avoiding unnecessary pressure on composite proxy scores.  
-  https://proceedings.iclr.cc/paper_files/paper/2024/file/6ad68a54eaa8f9bf6ac698b02ec05048-Paper-Conference.pdf
-
-- Bailey & López de Prado (2014), **The Deflated Sharpe Ratio** — documents selection bias / backtest overfitting when many strategies are tried and motivates uncertainty/multiple-testing awareness in strategy qualification.  
-  https://davidhbailey.com/dhbpapers/deflated-sharpe.pdf
-
----
-
-## 20. Draft summary
-
-The current R12 philosophy can be compressed to:
-
-> **Build an account-aware autonomous Trader that learns to compound capital over a continuing trajectory without treating survival as a trivial inactivity game. Prediction models are eyes, not the brain. The first system remains a price taker and uses Market + Account, while reserving an interface for future learned memory. Train initially on clean net log-equity growth, evaluate economic value against same-asset Buy & Hold, keep survival/path risk distinct, and qualify policies through uncertainty-aware Pareto dominance rather than a universal weighted score. Preserve non-dominated policies in a small archive; automate routine comparison; involve Master/SOL only when a genuine preference trade-off remains.**
+References should support design choices without becoming implementation authority.
