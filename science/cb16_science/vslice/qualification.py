@@ -12,7 +12,10 @@ The runner implements the preregistered protocol literally:
 
 ```text
 run the full implementation test suite against a byte-identical copy of this commit
-fail closed (CONTRACT_MISMATCH) unless that exact-commit test gate is green
+fail closed unless that exact-commit test gate is green:
+  test failures / broken implementation  -> CONTRACT_MISMATCH
+  suite cannot execute (timeout, missing
+  executable, analogous runtime blocker) -> EXECUTION_BLOCKED
 torch.manual_seed(seed) before each positive/control learner construction
 paired learners share bitwise-identical initial Actor/Critic parameters
 deterministic collection streams derived only from seed/task/arm/generation
@@ -30,6 +33,12 @@ the worktree it will qualify, binds the evidence to ``CB16_COMMIT_SHA`` and to a
 SHA-256 digest of the implementation surface, and refuses to produce any
 scientific verdict unless the suite is green, the copy is byte-identical to the
 source, and the source is unchanged by the test run.
+
+A qualification blocked by the implementation test gate is never a scientific
+result: Task A and Task B stay ``NOT_EVALUATED`` and the artifacts carry no
+scientific verdict.  A suite that ran and failed is a contract violation
+(``CONTRACT_MISMATCH``); a suite that could not be executed is an
+execution/environment blocker (``EXECUTION_BLOCKED``).
 
 It writes only the three preregistered artifacts (``experiment_spec.json``,
 ``RESULT.json``, ``REPORT.md``) under ``CB16_RESULT_DIR``.  It never writes to
@@ -1193,6 +1202,62 @@ def implementation_test_gate(evidence: Mapping[str, Any], *, commit: str) -> Dic
     }
 
 
+#: Suite status that means the runner executed the suite and unittest reported a
+#: non-green result.  Every other non-green status (``TIMEOUT``,
+#: ``NOT_EXECUTABLE``, a missing verdict, or a green run whose binding evidence
+#: did not hold) means the qualification could not be validly executed.
+IMPLEMENTATION_TEST_RED_STATUS = "FAIL"
+
+#: Classification and exit code for each implementation-test failure class.
+IMPLEMENTATION_TEST_FAILURE_TAXONOMY = {
+    "CONTRACT_MISMATCH": EXIT_CONTRACT_MISMATCH,
+    "EXECUTION_BLOCKED": EXIT_EXECUTION_BLOCKED,
+}
+
+
+def implementation_failure_classification(evidence: Mapping[str, Any]) -> Tuple[str, int]:
+    """Map a non-green exact-commit implementation test gate to its taxonomy.
+
+    ``FAIL`` is the one status that proves the implementation itself is broken:
+    the suite ran at the exact commit and unittest reported failures, so the
+    contract violation is ``CONTRACT_MISMATCH``.  ``TIMEOUT``, ``NOT_EXECUTABLE``
+    and every other non-green outcome mean the suite produced no verdict (or
+    could not be bound to the exact commit), which is a runtime/environment
+    blocker: ``EXECUTION_BLOCKED``.
+
+    Neither case is a scientific result; Task A and Task B stay
+    ``NOT_EVALUATED`` in both.
+    """
+
+    status = evidence.get("status")
+    classification = (
+        "CONTRACT_MISMATCH"
+        if status == IMPLEMENTATION_TEST_RED_STATUS
+        else "EXECUTION_BLOCKED"
+    )
+    return classification, IMPLEMENTATION_TEST_FAILURE_TAXONOMY[classification]
+
+
+def implementation_test_failure_detail(classification: str, evidence: Mapping[str, Any]) -> str:
+    """Human-readable detail for a blocked implementation test gate."""
+
+    status = evidence.get("status")
+    exit_code = evidence.get("exit_code")
+    commit = evidence.get("commit_sha")
+    if classification == "CONTRACT_MISMATCH":
+        return (
+            "the exact-commit implementation test suite ran and did not pass "
+            f"(status={status!r}, exit_code={exit_code!r}, "
+            f"tests_run={evidence.get('tests_run')!r}, commit={commit!r}); "
+            "no scientific result was produced"
+        )
+    return (
+        "the exact-commit implementation test suite could not be executed "
+        f"(status={status!r}, exit_code={exit_code!r}, commit={commit!r}); "
+        "no scientific result was produced"
+    )
+
+
 def run_experiment(
     spec: Mapping[str, Any], *, seeds: Sequence[int], implementation_tests: Mapping[str, Any]
 ) -> QualificationOutcome:
@@ -1611,13 +1676,18 @@ def render_failure_report(
 def implementation_failure_outcome(
     spec: Mapping[str, Any], evidence: Mapping[str, Any], gate: Mapping[str, Any]
 ) -> QualificationOutcome:
-    """Artifacts for a run blocked by the exact-commit implementation test gate."""
+    """Artifacts for a run blocked by the exact-commit implementation test gate.
 
-    detail = (
-        "the exact-commit implementation test gate did not pass "
-        f"(status={evidence.get('status')!r}, exit_code={evidence.get('exit_code')!r}, "
-        f"commit={evidence.get('commit_sha')!r}); no scientific result was produced"
-    )
+    The classification follows :func:`implementation_failure_classification`:
+    an executed red suite is ``CONTRACT_MISMATCH`` (the implementation is
+    broken); an unexecutable suite is ``EXECUTION_BLOCKED`` (runtime /
+    environment blocker).  Either way the run is not a scientific result: Task A
+    and Task B stay ``NOT_EVALUATED``, no seeds and no aggregate gates are
+    recorded, and no scientific verdict is produced.
+    """
+
+    classification, exit_code = implementation_failure_classification(evidence)
+    detail = implementation_test_failure_detail(classification, evidence)
     global_gate = spec.get("global_gate")
     required_by_global_gate = (
         bool(global_gate.get("implementation_tests_must_pass"))
@@ -1629,13 +1699,14 @@ def implementation_failure_outcome(
         "gate": dict(gate),
         "required_by_global_gate": required_by_global_gate,
         "runner_executed_suite": True,
+        "failure_classification": classification,
     }
     result = {
         "schema": "cb16.result.v1",
         "experiment_id": EXPERIMENT_ID,
         "result_command": os.environ.get("CB16_RESULT_COMMAND", RESULT_COMMAND),
         "commit_sha": commit_sha(),
-        "classification": "CONTRACT_MISMATCH",
+        "classification": classification,
         "runtime": runtime_record(),
         "implementation_tests": implementation,
         "preregistered_spec": {
@@ -1650,12 +1721,12 @@ def implementation_failure_outcome(
         "verdicts": {
             "task_a": "NOT_EVALUATED",
             "task_b": "NOT_EVALUATED",
-            "global": "CONTRACT_MISMATCH",
+            "global": classification,
         },
-        "error": {"type": "CONTRACT_MISMATCH", "detail": detail},
+        "error": {"type": classification, "detail": detail},
     }
     report = render_failure_report(
-        classification="CONTRACT_MISMATCH",
+        classification=classification,
         commit=result["commit_sha"],
         detail=detail,
         implementation_tests=implementation,
@@ -1665,10 +1736,10 @@ def implementation_failure_outcome(
         spec=dict(spec),
         result=result,
         report=report,
-        classification="CONTRACT_MISMATCH",
-        exit_code=EXIT_CONTRACT_MISMATCH,
+        classification=classification,
+        exit_code=exit_code,
         summary_line=(
-            f"{RESULT_COMMAND}: classification=CONTRACT_MISMATCH "
+            f"{RESULT_COMMAND}: classification={classification} "
             f"implementation_tests={evidence.get('status')}; no scientific verdict produced"
         ),
     )
@@ -1774,9 +1845,11 @@ __all__ = [
     "configure_deterministic_runtime",
     "copy_implementation_tree",
     "gate_section",
+    "implementation_failure_classification",
     "implementation_failure_outcome",
     "implementation_source_sha256",
     "implementation_surface_files",
+    "implementation_test_failure_detail",
     "implementation_test_gate",
     "load_spec",
     "main",

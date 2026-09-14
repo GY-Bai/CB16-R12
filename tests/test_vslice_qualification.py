@@ -617,6 +617,38 @@ class ImplementationTestGateTests(unittest.TestCase):
                     all(value for key, value in result["conditions"].items() if key != unmet)
                 )
 
+    def test_implementation_failure_taxonomy(self):
+        """Executed red suite -> CONTRACT_MISMATCH; unexecutable suite -> EXECUTION_BLOCKED."""
+
+        commit = qualification.commit_sha()
+        red = green_implementation_tests(commit_sha=commit, status="FAIL", exit_code=1)
+        timeout = green_implementation_tests(
+            commit_sha=commit, status="TIMEOUT", exit_code=124, passed=False
+        )
+        not_executable = green_implementation_tests(
+            commit_sha=commit, status="NOT_EXECUTABLE", exit_code=126, passed=False
+        )
+        no_verdict = green_implementation_tests(commit_sha=commit, status=None, exit_code=None)
+
+        self.assertEqual(
+            qualification.implementation_failure_classification(red),
+            ("CONTRACT_MISMATCH", qualification.EXIT_CONTRACT_MISMATCH),
+        )
+        for evidence in (timeout, not_executable, no_verdict):
+            with self.subTest(status=evidence["status"]):
+                self.assertEqual(
+                    qualification.implementation_failure_classification(evidence),
+                    ("EXECUTION_BLOCKED", qualification.EXIT_EXECUTION_BLOCKED),
+                )
+
+        red_detail = qualification.implementation_test_failure_detail("CONTRACT_MISMATCH", red)
+        blocked_detail = qualification.implementation_test_failure_detail(
+            "EXECUTION_BLOCKED", timeout
+        )
+        self.assertIn("ran and did not pass", red_detail)
+        self.assertIn("could not be executed", blocked_detail)
+        self.assertIn("TIMEOUT", blocked_detail)
+
     def test_run_experiment_refuses_unverified_implementation_tests(self):
         spec = reduced_spec(seeds=(1201,), generations=1)
         red_variants = (
@@ -733,6 +765,91 @@ class RunnerTests(unittest.TestCase):
             "## Limitations",
         ):
             self.assertIn(section, report)
+
+    def test_formal_runner_classifies_unexecutable_suite_as_execution_blocked(self):
+        """Timeout / missing executable are execution/environment blockers, not contract failures."""
+
+        blockers = (
+            green_implementation_tests(
+                status="TIMEOUT",
+                passed=False,
+                exit_code=124,
+                tests_run=None,
+                stdout_tail="",
+                stderr_tail="",
+            ),
+            green_implementation_tests(
+                status="NOT_EXECUTABLE",
+                passed=False,
+                exit_code=126,
+                tests_run=None,
+                stderr_tail="FileNotFoundError: [Errno 2] No such file or directory",
+            ),
+        )
+        for evidence in blockers:
+            with self.subTest(status=evidence["status"]):
+                with tempfile.TemporaryDirectory() as tmp:
+                    result_dir = Path(tmp) / "result"
+                    with mock.patch.dict(
+                        os.environ, {"CB16_COMMIT_SHA": "0" * 40}, clear=False
+                    ), mock.patch.object(
+                        qualification, "run_implementation_test_suite", return_value=evidence
+                    ), mock.patch.object(
+                        qualification,
+                        "run_experiment",
+                        side_effect=AssertionError("science must not run without a suite verdict"),
+                    ) as experiment:
+                        outcome = qualification.run_qualification(result_dir=result_dir)
+                    experiment.assert_not_called()
+
+                    self.assertEqual(outcome.classification, "EXECUTION_BLOCKED")
+                    self.assertEqual(outcome.exit_code, qualification.EXIT_EXECUTION_BLOCKED)
+                    for name in (
+                        qualification.SPEC_FILENAME,
+                        qualification.RESULT_FILENAME,
+                        qualification.REPORT_FILENAME,
+                    ):
+                        self.assertTrue((result_dir / name).is_file(), name)
+                    result = json.loads(
+                        (result_dir / qualification.RESULT_FILENAME).read_text(encoding="utf-8")
+                    )
+                    written_spec = json.loads(
+                        (result_dir / qualification.SPEC_FILENAME).read_text(encoding="utf-8")
+                    )
+                    report = (result_dir / qualification.REPORT_FILENAME).read_text(
+                        encoding="utf-8"
+                    )
+
+                self.assertEqual(result["classification"], "EXECUTION_BLOCKED")
+                self.assertEqual(result["error"]["type"], "EXECUTION_BLOCKED")
+                self.assertEqual(result["implementation_tests"]["status"], evidence["status"])
+                self.assertEqual(
+                    result["implementation_tests"]["failure_classification"],
+                    "EXECUTION_BLOCKED",
+                )
+                self.assertFalse(result["implementation_tests"]["gate"]["passed"])
+                self.assertEqual(
+                    result["verdicts"],
+                    {
+                        "task_a": "NOT_EVALUATED",
+                        "task_b": "NOT_EVALUATED",
+                        "global": "EXECUTION_BLOCKED",
+                    },
+                )
+                self.assertEqual(result["seeds"], [])
+                self.assertEqual(result["aggregate_gates"], {})
+                self.assertEqual(written_spec, committed_spec())
+                self.assertIn("EXECUTION_BLOCKED", report)
+                self.assertIn("could not be executed", report)
+                for section in (
+                    "## Implementation correctness",
+                    "## Task A controlled learnability",
+                    "## Task B delayed-credit learnability",
+                    "## Negative controls",
+                    "## Scientific verdict",
+                    "## Limitations",
+                ):
+                    self.assertIn(section, report)
 
     def test_formal_runner_passes_its_own_test_evidence_into_the_experiment(self):
         """The runner produces the evidence itself; the experiment receives it."""
