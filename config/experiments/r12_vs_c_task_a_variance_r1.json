@@ -1,0 +1,120 @@
+{
+  "experiment_id": "r12.vs_c.task_a_variance_attribution.r1",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "purpose": "Test whether Task-A instability is materially explained by Monte-Carlo collection variance when the learner, objective, optimizer, AccountState, Physics, seeds, generations and controls are held fixed.",
+  "authority": {
+    "context_length": 64,
+    "normalization": "N0_ENDPOINT_ANCHORED_V1",
+    "sensory_seed": 12012,
+    "sensory_z_dim": 32,
+    "actor_hidden_width": 64,
+    "actor_hidden_layers": 2,
+    "device": "cpu",
+    "torch_num_threads_per_worker": 1,
+    "max_seed_workers": 4,
+    "deterministic_algorithms": true,
+    "execution_engine": "vectorized-batched-v1",
+    "nominal_exposure_budget": 1.0,
+    "hard_exposure_limit": 1.0
+  },
+  "optimizer": {
+    "actor": "Adam",
+    "actor_lr": 0.001,
+    "critic": "Adam",
+    "critic_lr": 0.001,
+    "discount_factor": 1.0,
+    "entropy_bonus": 0.0,
+    "replay": false
+  },
+  "paired_seeds": [1201, 1202, 1203, 1204, 1205, 1206, 1207, 1208],
+  "task_a": {
+    "name": "ACCOUNT_CONDITIONED_MAINTENANCE_BATCH_VARIANCE",
+    "generations": 256,
+    "trajectory_length": 1,
+    "market": "identical flat OHLCV: prices 100, volume 10, one predecessor plus 64 represented bars",
+    "initial_truths": [
+      {
+        "name": "SHORT_HALF",
+        "equity": 1000.0,
+        "quantity": -5.0,
+        "mark_price": 100.0,
+        "desired_target_exposure": -0.5
+      },
+      {
+        "name": "FLAT",
+        "equity": 1000.0,
+        "quantity": 0.0,
+        "mark_price": 100.0,
+        "desired_target_exposure": 0.0
+      },
+      {
+        "name": "LONG_HALF",
+        "equity": 1000.0,
+        "quantity": 5.0,
+        "mark_price": 100.0,
+        "desired_target_exposure": 0.5
+      }
+    ],
+    "physics": {
+      "open_next": 100.0,
+      "close_next": 100.0,
+      "proportional_friction_kappa": 0.1,
+      "permission_bisection_iterations": 24
+    },
+    "positive_training_observation": "policy observes the true AccountState derived from each actual AccountTruth",
+    "control": {
+      "name": "ACCOUNT_OBSERVATION_ZERO_RELATION",
+      "construction": "for each arm and generation, every actual-account x observed-account pair appears equally; actual and observed account marginals are balanced and exactly independent",
+      "reward_physics": "reward always comes from actual AccountTruth and sampled action; only policy-observed AccountState is zero-relation"
+    },
+    "arms": {
+      "baseline_b90": {
+        "batch_trajectories": 90,
+        "positive_per_actual_account": 30,
+        "control_per_actual_observed_pair": 10
+      },
+      "high_batch_b900": {
+        "batch_trajectories": 900,
+        "positive_per_actual_account": 300,
+        "control_per_actual_observed_pair": 100
+      }
+    },
+    "evaluation": {
+      "adapter": "deterministic_argmax_direction_plus_beta_mean",
+      "uses_true_account_state": true,
+      "metrics": [
+        "direction_correct_count",
+        "target_exposure_mae",
+        "mean_one_step_log_growth",
+        "all_flat_post"
+      ]
+    },
+    "seed_pass_gate": {
+      "direction_correct_count_min": 3,
+      "target_exposure_mae_max": 0.15
+    }
+  },
+  "attribution_gate": {
+    "baseline_control_seed_pass_count_max": 2,
+    "high_batch_positive_seed_pass_count_min": 6,
+    "high_batch_control_seed_pass_count_max": 2,
+    "high_batch_minus_baseline_positive_pass_count_min": 3
+  },
+  "outcomes": {
+    "variance_supported": "all attribution_gate conditions pass",
+    "control_invalid": "either control pass count exceeds its preregistered maximum",
+    "variance_not_sufficient": "controls remain valid but one or more variance-support conditions fail"
+  },
+  "global_gate": {
+    "implementation_tests_must_pass": true,
+    "no_threshold_changes_after_results": true,
+    "scientific_gate_miss_classification": "SCIENTIFIC_FAIL",
+    "contract_violation_classification": "CONTRACT_MISMATCH",
+    "runtime_or_environment_blocker_classification": "EXECUTION_BLOCKED"
+  },
+  "required_artifacts": [
+    "experiment_spec.json",
+    "RESULT.json",
+    "REPORT.md"
+  ]
+}
