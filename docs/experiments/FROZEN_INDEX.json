@@ -79,6 +79,12 @@
       "historical_path": "docs/tasks/active/R12_VS_D_OBJECTIVE_BALANCE_ENTROPY_GRADIENT_R2A.md",
       "snapshot_commit": "aa96d060cd9bc9bb8e32054a65877fa1646300c7",
       "sha256": "a2deed841c986878de46412e18c4834f5dad93e2850efd7aaa787b16b3d36e9c"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_D_REPRESENTATION_ACCESSIBILITY_R3.md",
+      "historical_path": "docs/tasks/active/R12_VS_D_REPRESENTATION_ACCESSIBILITY_R3.md",
+      "snapshot_commit": "1e0bfd4a8907c9f19c7c722971ee39f59face5ea",
+      "sha256": "919a878dbf02ebebaa21da38f16ece5212fa11548dd03d8fb0ce1f594e4cd2f8"
     }
   ]
 }
