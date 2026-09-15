@@ -1,0 +1,254 @@
+{
+  "allowed_promotion_decisions": [
+    "NO_PROMOTION",
+    "PROMOTE_DISTRIBUTION_ALIGNED_EVALUATION_HYPOTHESIS",
+    "PROMOTE_DISTRIBUTION_LEVEL_RELATION_TO_FRESH_VALIDATION"
+  ],
+  "claim_scope": {
+    "account_semantics": "FLAT_RESET_[e=0,s=1,c=1]_per_sample",
+    "asset": "BTCUSDT",
+    "changed_axis": "evaluation_adapter_only",
+    "costs": "kappa=0_funding_off",
+    "decision_horizon": "one_hour_open_to_close",
+    "market_representation": "N0_ENDPOINT_ANCHORED_V1_64h_plus_FrozenSensory32_seed12012",
+    "series_role": "diagnostic_not_confirmatory",
+    "training_period": "2020-01-03T17:00:00Z..2020-02-29T23:00:00Z",
+    "training_program": "identical_to_parent_R0",
+    "validation_freshness": "REUSED_DEVELOPMENT_ALREADY_INSPECTED_BY_PARENT_R0",
+    "validation_period": "2020-03-01T00:00:00Z..2020-03-31T23:00:00Z"
+  },
+  "claims": [
+    {
+      "authority_scope": [
+        "may support evaluation-adapter mismatch as a candidate explanation for part of the parent R0 gate miss",
+        "may reject promotion of that adapter-mismatch hypothesis if its frozen gate is not met"
+      ],
+      "claim_domain": "decision_value/evaluation_adapter_transfer",
+      "claim_id": "C_ADAPTER_TRANSFER",
+      "claim_scope": {
+        "comparison": "policy_distribution_expected_log_growth_minus_parent_argmax_adapter",
+        "validation": "reused_March_development"
+      },
+      "composition_dependencies": [
+        {
+          "ref": "parent_R0_training_program_reproduction",
+          "type": "validity_dependency"
+        },
+        {
+          "ref": "stochastic_training_policy_to_argmax_evaluation",
+          "type": "transfer_assumption"
+        }
+      ],
+      "estimand": {
+        "aggregation": "paired_by_seed_and_hour",
+        "primary": [
+          "delta_true_minus_control",
+          "delta_true_minus_pre"
+        ],
+        "unit": "UTC_calendar_day_block"
+      },
+      "invalid_inferences": [
+        "does_not_qualify_historical_market_information",
+        "does_not_identify_representation_or_objective_or_horizon_root_cause",
+        "does_not_make_March_fresh_confirmation",
+        "does_not_authorize_production_or_final_holdout"
+      ],
+      "promotion_scope": [
+        "PROMOTE_DISTRIBUTION_ALIGNED_EVALUATION_HYPOTHESIS"
+      ],
+      "tested_object": "evaluation transfer from stochastic training policy to deterministic argmax-direction + Beta-mean decisions"
+    },
+    {
+      "authority_scope": [
+        "may identify a distribution-level candidate relation worth later fresh validation",
+        "may record that the reused-development diagnostic gate was not met"
+      ],
+      "claim_domain": "historical_development_decision_diagnostic",
+      "claim_id": "C_DISTRIBUTION_LEVEL_RELATION",
+      "claim_scope": {
+        "fresh_confirmation": false,
+        "validation": "reused_March_development"
+      },
+      "composition_dependencies": [
+        {
+          "ref": "C_ADAPTER_TRANSFER",
+          "type": "promotion_prerequisite"
+        },
+        {
+          "ref": "matched_true_context_vs_shuffled_consequence_training",
+          "type": "validity_dependency"
+        }
+      ],
+      "estimand": {
+        "primary": [
+          "expected_post_positive_minus_control",
+          "expected_post_positive_minus_pre",
+          "expected_post_positive_mean_log_growth"
+        ],
+        "unit": "UTC_calendar_day_block"
+      },
+      "invalid_inferences": [
+        "not_historical_information_qualification",
+        "not_economic_robustness",
+        "not_final_holdout",
+        "not_production_authority"
+      ],
+      "promotion_scope": [
+        "PROMOTE_DISTRIBUTION_LEVEL_RELATION_TO_FRESH_VALIDATION"
+      ],
+      "tested_object": "trained positive policy distribution relative to shuffled-control and PRE under deterministic expected-log-growth evaluation"
+    }
+  ],
+  "data": {
+    "allowed_archives": [
+      {
+        "expected_rows": 44640,
+        "name": "BTCUSDT-1m-2020-01.zip",
+        "sha256": "b4e13ea185ba96c413ac9167cfbb6e238eb5eae119a7a77f41f4c61c5e099d03"
+      },
+      {
+        "expected_rows": 41760,
+        "name": "BTCUSDT-1m-2020-02.zip",
+        "sha256": "f32b20168ea590cd7d04a2995bc5ec500ea06331c8174f7fd14f29c1078e5ed2"
+      },
+      {
+        "expected_rows": 44640,
+        "name": "BTCUSDT-1m-2020-03.zip",
+        "sha256": "15790b4b031cbc5f59cae30e523fb8341588d279fe3839ba1224c7fe8a6bc929"
+      }
+    ],
+    "expected_hourly_bars": 2184,
+    "final_holdout_must_remain_unaccessed": true,
+    "inherit_exact_parent_R0_archives_and_hashes": true,
+    "train_decisions": 1375,
+    "validation_day_blocks": 31,
+    "validation_decisions": 744
+  },
+  "evaluation": {
+    "action_distribution_diagnostics": [
+      "mean_direction_entropy",
+      "mean_short_probability",
+      "mean_flat_probability",
+      "mean_long_probability",
+      "mean_expected_active_probability",
+      "mean_short_beta_mean",
+      "mean_long_beta_mean"
+    ],
+    "baseline_adapter": "deterministic_argmax_direction_plus_beta_mean",
+    "beta_expectation": {
+      "dtype": "float64",
+      "method": "Gauss_Legendre_quadrature_on_[0,1]",
+      "nodes": 64,
+      "random_sampling": false
+    },
+    "diagnostic_adapter": "deterministic_expected_stochastic_policy_log_growth",
+    "diagnostic_definition": "softmax categorical direction probabilities times direction-conditional Beta expectation of one-step log-growth; FLAT contributes zero"
+  },
+  "experiment_id": "r12.vs_d.evaluation_adapter_transfer_diagnostic.r1",
+  "gate_mapping": {
+    "C_ADAPTER_TRANSFER": [
+      "G_ADAPTER_SEED",
+      "G_ADAPTER_AGGREGATE"
+    ],
+    "C_DISTRIBUTION_LEVEL_RELATION": [
+      "G_DISTRIBUTION_SEED",
+      "G_DISTRIBUTION_AGGREGATE"
+    ]
+  },
+  "gates": {
+    "G_ADAPTER_AGGREGATE": {
+      "median_delta_true_minus_control_strictly_gt": 0.0,
+      "median_delta_true_minus_pre_strictly_gt": 0.0,
+      "seed_pass_count_min": 6
+    },
+    "G_ADAPTER_SEED": {
+      "per_seed": "LCB(delta_true_minus_control)>0 AND LCB(delta_true_minus_pre)>0"
+    },
+    "G_DISTRIBUTION_AGGREGATE": {
+      "median_expected_positive_mean_log_growth_strictly_gt": 0.0,
+      "median_expected_positive_minus_control_strictly_gt": 0.0,
+      "median_expected_positive_minus_pre_strictly_gt": 0.0,
+      "seed_pass_count_min": 6
+    },
+    "G_DISTRIBUTION_SEED": {
+      "per_seed": "LCB(expected_positive_minus_control)>0 AND LCB(expected_positive_minus_pre)>0"
+    }
+  },
+  "outcomes": {
+    "adapter_gate_fail": "EVALUATION_ADAPTER_MISMATCH_NOT_QUALIFIED_ON_REUSED_DEV",
+    "adapter_gate_pass": "EVALUATION_ADAPTER_MISMATCH_SUPPORTED_ON_REUSED_DEV",
+    "distribution_gate_fail": "DISTRIBUTION_LEVEL_RELATION_NOT_QUALIFIED_ON_REUSED_DEV",
+    "distribution_gate_pass": "DISTRIBUTION_LEVEL_RELATION_CANDIDATE_ON_REUSED_DEV"
+  },
+  "parent_evidence": {
+    "artifact_name": "cb16-science-results-57-34911876483-1",
+    "artifact_sha256": "9f2d54131f4170f7f06a4b3fffaeb0bf11bba4d0d8095cfc25c14fd2cb82a71d",
+    "current_scoped_assessment": "TESTED_CONFIGURATION_DEV_DECISION_GATE_NOT_MET",
+    "issue": 57,
+    "observed_summary": {
+      "median_post_positive_mean_log_growth": -0.00010992132978126853,
+      "median_post_positive_minus_control_mean_log_growth": 9.685038917580417e-05,
+      "median_post_positive_minus_pre_mean_log_growth": -7.022034918277601e-06,
+      "point_positive_gt_control_seed_count": 5,
+      "point_positive_gt_pre_seed_count": 4,
+      "seed_pass_count": 0
+    },
+    "parent_classification": "SCIENTIFIC_FAIL",
+    "parent_scientific_outcome": "HISTORICAL_MARKET_INFORMATION_NOT_QUALIFIED",
+    "run_id": 34911876483
+  },
+  "parent_experiment_ids": [
+    "r12.vs_d.historical_market_information_canary.r0"
+  ],
+  "purpose": "Diagnose whether the deterministic argmax-direction + Beta-mean evaluation adapter used by VS-D R0 materially obscures reward information present in the trained stochastic policy distribution, without changing data, representation, learner, objective, training budget, seeds, or controls.",
+  "required_artifacts": [
+    "experiment_spec.json",
+    "RESULT.json",
+    "REPORT.md"
+  ],
+  "research_series_policy": {
+    "final_holdout_access_forbidden": true,
+    "freshness_status": "NOT_FRESH_CONFIRMATION",
+    "if_adapter_gate_met": "adapter mismatch is only a candidate explanation; any stronger relation must be tested on fresh authorized validation before qualification",
+    "if_adapter_gate_not_met": "do_not_rescue_R1; next diagnostic may isolate representation/objective/horizon under a new preregistered identity",
+    "new_experiment_id_does_not_reset_adaptation_history": true,
+    "parent_results_inspected": true,
+    "reused_development_data": [
+      "BTCUSDT_2020-03"
+    ],
+    "series_id": "r12.vs_d.historical_development"
+  },
+  "schema": "cb16.experiment.v2",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "tested_object": "VS-D R0 frozen training configuration with evaluation transfer compared between the original deterministic argmax adapter and a deterministic policy-distribution expected-log-growth evaluator",
+  "training": {
+    "account_state_per_sample": "FLAT_RESET_[e=0,s=1,c=1]",
+    "actor_lr": 0.001,
+    "beta_risk_entropy_bonus": 0.0,
+    "control_arm": "SHUFFLED_CONTEXT_TO_CONSEQUENCE",
+    "critic_lr": 0.001,
+    "direction_entropy_coefficient": 0.005,
+    "generations": 256,
+    "model_seeds": [
+      3101,
+      3102,
+      3103,
+      3104,
+      3105,
+      3106,
+      3107,
+      3108
+    ],
+    "must_match_parent_R0": true,
+    "positive_arm": "TRUE_CONTEXT_TO_NEXT_HOUR_CONSEQUENCE",
+    "replay": false
+  },
+  "uncertainty_protocol": {
+    "bootstrap_replicates": 4096,
+    "bootstrap_rng": "python_random_MersenneTwister_deterministic_stream",
+    "day_blocks": 31,
+    "hours_per_block": 24,
+    "one_sided_95_percent_lower_bound_index_zero_based": 204,
+    "unit": "UTC_calendar_day_of_consequence_hour"
+  }
+}
