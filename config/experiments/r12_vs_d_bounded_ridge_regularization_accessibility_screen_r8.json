@@ -1,0 +1,243 @@
+{
+  "schema": "cb16.experiment.v2",
+  "experiment_id": "r12.vs_d.bounded_ridge_regularization_accessibility_screen.r8",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "experiment_role": "SCREENING",
+  "parent_experiment_ids": [
+    "r12.vs_d.representation_accessibility_diagnostic.r3",
+    "r12.vs_d.bounded_context_length_accessibility_screen.r6",
+    "r12.vs_d.march_temporal_robustness_of_64h_linear_hint.r7"
+  ],
+  "tested_object": "Regularization-scale sensitivity of the exact 64h N0 one-hour linear accessibility probe on adaptively reused January-February development",
+  "claim_scope": {
+    "asset": "BTCUSDT",
+    "representation": "N0_64h_flattened",
+    "target": "one_hour_arithmetic_return_close_over_open_minus_1",
+    "fit": "January_615_decisions_same_as_R6_R7",
+    "validation": "February_672_decisions_same_as_R6",
+    "ridge_lambdas": [
+      0.1,
+      1.0,
+      10.0,
+      100.0,
+      1000.0
+    ],
+    "reference_lambda": 1.0,
+    "march_read_forbidden": true,
+    "final_holdout_access_forbidden": true
+  },
+  "research_series_policy": {
+    "series_id": "r12.vs_d.historical_development",
+    "parent_results_inspected": true,
+    "freshness_status": "SCREENING_ADAPTIVELY_REUSED_JAN_FEB_AFTER_R6_R7",
+    "adaptation_rationale": "R6 showed 64h remained the strongest bounded context while its lambda=1 ridge point relation stayed weak and just below robust LCB; R8 isolates regularization scale before adding representation or learner complexity",
+    "new_experiment_id_does_not_reset_adaptation_history": true,
+    "screening_is_not_qualification": true,
+    "if_candidate_found": "promote only the named ridge-lambda candidate to a new separately preregistered robustness/transfer experiment",
+    "if_no_candidate_found": "do_not_rescue_R8; no screened ridge scale receives promotion",
+    "march_read_forbidden": true,
+    "final_holdout_access_forbidden": true
+  },
+  "data_exposure": {
+    "dataset_or_split_id": "BTCUSDT_2020_JAN_FEB_RIDGE_SCALE_SCREEN",
+    "roles_seen": [
+      "training",
+      "diagnostic",
+      "screening"
+    ],
+    "prior_experiment_ids": [
+      "r12.vs_d.representation_accessibility_diagnostic.r3",
+      "r12.vs_d.bounded_context_length_accessibility_screen.r6"
+    ],
+    "human_or_model_result_exposure": true,
+    "adaptations_made_after_exposure": [
+      "R8 regularization grid selected after observing R6/R7 weak 64h lambda=1 point relation"
+    ],
+    "freshness_class": "ADAPTIVELY_REUSED"
+  },
+  "claims": [
+    {
+      "claim_id": "C_RIDGE_REGULARIZATION_SCREENING_PRIORITY",
+      "vv_classification": "NOT_APPLICABLE",
+      "tested_object": "bounded comparative screen of ridge lambda 0.1/10/100/1000 against lambda=1 on the same 64h N0 one-hour relation",
+      "claim_domain": "probe_regularization_screening",
+      "claim_scope": {
+        "candidate_lambdas": [
+          0.1,
+          10.0,
+          100.0,
+          1000.0
+        ],
+        "reference_lambda": 1.0,
+        "validation": "adaptively_reused_February_672_common_window"
+      },
+      "estimand": {
+        "primary": "for each candidate lambda: February Pearson correlation, true-minus-median-shuffle correlation, and paired correlation gain over lambda=1 under common resamples",
+        "candidate_rule": "all three one-sided bootstrap lower bounds > 0; among eligible lambdas choose highest point true correlation; exact tie prefers lambda closest to 1 in log10 distance, then smaller lambda",
+        "unit": "dependence-aware 48h circular moving block over the common February hourly sequence"
+      },
+      "estimator": "January-standardized closed-form ridge at frozen lambda grid, February Pearson correlation, eight matched shuffled-January-target controls, paired circular moving-block bootstrap",
+      "replication_unit": "48h circular moving block; 4096 bootstrap replicates are uncertainty draws, not independent scientific replicates",
+      "validity_prerequisites": [
+        "identical January/February timestamps for every lambda",
+        "same 64h N0 features and feature standardizer across lambdas",
+        "same target permutations across lambdas",
+        "same bootstrap resamples across lambdas/controls",
+        "no February fitting or lambda selection during training"
+      ],
+      "credible_alternatives": [
+        "candidate gain may be finite-sample regularization luck on adaptively reused February",
+        "screening over multiple lambdas adds adaptation debt and is not confirmatory",
+        "lambda scale may interact with feature covariance and does not identify a representation root cause",
+        "a negative screen does not exclude other probe families"
+      ],
+      "authority_scope": [
+        "may prioritize one ridge lambda as a candidate for a new experiment",
+        "may conclude that none of the screened non-reference lambdas earned screening promotion"
+      ],
+      "promotion_scope": [
+        "PROMOTE_RIDGE_LAMBDA_0P1_CANDIDATE_HYPOTHESIS",
+        "PROMOTE_RIDGE_LAMBDA_10_CANDIDATE_HYPOTHESIS",
+        "PROMOTE_RIDGE_LAMBDA_100_CANDIDATE_HYPOTHESIS",
+        "PROMOTE_RIDGE_LAMBDA_1000_CANDIDATE_HYPOTHESIS"
+      ],
+      "invalid_inferences": [
+        "does_not_qualify_historical_market_information",
+        "does_not_make_February_confirmatory",
+        "does_not_establish_optimal_regularization",
+        "does_not_establish_profitability_or_account_economics",
+        "does_not_identify_regularization_as_unique_root_cause",
+        "does_not_authorize_March_or_final_holdout"
+      ],
+      "composition_dependencies": [
+        {
+          "type": "validity_dependency",
+          "ref": "R6_exact_64h_N0_linear_probe_semantics"
+        },
+        {
+          "type": "validity_dependency",
+          "ref": "common_January_February_chronology"
+        },
+        {
+          "type": "transfer_assumption",
+          "ref": "lambda_1_may_be_misregularized_for_320D_615-sample_ridge"
+        }
+      ]
+    }
+  ],
+  "gate_mapping": {
+    "C_RIDGE_REGULARIZATION_SCREENING_PRIORITY": [
+      "G_RIDGE_SCALE_SCREEN_CANDIDATE"
+    ]
+  },
+  "allowed_promotion_decisions": [
+    "NO_PROMOTION",
+    "PROMOTE_RIDGE_LAMBDA_0P1_CANDIDATE_HYPOTHESIS",
+    "PROMOTE_RIDGE_LAMBDA_10_CANDIDATE_HYPOTHESIS",
+    "PROMOTE_RIDGE_LAMBDA_100_CANDIDATE_HYPOTHESIS",
+    "PROMOTE_RIDGE_LAMBDA_1000_CANDIDATE_HYPOTHESIS"
+  ],
+  "data": {
+    "source_root": "/cb16/raw/klines_1m/BTCUSDT",
+    "manifest_path": "/cb16/raw/DOWNLOAD_MANIFEST.json",
+    "require_manifest_final_holdout_accessed_false": true,
+    "allowed_archives": [
+      {
+        "name": "BTCUSDT-1m-2020-01.zip",
+        "sha256": "b4e13ea185ba96c413ac9167cfbb6e238eb5eae119a7a77f41f4c61c5e099d03",
+        "expected_rows": 44640
+      },
+      {
+        "name": "BTCUSDT-1m-2020-02.zip",
+        "sha256": "f32b20168ea590cd7d04a2995bc5ec500ea06331c8174f7fd14f29c1078e5ed2",
+        "expected_rows": 41760
+      }
+    ],
+    "forbidden_reads": [
+      "BTCUSDT-1m-2020-03.zip",
+      "any_final_holdout_archive"
+    ],
+    "hourly_aggregation": {
+      "timezone": "UTC",
+      "require_exactly_60_contiguous_1m_rows_per_hour": true,
+      "expected_hourly_bars": 1440
+    },
+    "context": {
+      "normalization": "N0_ENDPOINT_ANCHORED_V1",
+      "represented_hours": 64,
+      "retained_predecessor_hours": 1,
+      "raw_window_hours": 65,
+      "feature_width": 320
+    },
+    "fit": {
+      "consequence_hour_start_utc": "2020-01-06T09:00:00Z",
+      "consequence_hour_end_utc": "2020-01-31T23:00:00Z",
+      "expected_decisions": 615
+    },
+    "validation": {
+      "consequence_hour_start_utc": "2020-02-01T00:00:00Z",
+      "consequence_hour_end_utc": "2020-02-28T23:00:00Z",
+      "expected_decisions": 672,
+      "calendar_days": 28
+    }
+  },
+  "screen": {
+    "ridge_lambdas": [
+      0.1,
+      1.0,
+      10.0,
+      100.0,
+      1000.0
+    ],
+    "reference_lambda": 1.0,
+    "candidate_lambdas": [
+      0.1,
+      10.0,
+      100.0,
+      1000.0
+    ],
+    "feature_standardization": "January fit mean/population-std; drop std<=1e-12; freeze for February",
+    "control_type": "shuffle_January_target_only_with_no_fixed_points",
+    "control_seeds": [
+      21001,
+      21002,
+      21003,
+      21004,
+      21005,
+      21006,
+      21007,
+      21008
+    ],
+    "same_target_permutation_across_lambdas": true,
+    "candidate_conditions": [
+      "true_corr_LCB>0",
+      "true_minus_median_shuffle_corr_LCB>0",
+      "true_minus_lambda1_corr_LCB>0"
+    ],
+    "candidate_selection": "eligible lambda with highest point true correlation; exact tie chooses smallest abs(log10(lambda/reference)); remaining tie chooses smaller lambda"
+  },
+  "uncertainty_protocol": {
+    "bootstrap_replicates": 4096,
+    "bootstrap_seed": 22001,
+    "lower_bound_order_index_zero_based": 204,
+    "method": "paired circular moving-block bootstrap over common February hourly indices",
+    "block_length_hours": 48,
+    "sample_length_hours": 672,
+    "same_resamples_across_all_lambdas_and_controls": true
+  },
+  "implementation_gate": {
+    "full_repository_suite_must_pass_at_exact_commit": true,
+    "result_schema": "cb16.result.v2"
+  },
+  "no_rescue": [
+    "no_lambda_grid_change",
+    "no_fit_window_change",
+    "no_validation_window_change",
+    "no_context_or_target_change",
+    "no_control_seed_change",
+    "no_bootstrap_change",
+    "no_post_result_candidate_rule_change",
+    "no_March_read",
+    "no_final_holdout_read"
+  ]
+}
