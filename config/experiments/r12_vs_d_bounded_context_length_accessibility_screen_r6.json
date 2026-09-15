@@ -1,0 +1,262 @@
+{
+  "schema": "cb16.experiment.v2",
+  "experiment_id": "r12.vs_d.bounded_context_length_accessibility_screen.r6",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "experiment_role": "SCREENING",
+  "parent_experiment_ids": [
+    "r12.vs_d.historical_market_information_canary.r0",
+    "r12.vs_d.evaluation_adapter_transfer_diagnostic.r1",
+    "r12.vs_d.objective_balance_entropy_gradient_diagnostic.r2a",
+    "r12.vs_d.representation_accessibility_diagnostic.r3",
+    "r12.vs_d.bounded_nonlinear_accessibility_diagnostic.r4",
+    "r12.vs_d.bounded_horizon_accessibility_screen.r5"
+  ],
+  "tested_object": "Relative one-hour linear accessibility from N0 contexts of 16h, 32h, 64h, and 128h under one fixed ridge probe family on common timestamps",
+  "claim_scope": {
+    "data": "BTCUSDT_2020-01_2020-02_adaptively_reused_development_only",
+    "target": "one_hour_arithmetic_return_close_over_open_minus_1",
+    "normalization": "N0_ENDPOINT_ANCHORED_V1",
+    "context_lengths_hours": [
+      16,
+      32,
+      64,
+      128
+    ],
+    "reference_context_hours": 64,
+    "probe": "closed_form_ridge_lambda_1",
+    "common_fit": "January_615_decisions",
+    "common_validation": "February_672_decisions",
+    "march_read_forbidden": true,
+    "final_holdout_access_forbidden": true
+  },
+  "research_series_policy": {
+    "series_id": "r12.vs_d.historical_development",
+    "parent_results_inspected": true,
+    "freshness_status": "SCREENING_ADAPTIVELY_REUSED_JAN_FEB_AFTER_R5",
+    "adaptation_rationale": "R5 found no longer-horizon candidate and the 1h reference remained the strongest point estimate; R6 screens whether the fixed 64h state window itself is a poor MVP choice before changing model machinery",
+    "new_experiment_id_does_not_reset_adaptation_history": true,
+    "screening_is_not_qualification": true,
+    "if_candidate_found": "promote only the named context-length candidate to a new separately preregistered qualification/transfer experiment",
+    "if_no_candidate_found": "do_not_rescue_R6; no screened context length receives promotion",
+    "march_read_forbidden": true,
+    "final_holdout_access_forbidden": true
+  },
+  "data_exposure": {
+    "dataset_or_split_id": "BTCUSDT_2020_JAN_FEB_COMMON_CONTEXT_SCREEN",
+    "roles_seen": [
+      "training",
+      "diagnostic",
+      "screening"
+    ],
+    "prior_experiment_ids": [
+      "r12.vs_d.historical_market_information_canary.r0",
+      "r12.vs_d.objective_balance_entropy_gradient_diagnostic.r2a",
+      "r12.vs_d.representation_accessibility_diagnostic.r3",
+      "r12.vs_d.bounded_nonlinear_accessibility_diagnostic.r4",
+      "r12.vs_d.bounded_horizon_accessibility_screen.r5"
+    ],
+    "human_or_model_result_exposure": true,
+    "adaptations_made_after_exposure": [
+      "R6 context-length set and screening question selected after R3-R5 one-hour/horizon diagnostics"
+    ],
+    "freshness_class": "ADAPTIVELY_REUSED"
+  },
+  "claims": [
+    {
+      "claim_id": "C_CONTEXT_LENGTH_SCREENING_PRIORITY",
+      "vv_classification": "NOT_APPLICABLE",
+      "tested_object": "bounded comparative screen of N0 context lengths 16h/32h/128h against the 64h reference using a fixed one-hour ridge probe",
+      "claim_domain": "representation/context_length_screening",
+      "claim_scope": {
+        "candidate_contexts_hours": [
+          16,
+          32,
+          128
+        ],
+        "reference_context_hours": 64,
+        "validation": "adaptively_reused_February_common_window"
+      },
+      "estimand": {
+        "primary": "for each candidate context: February Pearson correlation, true-minus-median-shuffle correlation, and paired correlation gain over the 64h reference under common resamples",
+        "candidate_rule": "all three one-sided bootstrap lower bounds > 0; among eligible contexts choose highest point true correlation, exact tie to shorter context",
+        "unit": "dependence-aware 48h moving blocks over the common February hourly sequence"
+      },
+      "estimator": "context-specific January feature standardization + closed-form ridge(lambda=1), February Pearson correlation, eight matched shuffled-January-target controls, paired circular moving-block bootstrap",
+      "replication_unit": "48h circular moving block; 4096 bootstrap replicates are uncertainty draws, not independent scientific replicates",
+      "validity_prerequisites": [
+        "same common first-consequence timestamps for all context lengths",
+        "same one-hour target timestamps for all context lengths",
+        "each N0 context uses only hours strictly before consequence hour",
+        "same January target permutation for a given control seed across all context lengths",
+        "same bootstrap resamples across all contexts and controls",
+        "no February fitting or context selection during fitting"
+      ],
+      "credible_alternatives": [
+        "apparent context gain from sample-window differences is controlled by common timestamps",
+        "apparent predictability from fitting noise is characterized by matched shuffled-January-target controls",
+        "feature dimension changes with context length; fixed ridge lambda does not resolve dimension-dependent regularization and any candidate requires follow-up",
+        "adaptive reuse/multiplicity remains unresolved and therefore screening cannot be confirmatory"
+      ],
+      "authority_scope": [
+        "may prioritize one screened context length as a candidate for a new formal follow-up",
+        "may conclude that none of the screened alternative context lengths earned screening promotion"
+      ],
+      "promotion_scope": [
+        "PROMOTE_CONTEXT16_CANDIDATE_HYPOTHESIS",
+        "PROMOTE_CONTEXT32_CANDIDATE_HYPOTHESIS",
+        "PROMOTE_CONTEXT128_CANDIDATE_HYPOTHESIS"
+      ],
+      "invalid_inferences": [
+        "does_not_qualify_any_context_for_historical_market_information",
+        "does_not_make_screening_confirmatory",
+        "does_not_establish_profitability_or_account_economics",
+        "does_not_prove_unscreened_context_lengths_fail",
+        "does_not_prove_context_length_is_the_unique_bottleneck",
+        "does_not_authorize_final_holdout"
+      ],
+      "composition_dependencies": [
+        {
+          "type": "validity_dependency",
+          "ref": "N0 causal context construction"
+        },
+        {
+          "type": "validity_dependency",
+          "ref": "common one-hour target chronology"
+        },
+        {
+          "type": "transfer_assumption",
+          "ref": "64h context may be an arbitrary MVP timescale"
+        }
+      ]
+    }
+  ],
+  "gate_mapping": {
+    "C_CONTEXT_LENGTH_SCREENING_PRIORITY": [
+      "G_CONTEXT_SCREEN_CANDIDATE"
+    ]
+  },
+  "allowed_promotion_decisions": [
+    "NO_PROMOTION",
+    "PROMOTE_CONTEXT16_CANDIDATE_HYPOTHESIS",
+    "PROMOTE_CONTEXT32_CANDIDATE_HYPOTHESIS",
+    "PROMOTE_CONTEXT128_CANDIDATE_HYPOTHESIS"
+  ],
+  "data": {
+    "source_root": "/cb16/raw/klines_1m/BTCUSDT",
+    "manifest_path": "/cb16/raw/DOWNLOAD_MANIFEST.json",
+    "require_manifest_final_holdout_accessed_false": true,
+    "allowed_archives": [
+      {
+        "name": "BTCUSDT-1m-2020-01.zip",
+        "sha256": "b4e13ea185ba96c413ac9167cfbb6e238eb5eae119a7a77f41f4c61c5e099d03",
+        "expected_rows": 44640
+      },
+      {
+        "name": "BTCUSDT-1m-2020-02.zip",
+        "sha256": "f32b20168ea590cd7d04a2995bc5ec500ea06331c8174f7fd14f29c1078e5ed2",
+        "expected_rows": 41760
+      }
+    ],
+    "forbidden_reads": [
+      "BTCUSDT-1m-2020-03.zip",
+      "any_final_holdout_archive"
+    ],
+    "hourly_aggregation": {
+      "timezone": "UTC",
+      "require_exactly_60_contiguous_1m_rows_per_hour": true,
+      "expected_hourly_bars": 1440
+    },
+    "contexts": [
+      {
+        "represented_hours": 16,
+        "raw_window_hours": 17,
+        "feature_width": 80
+      },
+      {
+        "represented_hours": 32,
+        "raw_window_hours": 33,
+        "feature_width": 160
+      },
+      {
+        "represented_hours": 64,
+        "raw_window_hours": 65,
+        "feature_width": 320
+      },
+      {
+        "represented_hours": 128,
+        "raw_window_hours": 129,
+        "feature_width": 640
+      }
+    ],
+    "common_fit": {
+      "consequence_hour_start_utc": "2020-01-06T09:00:00Z",
+      "consequence_hour_end_utc": "2020-01-31T23:00:00Z",
+      "expected_decisions": 615
+    },
+    "common_validation": {
+      "consequence_hour_start_utc": "2020-02-01T00:00:00Z",
+      "consequence_hour_end_utc": "2020-02-28T23:00:00Z",
+      "expected_decisions": 672,
+      "calendar_days": 28
+    }
+  },
+  "screen": {
+    "context_lengths_hours": [
+      16,
+      32,
+      64,
+      128
+    ],
+    "reference_context_hours": 64,
+    "target_formula": "close[first_consequence_hour] / open[first_consequence_hour] - 1.0; every N0 state uses only hours strictly before first_consequence_hour",
+    "ridge_lambda": 1.0,
+    "feature_standardization": "context-specific January common-fit mean/population-std; drop std<=1e-12; freeze for February",
+    "control_type": "shuffle_January_target_only_with_no_fixed_points",
+    "control_seeds": [
+      18001,
+      18002,
+      18003,
+      18004,
+      18005,
+      18006,
+      18007,
+      18008
+    ],
+    "same_target_permutation_across_contexts": true,
+    "candidate_contexts_hours": [
+      16,
+      32,
+      128
+    ],
+    "candidate_conditions": [
+      "true_corr_LCB>0",
+      "true_minus_median_shuffle_corr_LCB>0",
+      "true_minus_64h_corr_LCB>0"
+    ],
+    "candidate_selection": "eligible context with highest point true correlation; exact tie selects shorter context"
+  },
+  "uncertainty_protocol": {
+    "bootstrap_replicates": 4096,
+    "bootstrap_seed": 19001,
+    "lower_bound_order_index_zero_based": 204,
+    "method": "paired circular moving-block bootstrap over common February hourly indices",
+    "block_length_hours": 48,
+    "sample_length_hours": 672,
+    "same_resamples_across_all_contexts_and_controls": true
+  },
+  "implementation_gate": {
+    "full_repository_suite_must_pass_at_exact_commit": true,
+    "result_schema": "cb16.result.v2"
+  },
+  "no_rescue": [
+    "no_context_set_change",
+    "no_target_formula_change",
+    "no_common_window_change",
+    "no_ridge_lambda_change",
+    "no_control_seed_change",
+    "no_bootstrap_change",
+    "no_post_result_candidate_rule_change",
+    "no_March_read",
+    "no_final_holdout_read"
+  ]
+}
