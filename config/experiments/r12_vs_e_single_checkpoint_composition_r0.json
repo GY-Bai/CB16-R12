@@ -1,0 +1,361 @@
+{
+  "schema": "cb16.experiment.v2",
+  "experiment_id": "r12.vs_e.single_checkpoint_composition.r0",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "experiment_role": "QUALIFICATION",
+  "parent_experiment_ids": [
+    "r12.vs_c.joint_confirmation.r3"
+  ],
+  "tested_object": "One Actor/Critic checkpoint trained by a frozen interleaved Task-A-positive then Task-B-positive update schedule, evaluated for simultaneous retention of both controlled abilities across the final task switch",
+  "claim_scope": {
+    "domain": "controlled_single_checkpoint_composition",
+    "task_a": "account-conditioned maintenance",
+    "task_b": "delayed-consequence credit",
+    "one_checkpoint": true,
+    "historical_market_data_used": false,
+    "historical_profitability_claim": false,
+    "continuing_account_composition_claim": false
+  },
+  "research_series_policy": {
+    "series_id": "r12.vs_e.controlled_composition",
+    "rationale": "VS-C R3 confirmed Task A and Task B under separate task-specific learner instances; canonical authority explicitly states that R3 did not establish one checkpoint simultaneously holding both abilities, multitask coexistence, retention, or continuing-account composition.",
+    "if_pass": "promote only single-checkpoint synthetic dual-task composition to a later separately preregistered controlled integration experiment",
+    "if_fail": "do not rescue schedule/budget/gates under R0; open a new identity only for a new composition hypothesis",
+    "does_not_reinterpret_vs_c_r3": true,
+    "does_not_consume_vs_d_historical_data": true
+  },
+  "data_exposure": {
+    "dataset_or_split_id": "SYNTHETIC_VS_C_TASK_A_B_V1",
+    "roles_seen": [
+      "controlled_training",
+      "controlled_confirmation"
+    ],
+    "prior_experiment_ids": [
+      "r12.vs_c.joint_confirmation.r3"
+    ],
+    "human_or_model_result_exposure": true,
+    "adaptations_made_after_exposure": [
+      "VS-E composition claim selected because current authority records that VS-C R3 used separate task-specific training instances and did not establish one-checkpoint coexistence"
+    ],
+    "freshness_class": "REUSED_SYNTHETIC_TASK_DEFINITIONS_WITH_FRESH_COMPOSITION_SEEDS"
+  },
+  "claims": [
+    {
+      "claim_id": "C_SINGLE_CHECKPOINT_DUAL_TASK_COMPOSITION",
+      "vv_classification": "VALIDATION",
+      "tested_object": "A single interleaved OnPolicyLearner checkpoint with exact R3 authority/optimizer and fresh seeds",
+      "claim_domain": "controlled_learning_composition",
+      "claim_scope": {
+        "schedule": "256 cycles; Task A update then Task B update in every cycle; 512 total learner generations",
+        "positive_arm": "Task A positive relation + Task B true delayed consequence",
+        "control_arm": "Task A account-observation zero relation + Task B shuffled action-to-consequence relation",
+        "evaluation": "true Task A and true Task B environments at PRE, after final A update, and after final B update",
+        "fresh_seeds": "2501..2508"
+      },
+      "estimand": {
+        "primary": [
+          "positive_joint_seed_pass_count_after_final_A",
+          "positive_joint_seed_pass_count_after_final_B",
+          "control_joint_seed_pass_count_after_final_A",
+          "control_joint_seed_pass_count_after_final_B"
+        ],
+        "supporting": [
+          "final_Task_A_R3_aggregate_gate",
+          "final_Task_B_R3_aggregate_gate"
+        ],
+        "gate": "both reused R3 final aggregate gates pass; positive joint pass count >=7/8 at both final-switch checkpoints; control joint pass count <=1/8 at both checkpoints",
+        "unit": "fresh paired learner seed"
+      },
+      "estimator": "Eight fresh paired seeds; one positive and one dual-control learner per seed from bitwise-identical initialization; frozen deterministic adapter evaluation",
+      "replication_unit": "paired learner seed; task batches and trajectories within a seed are not independent scientific replicates",
+      "validity_prerequisites": [
+        "exact R3 authority, optimizer, Task A, Task B, and per-task gate semantics",
+        "fresh seeds do not overlap R0-R3 seed sets",
+        "positive/control learners start bitwise-identically per seed",
+        "single learner instance receives both task updates without reset or parameter copy between tasks",
+        "global generation id increases monotonically across all 512 updates",
+        "evaluation does not update parameters",
+        "no historical data read"
+      ],
+      "credible_alternatives": [
+        "PASS establishes only coexistence for these two synthetic tasks and schedule, not continuing-account historical learning",
+        "FAIL may be schedule/interference/capacity specific and does not falsify the whole learner family",
+        "R3 separate-task confirmation remains valid regardless of VS-E outcome",
+        "direction entropy coefficient 0.005 is inherited for comparability and is not promoted to production authority"
+      ],
+      "authority_scope": [
+        "may qualify one-checkpoint coexistence of the exact two controlled abilities under the frozen interleaved schedule",
+        "may permit a later controlled integration/composition experiment"
+      ],
+      "promotion_scope": [
+        "PROMOTE_SINGLE_CHECKPOINT_DUAL_TASK_COMPOSITION"
+      ],
+      "invalid_inferences": [
+        "does_not_establish_historical_market_information",
+        "does_not_establish_profitability",
+        "does_not_establish_continuing_account_composition",
+        "does_not_establish_multitask_generalization_beyond_Task_A_and_Task_B",
+        "does_not_promote_entropy_coefficient_to_architecture_authority",
+        "does_not_override_any_VS_D_result"
+      ],
+      "composition_dependencies": [
+        {
+          "type": "validity_dependency",
+          "ref": "VS-C R3 Task A/Task B environment and learner semantics"
+        },
+        {
+          "type": "validity_dependency",
+          "ref": "single learner identity and uninterrupted optimizer state across interleaved updates"
+        },
+        {
+          "type": "promotion_prerequisite",
+          "ref": "both R3-compatible per-task aggregate gates at final checkpoint"
+        }
+      ]
+    }
+  ],
+  "gate_mapping": {
+    "C_SINGLE_CHECKPOINT_DUAL_TASK_COMPOSITION": [
+      "G_FINAL_TASK_A_R3_COMPATIBLE",
+      "G_FINAL_TASK_B_R3_COMPATIBLE",
+      "G_SINGLE_CHECKPOINT_SWITCH_COEXISTENCE"
+    ]
+  },
+  "allowed_promotion_decisions": [
+    "NO_PROMOTION",
+    "PROMOTE_SINGLE_CHECKPOINT_DUAL_TASK_COMPOSITION"
+  ],
+  "parent_authority": {
+    "spec_path": "config/experiments/r12_vs_c_joint_confirmation_r3.json",
+    "raw_spec_sha256": "e08a8c10d417d34600c97599b8f149bf4092cbe683da7edfa5ad32b7740cb56d",
+    "formal_run_id": 34908126391,
+    "formal_commit": "465c8c916d0f67472b1575e177e8e24b1e29a4cf",
+    "artifact_digest": "sha256:7b10221a4dea2cd245e2a00a947efb97a4894f3d6b1ee1586c7fda31cde6a276",
+    "interpretation": "R3 joint means joint adjudication of separate task-specific training instances; it does not establish this R0 composition claim."
+  },
+  "authority": {
+    "context_length": 64,
+    "normalization": "N0_ENDPOINT_ANCHORED_V1",
+    "sensory_seed": 12012,
+    "sensory_z_dim": 32,
+    "actor_hidden_width": 64,
+    "actor_hidden_layers": 2,
+    "device": "cpu",
+    "torch_num_threads_per_worker": 1,
+    "max_seed_workers": 4,
+    "deterministic_algorithms": true,
+    "execution_engine": "vectorized-batched-v1",
+    "nominal_exposure_budget": 1.0,
+    "hard_exposure_limit": 1.0
+  },
+  "optimizer": {
+    "actor": "Adam",
+    "actor_lr": 0.001,
+    "critic": "Adam",
+    "critic_lr": 0.001,
+    "discount_factor": 1.0,
+    "replay": false,
+    "direction_entropy_coefficient": 0.005,
+    "direction_entropy_target": "categorical_direction_only",
+    "beta_risk_entropy_bonus": 0.0
+  },
+  "paired_seeds": [
+    2501,
+    2502,
+    2503,
+    2504,
+    2505,
+    2506,
+    2507,
+    2508
+  ],
+  "task_a": {
+    "name": "ACCOUNT_CONDITIONED_MAINTENANCE_JOINT_CONFIRMATION",
+    "generations": 256,
+    "trajectory_length": 1,
+    "batch_trajectories": 900,
+    "positive_per_actual_account": 300,
+    "control_per_actual_observed_pair": 100,
+    "market": "identical flat OHLCV: prices 100, volume 10, one predecessor plus 64 represented bars",
+    "initial_truths": [
+      {
+        "name": "SHORT_HALF",
+        "equity": 1000.0,
+        "quantity": -5.0,
+        "mark_price": 100.0,
+        "desired_target_exposure": -0.5
+      },
+      {
+        "name": "FLAT",
+        "equity": 1000.0,
+        "quantity": 0.0,
+        "mark_price": 100.0,
+        "desired_target_exposure": 0.0
+      },
+      {
+        "name": "LONG_HALF",
+        "equity": 1000.0,
+        "quantity": 5.0,
+        "mark_price": 100.0,
+        "desired_target_exposure": 0.5
+      }
+    ],
+    "physics": {
+      "open_next": 100.0,
+      "close_next": 100.0,
+      "proportional_friction_kappa": 0.1,
+      "permission_bisection_iterations": 24
+    },
+    "positive_training_observation": "policy observes the true AccountState derived from each actual AccountTruth",
+    "control": {
+      "name": "ACCOUNT_OBSERVATION_ZERO_RELATION",
+      "construction": "every actual-account x observed-account pair appears equally; actual and observed account marginals are balanced and exactly independent",
+      "reward_physics": "reward always comes from actual AccountTruth and sampled action; only policy-observed AccountState is zero-relation"
+    },
+    "evaluation": {
+      "adapter": "deterministic_argmax_direction_plus_beta_mean",
+      "uses_true_account_state": true,
+      "metrics": [
+        "direction_correct_count",
+        "target_exposure_mae",
+        "mean_one_step_log_growth",
+        "all_flat_post",
+        "pre_to_post_target_mae_improvement"
+      ]
+    },
+    "seed_pass_gate": {
+      "direction_correct_count_min": 3,
+      "target_exposure_mae_max": 0.15
+    }
+  },
+  "task_b": {
+    "name": "DELAYED_CONSEQUENCE_CREDIT",
+    "generations": 256,
+    "batch_trajectories": 128,
+    "trajectory_length": 2,
+    "cue_market": {
+      "endpoint_price": 100.0,
+      "represented_log_ramp_magnitude": 0.04,
+      "volume": 10.0,
+      "up": "represented closes rise exponentially from 100*exp(-0.04) to 100",
+      "down": "represented closes fall exponentially from 100*exp(+0.04) to 100",
+      "open": "previous represented close; first represented open equals predecessor close",
+      "high": "max(open,close)*1.001",
+      "low": "min(open,close)/1.001"
+    },
+    "step_0": {
+      "initial_truth": {
+        "equity": 1000.0,
+        "quantity": 0.0,
+        "mark_price": 100.0
+      },
+      "open_next": 100.0,
+      "close_next": 100.0,
+      "proportional_friction_kappa": 0.0,
+      "required_immediate_reward": 0.0
+    },
+    "step_1": {
+      "market": "neutral flat OHLCV at price 100 and volume 10",
+      "up_gap_open_and_close": 110.0,
+      "down_gap_open_and_close": 90.0,
+      "description": "the position created by action_0 remains active through the gap before action_1 executes; with zero friction and close_2=open_2, action_1 has no contemporaneous economic effect"
+    },
+    "positive_training": "use each trajectory's own delayed step_1 log-equity reward",
+    "control": {
+      "name": "SHUFFLED_ACTION_TO_CONSEQUENCE",
+      "construction": "within every generation, preserve all collected states/actions and the multiset of delayed step_1 rewards, but assign delayed rewards through a deterministic seed-and-generation-specific non-identity permutation before learner update",
+      "fixed_points_allowed": false
+    },
+    "evaluation": {
+      "adapter": "deterministic_argmax_direction_plus_beta_mean",
+      "true_unshuffled_environment": true,
+      "metrics": [
+        "up_direction_correct",
+        "down_direction_correct",
+        "up_requested_risk",
+        "down_requested_risk",
+        "mean_true_delayed_log_growth",
+        "pre_to_post_true_delayed_log_growth_improvement",
+        "direction_probability_margin"
+      ]
+    },
+    "seed_pass_gate": {
+      "up_direction": "LONG",
+      "down_direction": "SHORT",
+      "up_requested_risk_min": 0.5,
+      "down_requested_risk_min": 0.5,
+      "mean_true_delayed_log_growth_min": 0.03
+    }
+  },
+  "training_schedule": {
+    "cycles": 256,
+    "updates_per_cycle": [
+      "TASK_A",
+      "TASK_B"
+    ],
+    "total_updates": 512,
+    "task_a_updates": 256,
+    "task_b_updates": 256,
+    "task_a_mode_positive": "positive",
+    "task_b_mode_positive": "positive",
+    "task_a_mode_control": "control",
+    "task_b_mode_control": "control",
+    "parameter_reset_between_updates": false,
+    "optimizer_reset_between_updates": false,
+    "evaluation_checkpoints": [
+      "PRE",
+      "AFTER_FINAL_TASK_A_UPDATE",
+      "AFTER_FINAL_TASK_B_UPDATE"
+    ],
+    "learner_generation_id": "global monotonic 0..511; Task A update in cycle c consumes generation 2c and Task B update consumes generation 2c+1",
+    "task_local_generation_index": "cycle index 0..255 is used for the inherited R3 task-specific collection RNG and Task-B shuffled-consequence permutation RNG; this preserves the parent per-task RNG semantics while the learner generation remains global"
+  },
+  "reused_r3_final_gates": {
+    "task_a": {
+      "positive_seed_pass_count_min": 7,
+      "control_seed_pass_count_max": 1,
+      "paired_positive_target_mae_strictly_better_than_control_count_min": 7,
+      "positive_median_pre_to_post_target_mae_improvement_min": 0.15
+    },
+    "task_b": {
+      "positive_seed_pass_count_min": 7,
+      "control_seed_pass_count_max": 1,
+      "paired_positive_growth_minus_control_count_min": 7,
+      "paired_positive_growth_minus_control_min": 0.02,
+      "positive_median_pre_to_post_true_delayed_log_growth_improvement_min": 0.02
+    },
+    "evaluation_checkpoint": "AFTER_FINAL_TASK_B_UPDATE for both Task A and Task B; PRE-to-POST improvements are PRE -> AFTER_FINAL_TASK_B_UPDATE"
+  },
+  "composition_gate": {
+    "positive_joint_seed_pass_count_after_final_A_min": 7,
+    "positive_joint_seed_pass_count_after_final_B_min": 7,
+    "control_joint_seed_pass_count_after_final_A_max": 1,
+    "control_joint_seed_pass_count_after_final_B_max": 1,
+    "require_final_task_a_r3_aggregate_gate": true,
+    "require_final_task_b_r3_aggregate_gate": true,
+    "joint_seed_definition": "a seed is joint-pass at a checkpoint iff the same learner checkpoint passes both inherited R3 per-seed Task A and Task B gates"
+  },
+  "implementation_gate": {
+    "full_repository_suite_must_pass_at_exact_commit": true,
+    "result_schema": "cb16.result.v2"
+  },
+  "runtime": {
+    "device": "cpu",
+    "torch_num_threads_per_worker": 1,
+    "max_seed_workers": 4,
+    "deterministic_algorithms": true,
+    "execution_engine": "vectorized-batched-v1-compatible"
+  },
+  "no_rescue": [
+    "no_seed_change",
+    "no_cycle_or_update_order_change",
+    "no_extra_generations",
+    "no_task_batch_change",
+    "no_task_environment_change",
+    "no_optimizer_or_entropy_change",
+    "no_gate_change",
+    "no_control_change",
+    "no_checkpoint_selection_after_results",
+    "no_historical_data_read"
+  ]
+}
