@@ -418,6 +418,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-d-bounded-ridge-regularization-accessibility-screen-r8@v1": {
+      "description": "R12 VS-D R8 bounded ridge-regularization SCREENING. Reads only BTCUSDT Jan-Feb 2020, holds 64h N0 / 1h target fixed, compares ridge lambda 0.1/1/10/100/1000 with matched shuffled-January-target controls and paired 48h circular moving-block bootstrap. Screening only; March and final holdout forbidden. Emits cb16.result.v2.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.bounded_ridge_regularization_accessibility_screen_r8"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-d-ridge-r8-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-d-ridge-r8-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
