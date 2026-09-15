@@ -176,6 +176,9 @@ REPORT_CHARS_FIX = 500
 #: it does not depend on the agent ending its reply a particular way, and it
 #: cannot be broken by how the transport escapes newlines.
 REPORT_FILE_NAME = "BUILD_REPORT.md"
+#: The session runner records each turn as a document next to the report, so the
+#: dispatcher reads a file instead of decoding a line of stdout.
+SESSION_RESULT_FILE = "SESSION_RESULT.json"
 
 
 # --------------------------------------------------------------------------
@@ -477,6 +480,11 @@ def parse_trigger(
 # --------------------------------------------------------------------------
 # Trusted metadata
 # --------------------------------------------------------------------------
+
+try:  # optional: use a real parser when the host has one
+    import yaml as _yaml
+except ImportError:  # pragma: no cover - depends on the host
+    _yaml = None
 
 _METADATA_FENCE = re.compile(r"^```+cb16[ \t]*$", re.MULTILINE)
 
@@ -816,9 +824,27 @@ DEFAULT_PROJECT_STORE = "/cb16/store"
 def _yaml_block(text: str, key: str) -> Optional[Dict[str, str]]:
     """Read the indented children of one top-level key.
 
-    Deliberately tiny: the dispatcher stays dependency free, and the only file
-    read this way is the DSH settings file, whose shape is stable.
+    A real parser is used whenever the host has one, because hand-reading YAML
+    is the same mistake as hand-reading any other structured format: quoting,
+    comments, anchors and block scalars all have rules, and a subset parser gets
+    them subtly wrong. The tiny fallback below exists only so the dispatcher
+    keeps running if PyYAML is absent, and it is not the preferred path.
     """
+
+    if _yaml is not None:
+        try:
+            document = _yaml.safe_load(text)
+        except Exception:
+            document = None
+        if isinstance(document, dict):
+            block = document.get(key)
+            if isinstance(block, dict):
+                return {
+                    str(name): str(value)
+                    for name, value in block.items()
+                    if value is not None
+                }
+            return None
 
     lines = text.splitlines()
     start = None
@@ -1313,17 +1339,25 @@ def write_task_packet(
 def collect_changed_files(worktree: Path) -> List[str]:
     # -uall lists every untracked file individually; without it a brand-new
     # directory would be reported as a single `path/` entry.
-    proc = git(worktree, "status", "--porcelain", "-uall")
+    #
+    # -z is what makes the names trustworthy. The human-readable form quotes any
+    # path containing a space, a quote or a non-ASCII byte and octal-escapes the
+    # bytes inside the quotes, and stripping the quotes by hand - as this used to
+    # do - yields mojibake rather than the name. NUL separation has no quoting
+    # and no escaping, so the bytes come back exactly as the filesystem has them.
+    proc = git(worktree, "status", "--porcelain", "-z", "-uall")
     if proc.returncode != 0:
         raise ExecutionBlocked("cannot read worktree status", detail=bounded(proc.stderr))
     changed: List[str] = []
-    for line in proc.stdout.splitlines():
-        if not line.strip():
+    for entry in proc.stdout.split("\0"):
+        if not entry.strip():
             continue
-        path = line[3:].strip()
+        # Each record is `XY <path>`; a rename adds the original path as the
+        # next NUL-separated field, which -z puts after the new one.
+        path = entry[3:]
         if " -> " in path:
             path = path.split(" -> ", 1)[1]
-        changed.append(path.strip('"'))
+        changed.append(path)
     return sorted(changed)
 
 
@@ -2004,8 +2038,36 @@ def branch_existed_remotely(repo: Path, branch: str) -> bool:
     )
 
 
+def session_result_path(worktree: Path) -> Path:
+    return worktree / ".cb16" / SESSION_RESULT_FILE
+
+
+def read_session_result(worktree: Path) -> Optional[Dict[str, Any]]:
+    """Read the turn record the runner wrote, or None if it did not.
+
+    The document is the primary channel. Decoding stdout is kept only as a
+    fallback for a runner that predates the file, because a JSON line on stdout
+    is the transport, and the transport is not the right place to keep state.
+    """
+
+    try:
+        payload = json.loads(session_result_path(worktree).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) and "session_id" in payload else None
+
+
+def clear_session_result(worktree: Path) -> None:
+    """Remove the previous turn's record so a missing one is detectable."""
+
+    try:
+        session_result_path(worktree).unlink()
+    except FileNotFoundError:
+        pass
+
+
 def parse_session_payload(stdout: str) -> Optional[Dict[str, Any]]:
-    """Read the last JSON object the session runner printed."""
+    """Read the last JSON object the session runner printed (fallback only)."""
 
     for line in reversed((stdout or "").splitlines()):
         candidate = line.strip()
@@ -2047,6 +2109,7 @@ def invoke_dsh_session(
     else:
         raise ExecutionBlocked(f"unknown session mode: {mode}")
 
+    clear_session_result(worktree)
     argv = [dsh_bin, "--profile", profile, *identity, "--output-format", "json", prompt]
     try:
         proc = subprocess.run(
@@ -2068,7 +2131,8 @@ def invoke_dsh_session(
             timed_out=True,
             note="session-timeout",
         )
-    payload = parse_session_payload(proc.stdout or "")
+    # The document first; stdout only if the runner did not write one.
+    payload = read_session_result(worktree) or parse_session_payload(proc.stdout or "")
     return RunResult(
         exit_code=proc.returncode,
         stdout=proc.stdout or "",
@@ -2757,6 +2821,13 @@ def dispatch(
             # The worktree outlives the round, so a stale report would be read
             # back as this round's. Clear it before the turn runs.
             clear_agent_report(worktree)
+        else:
+            # Same reasoning for the Science lane: a worktree is reused when the
+            # same commit is re-run, so a previous run's result package would
+            # otherwise be published as this run's output.
+            if lane_result_dir.exists():
+                shutil.rmtree(lane_result_dir, ignore_errors=True)
+            lane_result_dir.mkdir(parents=True, exist_ok=True)
 
         if dry_run and lane == LANE_BUILDER:
             run_result = run_dry_run(worktree, spec, result_dir=lane_result_dir)

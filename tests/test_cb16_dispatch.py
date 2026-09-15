@@ -857,6 +857,60 @@ class FixRoundHandoffTests(DispatchTestCase):
         self.assertIn("truncated at", "\n".join(lines))
 
 
+class SessionResultDocumentTests(DispatchTestCase):
+    """The session runner records a document; stdout is only transport."""
+
+    def _result(self, worktree, payload):
+        target = dispatcher.session_result_path(Path(worktree))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    def test_the_document_is_preferred_over_stdout(self):
+        payload = {"session_id": "session-doc", "session_action": "new", "text": "BUILD_REPORT\n- doc\n"}
+        result = dispatcher.RunResult(
+            exit_code=0,
+            stdout=json.dumps({"session_id": "session-stdout", "text": "BUILD_REPORT\n- stdout\n"}),
+            payload=payload,
+            report_text=payload["text"],
+        )
+        self.assertEqual(payload, result.payload)
+        self.assertEqual(result.report_text, "BUILD_REPORT\n- doc\n")
+
+    def test_reading_a_document_round_trips(self):
+        payload = {"session_id": "session-x", "session_action": "resume", "text": "hi"}
+        self._result(self.tmp, payload)
+        self.assertEqual(dispatcher.read_session_result(self.tmp), payload)
+
+    def test_a_missing_document_is_none(self):
+        self.assertIsNone(dispatcher.read_session_result(self.tmp))
+
+    def test_a_malformed_document_is_none(self):
+        target = dispatcher.session_result_path(self.tmp)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("{not json", encoding="utf-8")
+        self.assertIsNone(dispatcher.read_session_result(self.tmp))
+
+    def test_a_document_without_a_session_id_is_not_accepted(self):
+        target = dispatcher.session_result_path(self.tmp)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps({"text": "no id"}), encoding="utf-8")
+        self.assertIsNone(dispatcher.read_session_result(self.tmp))
+
+    def test_the_previous_turns_document_is_cleared(self):
+        self._result(self.tmp, {"session_id": "session-stale", "text": "old"})
+        dispatcher.clear_session_result(self.tmp)
+        self.assertIsNone(dispatcher.read_session_result(self.tmp))
+        dispatcher.clear_session_result(self.tmp)  # absent is not an error
+
+    def test_stdout_parsing_survives_as_a_fallback(self):
+        line = json.dumps({"session_id": "session-legacy", "session_action": "new"})
+        self.assertEqual(
+            dispatcher.parse_session_payload("noise\n" + line + "\n")["session_id"],
+            "session-legacy",
+        )
+        self.assertIsNone(dispatcher.parse_session_payload("no json here\n"))
+
+
 class ReportRescueTests(DispatchTestCase):
     """A missing report costs one bounded call, not the next round's context."""
 

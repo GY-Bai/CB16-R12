@@ -1,0 +1,136 @@
+{
+  "attribution_gate": {
+    "baseline_control_seed_pass_count_max": 2,
+    "entropy_control_seed_pass_count_max": 2,
+    "entropy_minus_baseline_positive_pass_count_min": 3,
+    "entropy_positive_seed_pass_count_min": 6
+  },
+  "authority": {
+    "actor_hidden_layers": 2,
+    "actor_hidden_width": 64,
+    "context_length": 64,
+    "deterministic_algorithms": true,
+    "device": "cpu",
+    "execution_engine": "vectorized-batched-v1",
+    "hard_exposure_limit": 1.0,
+    "max_seed_workers": 4,
+    "nominal_exposure_budget": 1.0,
+    "normalization": "N0_ENDPOINT_ANCHORED_V1",
+    "sensory_seed": 12012,
+    "sensory_z_dim": 32,
+    "torch_num_threads_per_worker": 1
+  },
+  "experiment_id": "r12.vs_c.task_a_direction_entropy_attribution.r2",
+  "global_gate": {
+    "contract_violation_classification": "CONTRACT_MISMATCH",
+    "implementation_tests_must_pass": true,
+    "no_threshold_changes_after_results": true,
+    "runtime_or_environment_blocker_classification": "EXECUTION_BLOCKED",
+    "scientific_gate_miss_classification": "SCIENTIFIC_FAIL"
+  },
+  "optimizer": {
+    "actor": "Adam",
+    "actor_lr": 0.001,
+    "beta_risk_entropy_bonus": 0.0,
+    "critic": "Adam",
+    "critic_lr": 0.001,
+    "discount_factor": 1.0,
+    "replay": false
+  },
+  "outcomes": {
+    "control_invalid": "either control pass count exceeds its preregistered maximum",
+    "direction_entropy_not_sufficient": "controls remain valid but one or more direction-exploration support conditions fail",
+    "direction_exploration_supported": "all attribution_gate conditions pass"
+  },
+  "paired_seeds": [
+    1201,
+    1202,
+    1203,
+    1204,
+    1205,
+    1206,
+    1207,
+    1208
+  ],
+  "purpose": "Test whether premature collapse of the categorical direction policy is a material cause of Task-A instability after 10x collection variance reduction proved insufficient.",
+  "required_artifacts": [
+    "experiment_spec.json",
+    "RESULT.json",
+    "REPORT.md"
+  ],
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "task_a": {
+    "arms": {
+      "baseline_no_entropy": {
+        "direction_entropy_coefficient": 0.0,
+        "direction_entropy_target": "categorical_direction_only"
+      },
+      "direction_entropy_005": {
+        "direction_entropy_coefficient": 0.005,
+        "direction_entropy_target": "categorical_direction_only"
+      }
+    },
+    "batch_trajectories": 900,
+    "control": {
+      "construction": "every actual-account x observed-account pair appears equally; actual and observed account marginals are balanced and exactly independent",
+      "name": "ACCOUNT_OBSERVATION_ZERO_RELATION",
+      "reward_physics": "reward always comes from actual AccountTruth and sampled action; only policy-observed AccountState is zero-relation"
+    },
+    "control_per_actual_observed_pair": 100,
+    "entropy_scale_rationale": {
+      "half_exposure_flatten_log_loss": 0.05129329438755058,
+      "max_entropy_bonus_at_coefficient": 0.005493061443340549,
+      "max_entropy_bonus_fraction_of_half_exposure_flatten_loss": 0.1070925868446257,
+      "max_three_way_categorical_entropy": 1.0986122886681098
+    },
+    "evaluation": {
+      "adapter": "deterministic_argmax_direction_plus_beta_mean",
+      "metrics": [
+        "direction_correct_count",
+        "target_exposure_mae",
+        "mean_one_step_log_growth",
+        "all_flat_post"
+      ],
+      "uses_true_account_state": true
+    },
+    "generations": 256,
+    "initial_truths": [
+      {
+        "desired_target_exposure": -0.5,
+        "equity": 1000.0,
+        "mark_price": 100.0,
+        "name": "SHORT_HALF",
+        "quantity": -5.0
+      },
+      {
+        "desired_target_exposure": 0.0,
+        "equity": 1000.0,
+        "mark_price": 100.0,
+        "name": "FLAT",
+        "quantity": 0.0
+      },
+      {
+        "desired_target_exposure": 0.5,
+        "equity": 1000.0,
+        "mark_price": 100.0,
+        "name": "LONG_HALF",
+        "quantity": 5.0
+      }
+    ],
+    "market": "identical flat OHLCV: prices 100, volume 10, one predecessor plus 64 represented bars",
+    "name": "ACCOUNT_CONDITIONED_MAINTENANCE_DIRECTION_EXPLORATION",
+    "physics": {
+      "close_next": 100.0,
+      "open_next": 100.0,
+      "permission_bisection_iterations": 24,
+      "proportional_friction_kappa": 0.1
+    },
+    "positive_per_actual_account": 300,
+    "positive_training_observation": "policy observes the true AccountState derived from each actual AccountTruth",
+    "seed_pass_gate": {
+      "direction_correct_count_min": 3,
+      "target_exposure_mae_max": 0.15
+    },
+    "trajectory_length": 1
+  }
+}

@@ -640,7 +640,66 @@ Builder posts as the token owner. Without the marker a round would read its own
 report back as the newest thing a reviewer asked for. Timeline collection skips
 tagged comments for exactly that reason.
 
-## 1n. Which instruction source wins
+## 1n. Read a document, do not parse a transport
+
+One rule keeps recurring, and every violation of it has cost a silent defect:
+
+> **If a producer is ours, it writes a document and the consumer reads the
+> document. The transport is never where state lives.**
+
+Why it matters, from this host's own history:
+
+| Violation | What it cost |
+| --- | --- |
+| the report was a text convention inside the agent's reply | one turn in three ended without it |
+| the session runner returned JSON on stdout | JSON escapes newlines, so a line-anchored scan never matched and **every** report on that path was discarded |
+| changed files were read from git's quoted porcelain and unescaped by hand | a non-ASCII filename came back as octal escapes |
+| the DSH model was read by hand-scanning YAML | a quoted value containing `:` was cut in half |
+
+Each is now a document read, or a machine format:
+
+| Consumer | Channel | Fallback |
+| --- | --- | --- |
+| the round's report | `.cb16/BUILD_REPORT.md` | reply text, then a rescue call, then a stub |
+| the session turn record | `.cb16/SESSION_RESULT.json` | stdout parsing (older runner only) |
+| changed files | `git status --porcelain -z` | none - NUL separation needs no unquoting |
+| the DSH model | `yaml.safe_load` | the tiny line scanner, only when PyYAML is absent |
+| the sandbox profile | NUL-delimited argv | none |
+
+The one place that still parses text on purpose is reviewer prose, because
+prose is what a reviewer writes. That is a document read too - it is simply a
+document whose fields are sentences.
+
+## 1o. Reclaiming host state
+
+State accumulates: worktrees hold a virtualenv each, the shared uv cache keeps
+every download, lock files stay behind after a crash, and disabled features leave
+records. Measured on this host before a cleanup: 1.4 GB of worktrees (two of them
+658 MB each) and 5.7 GB of uv cache.
+
+`scripts/cb16_state.py` reports by default and removes only with `--apply`:
+
+```bash
+python3 scripts/cb16_state.py --state-dir "$CB16_STATE_DIR" \
+  --work-root "$CB16_WORK_ROOT" --repo "$CB16_WORK_ROOT/repo"        # report
+python3 scripts/cb16_state.py ... --apply                          # reclaim
+```
+
+It removes only what it can prove dead:
+
+* lock files whose `flock` is not held - the file surviving a crash means
+  nothing, because the lock is a kernel flock and dies with its process;
+* records left by a disabled feature;
+* worktrees whose branch is already merged into `origin/main`.
+
+It refuses to touch worktrees while any lock is held, and it protects the
+dispatcher's own clone - an ancestry test alone would delete it, since it sits on
+the default branch, so it is skipped by path and by branch name.
+
+It never removes session logs, the per-branch reports, or cache contents;
+`uv cache prune` knows which entries are still referenced and this tool does not.
+
+## 1p. Which instruction source wins
 
 Five places can look like an instruction, and a fix round can hold several at
 once. The task packet therefore opens with an explicit ranking so the agent
