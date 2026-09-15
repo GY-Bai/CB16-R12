@@ -35,7 +35,7 @@ Leave it out for the legacy behaviour (a fresh session every dispatch). It is
 ignored for a branch that already existed on the remote, and it must not appear
 in Science metadata.
 
-Science lane uses a different block:
+Science lane uses a different block. New formal science should first pass Stage-1 protocol review using the canonical rules in `docs/authority/` and may use `docs/templates/SCIENTIFIC_EXPERIMENT_PROTOCOL.md` as a non-authoritative drafting scaffold. The trusted dispatch block remains:
 
 ```text
 mode: science

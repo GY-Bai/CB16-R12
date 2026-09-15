@@ -45,7 +45,11 @@
     "recursive_flat_docs_ingest_forbidden": true,
     "frozen_historical_gate_may_be_rewritten_by_later_interpretation": false,
     "historical_status_text_implies_current_pending_status": false,
-    "new_experiment_id_refreshes_reused_development_data": false
+    "new_experiment_id_refreshes_reused_development_data": false,
+    "verification_pass_implies_validation_pass": false,
+    "diagnostic_screening_or_exploratory_result_grants_qualification": false,
+    "protocol_may_be_rescued_after_result_inspection": false,
+    "new_complexity_requires_measured_gap_or_explicit_requirement": true
   },
   "removed_from_current_tree": [
     "docs/BOOTSTRAP_NEXT.md",

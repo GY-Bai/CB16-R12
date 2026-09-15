@@ -34,6 +34,25 @@ Chat-SOL should specify rather than delegate invention for:
 - qualification / promotion logic;
 - masks, NaN/Inf, and zero-denominator behavior.
 
+## Scientific protocol review
+
+Formal scientific work has two distinct review phases.
+
+**Stage 1 — protocol review, before results are known.** The reviewer checks that the experiment is capable of answering its declared question and freezes, as applicable:
+
+- `experiment_role` and `claim_kind` (`VERIFICATION` or `VALIDATION`);
+- scientific question, tested object, claim/domain/scope;
+- estimand, estimator, replication/dependence unit, and uncertainty procedure;
+- validity prerequisites and conditions that would make the result invalid for the claim;
+- dataset/split identity plus prior/adaptive exposure;
+- controls and material credible alternative explanations;
+- budget, stopping rule, seeds, transforms, objective, and gate;
+- allowed/invalid inference and exact promotion authority.
+
+Protocol acceptance authorizes execution of that experiment. It does not predict or pre-approve the result.
+
+**Stage 2 — result adjudication, after execution.** The reviewer checks protocol adherence, deviations, execution/validity, individual gates, claim-local inference, unresolved alternatives, prior-evidence transfer, and promotion. Stage 2 does not redesign the frozen protocol to obtain a preferred answer.
+
 ## Scientific execution
 A formal scientific run freezes its question, data scope, objective, controls, budget, and qualification rule **before** inspecting the result.
 
@@ -50,6 +69,10 @@ A changed scientific question or method gets a new run identity. A new identity 
 Training loss, non-zero gradients, changed parameters, throughput, or a written checkpoint are diagnostics. They do not by themselves prove controlled learning or economic improvement.
 
 Use explicit negative/random/shuffle controls when they materially test leakage or credit assignment.
+
+Every formal experiment also declares one role before execution: `QUALIFICATION`, `FALSIFICATION`, `DIAGNOSTIC`, `SCREENING`, `EXPLORATORY`, `ROBUSTNESS`, or `TRANSFER`. Diagnostic, screening, and exploratory work may guide the next hypothesis but do not silently become qualification evidence. A falsification experiment must be designed so the evidence can actually support the scoped negative proposition; a qualification gate miss alone is insufficient.
+
+For claims that cross implementation correctness and scientific capability, state them separately. **Verification** asks whether the declared system was built correctly; **Validation** asks whether that verified system does the scientifically/economically intended job in the declared context. Neither substitutes for the other.
 
 The top-level dispatcher/run vocabulary remains:
 
@@ -79,6 +102,29 @@ Review should name the tested object, claim/domain/scope, individual gate observ
 
 Do not rescue a frozen result by silently changing the method or gate. Equally, do not use the size of the final CB16 vision to excuse an unqualified required dependency. A reduced MVP result may affect a broader architecture only through an explicit scope-matched dependency or evidence synthesis; otherwise its authority remains local.
 
+## Diagnostic and screening work after a miss
+
+When a joint configuration misses a qualification and attribution is unresolved, do not serially patch one guessed cause at a time under the failed experiment identity. Freeze the miss first. Then, if useful, open a new `DIAGNOSTIC` or `SCREENING` experiment that compares multiple plausible factors or mechanisms under an explicit design.
+
+A screening experiment is allowed to be cheaper and broader than a confirmatory qualification. When several factors are plausible, prefer a bounded comparative or factorial/fractional-factorial screen over a long sequence of one-factor-at-a-time rescue attempts when the design is practical. Its output is prioritization/effect evidence, not automatic proof of a mechanism. If screening identifies a promising intervention, the stronger claim still requires a new appropriately scoped qualification/falsification/transfer experiment.
+
+## Complexity admission
+
+New machinery is a scientific-engineering cost, not free capability. A new learner mechanism, replay path, database, queue, service, cache, distributed executor, GPU dependency, authority subsystem, compatibility layer, or permanent state surface should enter R12 only when at least one of the following is explicit:
+
+1. an R12 semantic requirement cannot be met without it;
+2. a measured capability/reliability/performance gap motivates it;
+3. a preregistered interaction hypothesis specifically requires it;
+4. an external deployment/safety constraint requires it.
+
+The proposing task should state the observed gap/requirement, the smallest mechanism intended to address it, and what evidence would justify keeping the added complexity. Do not create a registry/compiler/service merely because a governance concept can be represented in software.
+
+## Permanent guardrails vs experiment parameters
+
+Promote only durable semantic invariants into permanent repository/CI guardrails: causality/no-lookahead, authority boundaries, accounting identities, terminal/truncation separation, protected-holdout access, or other rules intended to remain true across method changes. Keep optimizer choice, model width, budget, seed set, threshold, horizon, and similar method parameters scoped to their experiment/version unless a later authority explicitly elevates them.
+
+This prevents yesterday's successful configuration from becoming tomorrow's accidental architecture law.
+
 ## BUILD_REPORT
 Every Builder execution should end with a concise GitHub-visible report:
 
@@ -97,6 +143,8 @@ Large logs may remain in Actions/artifacts. The summary should not require artif
 
 ## Review loop
 
+Implementation tasks use:
+
 ```text
 Task contract
   -> Builder implementation
@@ -111,7 +159,19 @@ Task contract
              -> re-review
 ```
 
-A normal review bug does not require a new task or branch.
+Formal science uses:
+
+```text
+Protocol draft
+  -> Stage-1 protocol review
+  -> freeze experiment identity/spec
+  -> authorized execution
+  -> immutable result/evidence
+  -> Stage-2 result adjudication
+  -> scoped inference + promotion decision
+```
+
+A normal review bug does not require a new task or branch. A scientific protocol change after results are inspected requires a new experiment identity and retains the prior result in the research series.
 
 ## Probe protocol
 When GitHub-visible evidence is insufficient, SOL may request a bounded probe: a specific test, selected runtime values, one failure reproduction, a measured runtime quantity, or a bounded benchmark. Do not turn GitHub comments into an arbitrary shell execution interface.

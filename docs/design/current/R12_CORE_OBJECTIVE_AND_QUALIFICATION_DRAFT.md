@@ -265,6 +265,8 @@ The Pareto Archive stores qualified non-dominated policies. Active Champion is t
 - market state != account state != execution economics
 - prediction quality != economic decision quality
 - training reward != qualification != diagnostics
+- verification != validation
+- qualification != falsification != attribution
 - evidence strength != economic value
 - survival cushion != new-risk capacity
 - transaction cost != carry cost
@@ -281,7 +283,9 @@ A formal gate decides only its declared qualification. A miss normally means the
 
 R12 vertical slices are reduced qualification scaffolds, not compressed substitutes for the eventual full CB16 system. Component qualification permits only the explicitly named next use; composition and interaction require their own evidence. A local result propagates to a larger architecture only through a scope-matched logical necessity, promotion dependency, transfer assessment, or explicit synthesis of multiple results.
 
-Formal experiments freeze question, data, transforms, metrics, and gates before execution. No silent rescue. Final holdout remains protected. The same discipline forbids post-hoc widening of positive or negative conclusions.
+Formal experiments freeze question, data, transforms, metrics, and gates before execution. The protocol should identify the experiment role, tested object, estimand, estimator/replication unit, validity prerequisites, controls, and allowed/invalid inference before results are known. No silent rescue. Final holdout remains protected. The same discipline forbids post-hoc widening of positive or negative conclusions.
+
+Implementation verification and scientific validation are separate claims: proving that the specified equations, timing, accounting, or interfaces were implemented correctly does not by itself prove that the resulting Trader learns or creates economic value; observed behavioral improvement does not excuse a contract-invalid implementation.
 
 ## 10. Open decisions
 

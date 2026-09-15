@@ -2,9 +2,10 @@
 
 Authority class: `TEMPLATE_ONLY` — copy into `docs/tasks/active/`; do not dispatch this file itself.
 
-> Copy this file when opening a new bounded task. Replace every section.
+> Copy this file when opening a new bounded Builder task. Replace every section.
 > The matching GitHub Issue carries the trusted metadata block; this file is
-> what the Builder reads for scope and acceptance.
+> what the Builder reads for scope and acceptance. Formal scientific protocol
+> design uses `SCIENTIFIC_EXPERIMENT_PROTOCOL.md` instead of expanding this task template.
 
 # Objective
 
