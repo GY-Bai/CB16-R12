@@ -47,7 +47,7 @@ Training loss, non-zero gradients, changed parameters, throughput, or a written 
 
 Use explicit negative/random/shuffle controls when they materially test leakage or credit assignment.
 
-Classify failures by owning layer:
+Classify failures by owning layer. The top-level run vocabulary remains:
 
 ```text
 SCIENTIFIC_FAIL
@@ -57,7 +57,11 @@ EVIDENCE_INSUFFICIENT
 CONTRACT_MISMATCH
 ```
 
-Do not repair a scientific failure by silently widening infrastructure or changing the scientific gate.
+`SCIENTIFIC_FAIL` means only that a valid formal experiment missed **its own frozen scientific gate**. It is not a project-wide verdict. Every scientific failure report must also identify the `scientific_layer`, the narrow `failed_claim`, upstream evidence that remains valid, and stronger downstream claims that were not reached. See `docs/R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`.
+
+Do not repair a scientific failure by silently widening infrastructure or changing the scientific gate. Equally, do not inflate a local gate miss into rejection of the whole learner, architecture, market-information hypothesis family, or scientific program.
+
+For reduced MVP / vertical-slice tasks, review authority is component-scoped. The reviewer may decide whether the tested component/interface is ready for downstream composition, but may not infer feasibility or impossibility of the eventual full CB16 system from that reduced artifact alone.
 
 ## BUILD_REPORT
 Every Builder execution should end with a concise GitHub-visible report:

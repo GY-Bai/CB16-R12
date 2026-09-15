@@ -230,7 +230,9 @@ The following are diagnostics only:
 
 Scientific success requires preregistered frozen-policy behavioral evidence.
 
-Failure under a valid implementation is `SCIENTIFIC_FAIL`, not permission to add PPO/replay/Teacher/V-trace within the same run identity.
+Failure under a valid implementation is `SCIENTIFIC_FAIL` for the **specific preregistered claim being tested**, not permission to add PPO/replay/Teacher/V-trace within the same run identity and not evidence that the entire learner/scientific program is invalid. Controlled-learnability failure, historical-information failure, and economic-robustness failure are distinct layers. See `docs/R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`.
+
+This minimal learner is an intentionally reduced component test. Its job is to establish whether one simple learning spine can satisfy its local contracts strongly enough to compose with later CB16 modules. Failure requires local diagnosis/replacement; it does not define what a richer final Central Brain with additional organs, routing, memory, objectives, or coordination can ultimately achieve.
 
 ## 13. Escalation rule
 

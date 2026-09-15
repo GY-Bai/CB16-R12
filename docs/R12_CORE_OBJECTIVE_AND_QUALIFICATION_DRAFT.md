@@ -273,7 +273,11 @@ The Pareto Archive stores qualified non-dominated policies. Active Champion is t
 
 `wiring works != controlled learning works != historical improvement exists != economic superiority exists != production profitability is established`.
 
-Formal experiments freeze question, data, transforms, metrics, and gates before execution. No silent rescue. Final holdout remains protected.
+These are nested scientific layers, not one binary verdict. A failure at a later layer rejects only the narrow claim preregistered for that layer; it does not retroactively erase valid upstream evidence or prove that broader hypothesis families are impossible. The canonical interpretation rule is `docs/R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`.
+
+R12 vertical slices are deliberately reduced component proofs. They are not compressed substitutes for the eventual full CB16 system. Their authority is compositional: establish one interface/mechanism strongly enough to reuse downstream, or identify the local component that must be repaired/replaced before composition. A reduced slice is never authorized to declare the final architecture feasible or infeasible.
+
+Formal experiments freeze question, data, transforms, metrics, and gates before execution. No silent rescue. Final holdout remains protected. The same discipline applies to negative interpretation: no post-hoc widening of what a failed gate is allowed to mean.
 
 ## 10. Open decisions
 
