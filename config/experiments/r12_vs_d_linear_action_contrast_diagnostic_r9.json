@@ -1,0 +1,220 @@
+{
+  "schema": "cb16.experiment.v2",
+  "experiment_id": "r12.vs_d.linear_action_contrast_diagnostic.r9",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "experiment_role": "DIAGNOSTIC",
+  "parent_experiment_ids": [
+    "r12.vs_d.representation_accessibility_diagnostic.r3",
+    "r12.vs_d.bounded_context_length_accessibility_screen.r6",
+    "r12.vs_d.bounded_ridge_regularization_accessibility_screen.r8"
+  ],
+  "tested_object": "Decision relevance of the exact 64h N0 ridge(lambda=1) score when mapped only to LONG/SHORT sign actions on adaptively reused February development",
+  "claim_scope": {
+    "asset": "BTCUSDT",
+    "representation": "N0_64h_flattened",
+    "score_probe": "closed_form_ridge_lambda_1",
+    "action_mapping": "LONG_if_score_gt_0_SHORT_if_score_lt_0_FLAT_if_exact_zero",
+    "realized_contrast": "action_times_one_hour_arithmetic_return_vs_FLAT_zero",
+    "fit": "January_615_decisions",
+    "evaluation": "February_672_decisions",
+    "march_read_forbidden": true,
+    "final_holdout_access_forbidden": true
+  },
+  "research_series_policy": {
+    "series_id": "r12.vs_d.historical_development",
+    "parent_results_inspected": true,
+    "freshness_status": "DIAGNOSTIC_ADAPTIVELY_REUSED_JAN_FEB_AFTER_R8",
+    "adaptation_rationale": "R3-R8 repeatedly showed weak positive return-correlation point evidence without robust promotion; R9 changes the estimand from magnitude regression to the directly relevant sign action contrast while keeping representation and reference probe fixed",
+    "new_experiment_id_does_not_reset_adaptation_history": true,
+    "diagnostic_is_not_qualification": true,
+    "if_pass": "promote only a linear action-contrast candidate hypothesis to a new separately preregistered decision/economic experiment",
+    "if_fail": "do_not_rescue_R9; no action-contrast promotion",
+    "march_read_forbidden": true,
+    "final_holdout_access_forbidden": true
+  },
+  "data_exposure": {
+    "dataset_or_split_id": "BTCUSDT_2020_JAN_FEB_LINEAR_ACTION_CONTRAST",
+    "roles_seen": [
+      "training",
+      "diagnostic",
+      "screening"
+    ],
+    "prior_experiment_ids": [
+      "r12.vs_d.representation_accessibility_diagnostic.r3",
+      "r12.vs_d.bounded_ridge_regularization_accessibility_screen.r8"
+    ],
+    "human_or_model_result_exposure": true,
+    "adaptations_made_after_exposure": [
+      "R9 action-contrast estimand selected after observing weak but recurrent positive correlation point estimates and no promoted lambda/context/horizon candidate"
+    ],
+    "freshness_class": "ADAPTIVELY_REUSED"
+  },
+  "claims": [
+    {
+      "claim_id": "C_LINEAR_ACTION_CONTRAST_ACCESSIBILITY",
+      "vv_classification": "NOT_APPLICABLE",
+      "tested_object": "sign action induced by the exact January-fitted 64h N0 ridge(lambda=1) score versus matched shuffled-target score policies on February",
+      "claim_domain": "decision_contrast_diagnostic",
+      "claim_scope": {
+        "action_set": [
+          "SHORT",
+          "FLAT_EXACT_ZERO_ONLY",
+          "LONG"
+        ],
+        "requested_risk": "unit_for_nonzero_direction_only_for_diagnostic_estimand",
+        "costs": "zero",
+        "account_state": "not_modeled",
+        "validation": "adaptively_reused_February_672"
+      },
+      "estimand": {
+        "primary": [
+          "February_mean_unit_direction_return_contrast",
+          "February_true_minus_median_shuffle_mean_direction_return_contrast"
+        ],
+        "formula": "direction=sign(ridge_score); per-step contrast=direction*realized_one_hour_arithmetic_return relative to FLAT=0",
+        "gate": "both paired one-sided bootstrap lower bounds > 0",
+        "unit": "48h circular moving block over common February sequence"
+      },
+      "estimator": "January standardized ridge(lambda=1) score, deterministic sign mapping, eight shuffled-January-target control probes, paired 48h circular moving-block bootstrap",
+      "replication_unit": "48h circular moving block; bootstrap draws are uncertainty draws not independent scientific replicates",
+      "validity_prerequisites": [
+        "same January 615 / February 672 chronology as R6/R8",
+        "score fitting uses January targets only",
+        "lambda remains the non-promoted reference 1.0 rather than post-hoc lambda=0.1",
+        "same January target permutations for controls",
+        "February never used for fitting or threshold selection",
+        "zero costs/account/risk-sizing are explicit diagnostic simplifications"
+      ],
+      "credible_alternatives": [
+        "positive no-cost sign contrast may disappear under costs, sizing, or continuing-account dynamics",
+        "February is adaptively reused and cannot confirm the relation",
+        "binary sign mapping ignores a learned FLAT threshold and confidence/risk semantics",
+        "a gate miss may coexist with other nonlinear or state-dependent action contrasts"
+      ],
+      "authority_scope": [
+        "may support or fail to support a narrow no-cost unit-direction action-contrast candidate under this exact probe",
+        "may promote a new decision-contrast hypothesis only"
+      ],
+      "promotion_scope": [
+        "PROMOTE_LINEAR_ACTION_CONTRAST_CANDIDATE_HYPOTHESIS"
+      ],
+      "invalid_inferences": [
+        "does_not_qualify_historical_market_information",
+        "does_not_establish_profitability",
+        "does_not_survive_transaction_costs_or_funding",
+        "does_not_model_continuing_account_or_requested_risk",
+        "does_not_make_February_confirmatory",
+        "does_not_identify_a_unique_root_cause",
+        "does_not_authorize_March_or_final_holdout"
+      ],
+      "composition_dependencies": [
+        {
+          "type": "validity_dependency",
+          "ref": "R6/R8 exact 64h N0 lambda=1 reference probe semantics"
+        },
+        {
+          "type": "validity_dependency",
+          "ref": "causal one-hour return consequence"
+        },
+        {
+          "type": "transfer_assumption",
+          "ref": "weak magnitude relation may still carry decision-relevant sign contrast"
+        }
+      ]
+    }
+  ],
+  "gate_mapping": {
+    "C_LINEAR_ACTION_CONTRAST_ACCESSIBILITY": [
+      "G_LINEAR_ACTION_CONTRAST"
+    ]
+  },
+  "allowed_promotion_decisions": [
+    "NO_PROMOTION",
+    "PROMOTE_LINEAR_ACTION_CONTRAST_CANDIDATE_HYPOTHESIS"
+  ],
+  "data": {
+    "source_root": "/cb16/raw/klines_1m/BTCUSDT",
+    "manifest_path": "/cb16/raw/DOWNLOAD_MANIFEST.json",
+    "require_manifest_final_holdout_accessed_false": true,
+    "allowed_archives": [
+      {
+        "name": "BTCUSDT-1m-2020-01.zip",
+        "sha256": "b4e13ea185ba96c413ac9167cfbb6e238eb5eae119a7a77f41f4c61c5e099d03",
+        "expected_rows": 44640
+      },
+      {
+        "name": "BTCUSDT-1m-2020-02.zip",
+        "sha256": "f32b20168ea590cd7d04a2995bc5ec500ea06331c8174f7fd14f29c1078e5ed2",
+        "expected_rows": 41760
+      }
+    ],
+    "forbidden_reads": [
+      "BTCUSDT-1m-2020-03.zip",
+      "any_final_holdout_archive"
+    ],
+    "hourly_aggregation": {
+      "timezone": "UTC",
+      "require_exactly_60_contiguous_1m_rows_per_hour": true,
+      "expected_hourly_bars": 1440
+    },
+    "context": {
+      "normalization": "N0_ENDPOINT_ANCHORED_V1",
+      "represented_hours": 64,
+      "retained_predecessor_hours": 1,
+      "raw_window_hours": 65,
+      "feature_width": 320
+    },
+    "fit": {
+      "consequence_hour_start_utc": "2020-01-06T09:00:00Z",
+      "consequence_hour_end_utc": "2020-01-31T23:00:00Z",
+      "expected_decisions": 615
+    },
+    "evaluation": {
+      "consequence_hour_start_utc": "2020-02-01T00:00:00Z",
+      "consequence_hour_end_utc": "2020-02-28T23:00:00Z",
+      "expected_decisions": 672
+    }
+  },
+  "probe": {
+    "ridge_lambda": 1.0,
+    "feature_standardization": "January fit mean/population-std; drop std<=1e-12; freeze for February",
+    "control_type": "shuffle_January_target_only_with_no_fixed_points",
+    "control_seeds": [
+      23001,
+      23002,
+      23003,
+      23004,
+      23005,
+      23006,
+      23007,
+      23008
+    ],
+    "action_mapping": "numpy_sign_of_score; exact zero maps FLAT",
+    "per_step_contrast": "direction_times_realized_arithmetic_return"
+  },
+  "uncertainty_protocol": {
+    "bootstrap_replicates": 4096,
+    "bootstrap_seed": 24001,
+    "lower_bound_order_index_zero_based": 204,
+    "method": "paired circular moving-block bootstrap over common February hourly sequence",
+    "block_length_hours": 48,
+    "sample_length_hours": 672,
+    "same_resamples_across_true_and_controls": true
+  },
+  "implementation_gate": {
+    "full_repository_suite_must_pass_at_exact_commit": true,
+    "result_schema": "cb16.result.v2"
+  },
+  "no_rescue": [
+    "no_fit_or_evaluation_window_change",
+    "no_context_change",
+    "no_lambda_change",
+    "no_action_threshold_or_FLAT_deadband",
+    "no_control_seed_change",
+    "no_bootstrap_change",
+    "no_cost_or_account_semantics_added_under_R9",
+    "no_post_result_gate_change",
+    "no_March_read",
+    "no_final_holdout_read"
+  ]
+}
