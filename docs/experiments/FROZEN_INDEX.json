@@ -85,6 +85,12 @@
       "historical_path": "docs/tasks/active/R12_VS_D_REPRESENTATION_ACCESSIBILITY_R3.md",
       "snapshot_commit": "1e0bfd4a8907c9f19c7c722971ee39f59face5ea",
       "sha256": "919a878dbf02ebebaa21da38f16ece5212fa11548dd03d8fb0ce1f594e4cd2f8"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_D_BOUNDED_NONLINEAR_ACCESSIBILITY_R4.md",
+      "historical_path": "docs/tasks/active/R12_VS_D_BOUNDED_NONLINEAR_ACCESSIBILITY_R4.md",
+      "snapshot_commit": "26c8e59ad933e5a3b24891c8389c6df09090f323",
+      "sha256": "0046c8e056fb6666df1543a74d9b566f048df75f89631f5ca14ea7b19ed94245"
     }
   ]
 }
