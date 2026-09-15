@@ -1,0 +1,221 @@
+{
+  "schema": "cb16.experiment.v2",
+  "experiment_id": "r12.vs_d.march_temporal_robustness_of_64h_linear_hint.r7",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "experiment_role": "ROBUSTNESS",
+  "parent_experiment_ids": [
+    "r12.vs_d.historical_market_information_canary.r0",
+    "r12.vs_d.evaluation_adapter_transfer_diagnostic.r1",
+    "r12.vs_d.representation_accessibility_diagnostic.r3",
+    "r12.vs_d.bounded_horizon_accessibility_screen.r5",
+    "r12.vs_d.bounded_context_length_accessibility_screen.r6"
+  ],
+  "tested_object": "Temporal robustness on March 2020 of the exact R6-style January-fitted 64h N0 ridge(lambda=1) one-hour relation and matched shuffled-target controls",
+  "claim_scope": {
+    "asset": "BTCUSDT",
+    "fit": "January_2020_615_decisions_same_as_R6",
+    "evaluation": "March_2020_744_decisions_adaptively_reused_development",
+    "representation": "N0_64h_flattened",
+    "target": "one_hour_arithmetic_return_close_over_open_minus_1",
+    "probe": "closed_form_ridge_lambda_1",
+    "february_role": "causal_context_carryover_only_for_early_March_states",
+    "final_holdout_access_forbidden": true
+  },
+  "research_series_policy": {
+    "series_id": "r12.vs_d.historical_development",
+    "parent_results_inspected": true,
+    "freshness_status": "ROBUSTNESS_ADAPTIVELY_REUSED_MARCH_AFTER_R0_R1_AND_JAN_FEB_DIAGNOSTICS",
+    "adaptation_rationale": "R3-R6 repeatedly showed a weak positive one-hour 64h-N0 linear point relation on February without robust qualification; R7 freezes that simple surface and tests whether the point relation persists on already-exposed March development without any refit or model change",
+    "new_experiment_id_does_not_reset_adaptation_history": true,
+    "march_is_not_fresh_confirmation": true,
+    "if_robustness_gate_passes": "promote only a temporal-robustness candidate hypothesis for a new future qualification/transfer design; do not claim confirmation",
+    "if_gate_misses": "do_not_rescue_R7; record temporal robustness not established for this exact probe",
+    "final_holdout_access_forbidden": true
+  },
+  "data_exposure": {
+    "dataset_or_split_id": "BTCUSDT_2020_MARCH_DEVELOPMENT",
+    "roles_seen": [
+      "development_validation",
+      "diagnostic",
+      "robustness"
+    ],
+    "prior_experiment_ids": [
+      "r12.vs_d.historical_market_information_canary.r0",
+      "r12.vs_d.evaluation_adapter_transfer_diagnostic.r1"
+    ],
+    "human_or_model_result_exposure": true,
+    "adaptations_made_after_exposure": [
+      "R7 robustness question selected after observing R0/R1 March results and R3-R6 Jan-Feb diagnostics"
+    ],
+    "freshness_class": "ADAPTIVELY_REUSED"
+  },
+  "claims": [
+    {
+      "claim_id": "C_MARCH_TEMPORAL_ROBUSTNESS_OF_64H_LINEAR_HINT",
+      "vv_classification": "NOT_APPLICABLE",
+      "tested_object": "January-fitted 64h N0 ridge(lambda=1) true-target probe versus eight matched shuffled-January-target probes evaluated on March 2020",
+      "claim_domain": "robustness/temporal_transfer_of_point_relation",
+      "claim_scope": {
+        "fit_decisions": 615,
+        "march_evaluation_decisions": 744,
+        "context_hours": 64,
+        "target_horizon_hours": 1,
+        "control_seeds": "18001..18008"
+      },
+      "estimand": {
+        "primary": [
+          "March_true_corr_bootstrap_LCB",
+          "March_true_minus_median_shuffle_corr_bootstrap_LCB"
+        ],
+        "robustness_rule": "both one-sided 95% day-block bootstrap lower bounds > 0",
+        "unit": "31 UTC March calendar-day blocks"
+      },
+      "estimator": "January feature standardization + closed-form ridge(lambda=1), March Pearson correlation, eight matched shuffled-January-target controls, paired day-block bootstrap",
+      "replication_unit": "UTC calendar day; 4096 bootstrap replicates are uncertainty draws, not independent scientific replicates",
+      "validity_prerequisites": [
+        "January fit window and 64h N0/ridge semantics match R6 reference configuration",
+        "no February or March target fitting",
+        "February may enter only as strictly prior context for early-March states",
+        "same January target permutations used for matched controls",
+        "March consists of 31 complete UTC day blocks",
+        "final holdout remains unaccessed"
+      ],
+      "credible_alternatives": [
+        "March was already inspected in R0/R1 and is not independent confirmation",
+        "a robustness miss may reflect temporal regime shift rather than absence of any market relation",
+        "a robustness pass may reflect adaptation history and requires a separate fresh/independent design before qualification",
+        "linear one-hour accessibility is only one narrow relation family"
+      ],
+      "authority_scope": [
+        "may support or fail to support temporal robustness of this exact January-fitted 64h linear point relation on adaptively reused March development",
+        "may prioritize a future independent robustness/transfer experiment if the gate passes"
+      ],
+      "promotion_scope": [
+        "PROMOTE_TEMPORAL_ROBUSTNESS_CANDIDATE_HYPOTHESIS"
+      ],
+      "invalid_inferences": [
+        "does_not_qualify_historical_market_information",
+        "does_not_make_March_fresh_confirmation",
+        "does_not_establish_profitability_or_account_economics",
+        "does_not_prove_temporal_regime_shift_is_the_root_cause_if_gate_misses",
+        "does_not_prove_general_temporal_robustness_if_gate_passes",
+        "does_not_authorize_final_holdout"
+      ],
+      "composition_dependencies": [
+        {
+          "type": "validity_dependency",
+          "ref": "R6-style January 64h N0 ridge construction"
+        },
+        {
+          "type": "validity_dependency",
+          "ref": "R0 March causal context carryover rule"
+        },
+        {
+          "type": "transfer_assumption",
+          "ref": "February weak point relation may persist into March"
+        }
+      ]
+    }
+  ],
+  "gate_mapping": {
+    "C_MARCH_TEMPORAL_ROBUSTNESS_OF_64H_LINEAR_HINT": [
+      "G_MARCH_ROBUSTNESS"
+    ]
+  },
+  "allowed_promotion_decisions": [
+    "NO_PROMOTION",
+    "PROMOTE_TEMPORAL_ROBUSTNESS_CANDIDATE_HYPOTHESIS"
+  ],
+  "data": {
+    "symbol": "BTCUSDT",
+    "source_interval": "1m",
+    "decision_interval": "1h_UTC",
+    "source_root": "/cb16/raw/klines_1m/BTCUSDT",
+    "manifest_path": "/cb16/raw/DOWNLOAD_MANIFEST.json",
+    "require_manifest_final_holdout_accessed_false": true,
+    "allowed_archives": [
+      {
+        "name": "BTCUSDT-1m-2020-01.zip",
+        "sha256": "b4e13ea185ba96c413ac9167cfbb6e238eb5eae119a7a77f41f4c61c5e099d03",
+        "expected_rows": 44640
+      },
+      {
+        "name": "BTCUSDT-1m-2020-02.zip",
+        "sha256": "f32b20168ea590cd7d04a2995bc5ec500ea06331c8174f7fd14f29c1078e5ed2",
+        "expected_rows": 41760
+      },
+      {
+        "name": "BTCUSDT-1m-2020-03.zip",
+        "sha256": "15790b4b031cbc5f59cae30e523fb8341588d279fe3839ba1224c7fe8a6bc929",
+        "expected_rows": 44640
+      }
+    ],
+    "hourly_aggregation": {
+      "timezone": "UTC",
+      "require_exactly_60_contiguous_1m_rows_per_hour": true,
+      "expected_hourly_bars": 2184
+    },
+    "context": {
+      "normalization": "N0_ENDPOINT_ANCHORED_V1",
+      "represented_hours": 64,
+      "retained_predecessor_hours": 1,
+      "raw_window_hours": 65
+    },
+    "fit": {
+      "role": "adaptively_reused_training",
+      "consequence_hour_start_utc": "2020-01-06T09:00:00Z",
+      "consequence_hour_end_utc": "2020-01-31T23:00:00Z",
+      "expected_decisions": 615
+    },
+    "evaluation": {
+      "role": "adaptively_reused_March_robustness_not_confirmation",
+      "consequence_hour_start_utc": "2020-03-01T00:00:00Z",
+      "consequence_hour_end_utc": "2020-03-31T23:00:00Z",
+      "expected_decisions": 744,
+      "expected_utc_day_blocks": 31,
+      "decisions_per_day": 24,
+      "target_fitting_forbidden": true,
+      "causal_context_history_carryover": "may use trailing February hourly bars strictly before each March consequence"
+    }
+  },
+  "probe": {
+    "ridge_lambda": 1.0,
+    "feature_standardization": "January fit mean/population-std; drop std<=1e-12; freeze for March",
+    "control_type": "shuffle_January_target_only_with_no_fixed_points",
+    "control_seeds": [
+      18001,
+      18002,
+      18003,
+      18004,
+      18005,
+      18006,
+      18007,
+      18008
+    ],
+    "target_formula": "close[consequence_hour] / open[consequence_hour] - 1.0"
+  },
+  "uncertainty_protocol": {
+    "bootstrap_replicates": 4096,
+    "bootstrap_seed": 20001,
+    "lower_bound_order_index_zero_based": 204,
+    "method": "paired bootstrap of 31 UTC March calendar-day blocks",
+    "day_blocks": 31,
+    "hours_per_day": 24,
+    "same_resamples_across_true_and_controls": true
+  },
+  "implementation_gate": {
+    "full_repository_suite_must_pass_at_exact_commit": true,
+    "result_schema": "cb16.result.v2"
+  },
+  "no_rescue": [
+    "no_fit_window_change",
+    "no_March_window_change",
+    "no_context_change",
+    "no_target_change",
+    "no_ridge_lambda_change",
+    "no_control_seed_change",
+    "no_bootstrap_change",
+    "no_post_result_gate_change",
+    "no_final_holdout_read"
+  ]
+}
