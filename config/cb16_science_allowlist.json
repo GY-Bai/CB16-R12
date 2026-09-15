@@ -470,6 +470,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-e-single-checkpoint-composition-r0@v1": {
+      "description": "R12 VS-E R0 controlled single-checkpoint composition qualification. One uninterrupted learner alternates inherited VS-C Task A then Task B updates for 256 cycles with fresh paired seeds and matched dual controls, evaluates both abilities across the final task switch, and reads no historical market data. Emits cb16.result.v2.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.single_checkpoint_composition_r0"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-e-r0-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-e-r0-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
