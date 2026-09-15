@@ -1,0 +1,12 @@
+{
+  "schema": "cb16.experiment-supersession-index.v1",
+  "entries": [
+    {
+      "superseded_experiment_id": "r12.vs_d.objective_balance_entropy_gradient_diagnostic.r2",
+      "superseding_experiment_id": "r12.vs_d.objective_balance_entropy_gradient_diagnostic.r2a",
+      "phase": "BEFORE_IMPLEMENTATION_AND_BEFORE_SCIENTIFIC_RUN",
+      "scientific_result_exists": false,
+      "reason": "Jan-Feb-only R2 inherited expected_hourly_bars=2184 and March evaluation text from R0; those conflict with R2 march_read_forbidden=true. Scientific claim, seeds, objective diagnostic and gates are unchanged in R2A."
+    }
+  ]
+}

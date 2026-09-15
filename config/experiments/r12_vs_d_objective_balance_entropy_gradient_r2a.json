@@ -1,0 +1,266 @@
+{
+  "schema": "cb16.experiment.v2",
+  "experiment_id": "r12.vs_d.objective_balance_entropy_gradient_diagnostic.r2a",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "parent_experiment_ids": [
+    "r12.vs_d.historical_market_information_canary.r0",
+    "r12.vs_d.evaluation_adapter_transfer_diagnostic.r1"
+  ],
+  "tested_object": "VS-D R0 frozen training objective, measuring reward-driven categorical-direction policy-gradient versus lambda-weighted categorical entropy gradient on the same theta_g and sampled training batch",
+  "claim_scope": {
+    "data": "BTCUSDT_2020-01_2020-02_training_only",
+    "validation_data_read": false,
+    "march_read_forbidden": true,
+    "representation": "N0_64h_plus_FrozenSensory_z32_seed12012",
+    "account": "flat_reset",
+    "horizon": "one_hour",
+    "learner": "R0 actor/critic and Adam 0.001/0.001",
+    "direction_entropy_coefficient": 0.005,
+    "generations": 256,
+    "model_seeds": [
+      3101,
+      3102,
+      3103,
+      3104,
+      3105,
+      3106,
+      3107,
+      3108
+    ],
+    "arms": [
+      "true_context",
+      "shuffled_consequence"
+    ]
+  },
+  "research_series_policy": {
+    "series_id": "r12.vs_d.historical_development",
+    "parent_results_inspected": true,
+    "reused_training_data": [
+      "BTCUSDT_2020-01",
+      "BTCUSDT_2020-02"
+    ],
+    "reused_development_data": [],
+    "freshness_status": "DIAGNOSTIC_REUSED_TRAINING_NOT_CONFIRMATION",
+    "new_experiment_id_does_not_reset_adaptation_history": true,
+    "final_holdout_access_forbidden": true,
+    "if_gate_met": "promote only an objective-scale intervention hypothesis under a new preregistered identity; do not alter R2",
+    "if_gate_not_met": "do_not_rescue_R2; objective-scale dominance hypothesis is not qualified and another scoped diagnostic is required",
+    "supersedes_invalid_prereg": "r12.vs_d.objective_balance_entropy_gradient_diagnostic.r2",
+    "supersession_reason": "pre-implementation contract mismatch: Jan-Feb-only diagnostic inherited Jan-Mar hourly count and March control-evaluation text from parent R0"
+  },
+  "claims": [
+    {
+      "claim_id": "C_DIRECTION_ENTROPY_GRADIENT_DOMINANCE",
+      "tested_object": "lambda_dir=0.005 entropy term versus reward-driven categorical-direction policy-gradient term under the frozen positive R0 training arm",
+      "claim_domain": "optimization/objective_balance",
+      "claim_scope": {
+        "arm": "true_context",
+        "generations": "all_0_through_255",
+        "same_theta_and_sampled_batch": true,
+        "gradient_space": "actor parameters touched by direction-only terms"
+      },
+      "estimand": {
+        "primary": "per-seed discrete_q25(log10(weighted_entropy_grad_norm / max(direction_pg_grad_norm,1e-12))) across 256 generations",
+        "unit": "model_seed",
+        "within_seed_generation_summary": "sort 256 log10 ratios ascending and take zero-based index 63"
+      },
+      "authority_scope": [
+        "may support that the frozen historical objective has entropy-gradient dominance in the measured direction-learning subspace",
+        "may support a separately preregistered entropy/objective-scale intervention hypothesis"
+      ],
+      "promotion_scope": [
+        "PROMOTE_ENTROPY_SCALE_INTERVENTION_HYPOTHESIS"
+      ],
+      "invalid_inferences": [
+        "does_not_prove_entropy_caused_parent_R0_gate_miss",
+        "does_not_authorize_changing_lambda_inside_R2",
+        "does_not_qualify_historical_market_information",
+        "does_not_falsify_representation_or_horizon_or_learner_family",
+        "does_not_open_or_infer_final_holdout"
+      ],
+      "composition_dependencies": [
+        {
+          "type": "validity_dependency",
+          "ref": "parent_R0_training_objective_and_sampling_reproduction"
+        },
+        {
+          "type": "transfer_assumption",
+          "ref": "R3_lambda_0.005_controlled_learnability_to_historical_reward_scale"
+        }
+      ]
+    }
+  ],
+  "gate_mapping": {
+    "C_DIRECTION_ENTROPY_GRADIENT_DOMINANCE": [
+      "G_OBJECTIVE_BALANCE_SEED",
+      "G_OBJECTIVE_BALANCE_AGGREGATE"
+    ]
+  },
+  "allowed_promotion_decisions": [
+    "NO_PROMOTION",
+    "PROMOTE_ENTROPY_SCALE_INTERVENTION_HYPOTHESIS"
+  ],
+  "data": {
+    "source_root": "/cb16/raw/klines_1m/BTCUSDT",
+    "manifest_path": "/cb16/raw/DOWNLOAD_MANIFEST.json",
+    "require_manifest_final_holdout_accessed_false": true,
+    "allowed_archives": [
+      {
+        "name": "BTCUSDT-1m-2020-01.zip",
+        "sha256": "b4e13ea185ba96c413ac9167cfbb6e238eb5eae119a7a77f41f4c61c5e099d03",
+        "expected_rows": 44640
+      },
+      {
+        "name": "BTCUSDT-1m-2020-02.zip",
+        "sha256": "f32b20168ea590cd7d04a2995bc5ec500ea06331c8174f7fd14f29c1078e5ed2",
+        "expected_rows": 41760
+      }
+    ],
+    "hourly_aggregation": {
+      "timezone": "UTC",
+      "require_exactly_60_contiguous_1m_rows_per_hour": true,
+      "open": "first_1m_open",
+      "high": "max_1m_high",
+      "low": "min_1m_low",
+      "close": "last_1m_close",
+      "volume": "sum_1m_volume",
+      "expected_hourly_bars": 1440
+    },
+    "context": {
+      "normalization": "N0_ENDPOINT_ANCHORED_V1",
+      "represented_hours": 64,
+      "retained_predecessor_hours": 1,
+      "raw_window_hours": 65
+    },
+    "train": {
+      "role": "development_training",
+      "source_months": [
+        "2020-01",
+        "2020-02"
+      ],
+      "consequence_hour_start_utc": "2020-01-03T17:00:00Z",
+      "consequence_hour_end_utc": "2020-02-29T23:00:00Z",
+      "expected_decisions": 1375,
+      "validation_consequence_overlap_count": 0
+    },
+    "forbidden_reads": [
+      "BTCUSDT-1m-2020-03.zip",
+      "any_final_holdout_archive"
+    ]
+  },
+  "authority": {
+    "context_length": 64,
+    "sensory_seed": 12012,
+    "sensory_z_dim": 32,
+    "actor_hidden_width": 64,
+    "actor_hidden_layers": 2,
+    "device": "cpu",
+    "deterministic_algorithms": true,
+    "torch_num_threads_per_worker": 1,
+    "max_seed_workers": 4,
+    "nominal_exposure_budget": 1.0,
+    "hard_exposure_limit": 1.0,
+    "initial_equity": 1.0,
+    "initial_quantity": 0.0,
+    "account_state_per_sample": "FLAT_RESET_[e=0,s=1,c=1]",
+    "execution_timing": "observe_hour_t_close_then_execute_hour_t_plus_1_open_then_mark_hour_t_plus_1_close",
+    "proportional_friction_kappa": 0.0,
+    "funding": "OFF",
+    "symbol_identity_input": false
+  },
+  "learner": {
+    "actor_optimizer": "Adam",
+    "actor_lr": 0.001,
+    "critic_optimizer": "Adam",
+    "critic_lr": 0.001,
+    "discount_factor": 1.0,
+    "replay": false,
+    "direction_entropy_coefficient": 0.005,
+    "direction_entropy_target": "categorical_direction_only",
+    "beta_risk_entropy_bonus": 0.0,
+    "generations": 256,
+    "training_batch": "all_1375_training_windows_each_generation",
+    "action_sampling": "stochastic_Categorical_direction_plus_conditional_Beta_risk",
+    "evaluation_adapter": "deterministic_argmax_direction_plus_beta_mean"
+  },
+  "training_positive": {
+    "name": "TRUE_CONTEXT_TO_NEXT_HOUR_CONSEQUENCE",
+    "reward": "canonical one-step log-equity growth under the sampled action and matching next-hour open/close consequence",
+    "realized_winner_label": false
+  },
+  "training_control": {
+    "name": "SHUFFLED_CONTEXT_TO_CONSEQUENCE",
+    "construction": "each generation retains every training context/action and the exact multiset of next-hour (open,close) consequences, but assigns consequences through a deterministic seed-and-generation-specific fixed-point-free permutation",
+    "permutation": "controlled_tasks.no_fixed_point_permutation",
+    "fixed_points_allowed": false,
+    "r2a_evaluation": "NOT_APPLICABLE_TRAINING_ONLY_DIAGNOSTIC"
+  },
+  "model_seeds": [
+    3101,
+    3102,
+    3103,
+    3104,
+    3105,
+    3106,
+    3107,
+    3108
+  ],
+  "diagnostic": {
+    "measurement_timing": "before each original combined actor update, on the exact sampled batch at theta_g and current critic phi_g",
+    "direction_policy_gradient_loss": "-mean(Categorical(direction_logits).log_prob(sampled_direction) * stopgrad(reward - V_phi(state)))",
+    "weighted_entropy_loss": "-0.005 * mean(Categorical(direction_logits).entropy())",
+    "full_policy_gradient_loss": "-mean(full_hybrid_action_log_prob * stopgrad(reward - V_phi(state)))",
+    "gradient_method": "torch.autograd.grad without optimizer step or persistent .grad mutation",
+    "primary_ratio": "weighted_entropy_direction_grad_l2 / max(direction_pg_grad_l2, 1e-12)",
+    "secondary_metrics": [
+      "full_pg_grad_l2",
+      "direction_pg_grad_l2",
+      "weighted_entropy_grad_l2",
+      "direction_pg_entropy_cosine",
+      "mean_reward",
+      "std_reward",
+      "mean_advantage",
+      "std_advantage",
+      "mean_direction_entropy",
+      "policy_gradient_loss",
+      "weighted_entropy_loss",
+      "combined_actor_loss"
+    ],
+    "control_arm": "repeat identical measurements on shuffled-consequence arm for characterization only; control metrics do not enter the primary claim gate",
+    "rng_rule": "diagnostic autograd must consume no RNG and must not alter collection streams or learner updates"
+  },
+  "seed_gate": {
+    "positive_arm_discrete_q25_log10_entropy_to_direction_pg_grad_ratio_strictly_gt": 0.0,
+    "interpretation": "index63>0 means entropy gradient norm exceeds reward-driven categorical-direction gradient norm in at least 193 of 256 generations"
+  },
+  "aggregate_gate": {
+    "seed_pass_count_min": 6,
+    "median_across_8_seeds_of_discrete_q25_log10_ratio_strictly_gt": 0.0
+  },
+  "global_gate": {
+    "implementation_tests_must_pass": true,
+    "only_allowed_archives_may_be_opened": true,
+    "march_read_forbidden": true,
+    "final_holdout_must_remain_unaccessed": true,
+    "learner_update_semantics_must_match_parent_R0": true,
+    "diagnostic_must_not_mutate_training": true,
+    "no_threshold_or_training_changes_after_results": true,
+    "scientific_gate_miss_classification": "SCIENTIFIC_FAIL",
+    "contract_violation_classification": "CONTRACT_MISMATCH",
+    "runtime_or_environment_blocker_classification": "EXECUTION_BLOCKED"
+  },
+  "explicit_non_claims": [
+    "not_a_parent_R0_rescue",
+    "not_a_lambda_intervention",
+    "not_root_cause_resolution",
+    "not_historical_information_qualification",
+    "not_a_March_validation_result",
+    "not_a_final_holdout_result",
+    "not_a_profitability_result"
+  ],
+  "required_artifacts": [
+    "experiment_spec.json",
+    "RESULT.json",
+    "REPORT.md"
+  ]
+}
