@@ -2,6 +2,8 @@
 
 Status: **MASTER-ALIGNED V1 CANDIDATE — CONSTANTS REMAIN EXPERIMENT-SCOPED**
 
+Authority class: `CURRENT_DESIGN_CANDIDATE`; subordinate to `docs/authority/`.
+
 Purpose: define the smallest deterministic contract that converts Central Brain intent into account consequences without venue identity, hindsight, or strategy logic in Physics.
 
 ## 1. Runtime and timing

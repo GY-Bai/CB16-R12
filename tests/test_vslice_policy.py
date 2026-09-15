@@ -1,6 +1,6 @@
 """Actor/Critic/state-boundary regression tests: required tests 6-17.
 
-Required by ``docs/tasks/R12_VS_B_LEARNER_SPINE_R0.md`` (section "Required
+Required by ``docs/experiments/frozen/R12_VS_B_LEARNER_SPINE_R0.md`` (section "Required
 tests", "State boundary", "Actor / policy distribution", "Critic").
 
     .venv/bin/python -m unittest discover -s tests -t .

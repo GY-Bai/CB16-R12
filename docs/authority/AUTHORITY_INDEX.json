@@ -1,0 +1,55 @@
+{
+  "schema": "cb16.docs.authority-index.v1",
+  "current_canonical": [
+    "docs/authority/R12_EVIDENCE_SCOPE_AND_CLAIM_AUTHORITY.md",
+    "docs/authority/TASK_REVIEW_PROTOCOL.md"
+  ],
+  "authority_classes": {
+    "CURRENT_CANONICAL": {
+      "directory": "docs/authority",
+      "default_context": true
+    },
+    "CURRENT_DESIGN_CANDIDATE": {
+      "directory": "docs/design/current",
+      "default_context": false
+    },
+    "CURRENT_OPERATIONAL": {
+      "directory": "docs/operations/current",
+      "default_context": false
+    },
+    "CURRENT_TASK_SCOPE_ONLY": {
+      "directory": "docs/tasks/active",
+      "default_context": false
+    },
+    "FROZEN_HISTORICAL_AUTHORITY": {
+      "directory": "docs/experiments/frozen",
+      "default_context": false
+    },
+    "SUPERSEDED_ARCHAEOLOGY": {
+      "directory": "docs/archive",
+      "default_context": false
+    },
+    "TEMPLATE_ONLY": {
+      "directory": "docs/templates",
+      "default_context": false
+    }
+  },
+  "reading_order": [
+    "docs/README.md",
+    "docs/authority/README.md",
+    "relevant current design/operations/task dependencies only",
+    "referenced frozen historical contract only",
+    "archive only when explicit archaeology is required"
+  ],
+  "hard_rules": {
+    "recursive_flat_docs_ingest_forbidden": true,
+    "frozen_historical_gate_may_be_rewritten_by_later_interpretation": false,
+    "historical_status_text_implies_current_pending_status": false,
+    "new_experiment_id_refreshes_reused_development_data": false
+  },
+  "removed_from_current_tree": [
+    "docs/BOOTSTRAP_NEXT.md",
+    "docs/OCI_AGENT_SCIENCE_SANDBOX_CLOSURE_PROMPT.md",
+    "docs/tasks/DRY_RUN_SMOKE.md"
+  ]
+}

@@ -1,7 +1,7 @@
 """Known-answer tests for the R12 VS-A canonical contracts (required tests 1-11).
 
 Every expected value is derived by hand from
-``docs/tasks/R12_VS_A_PHYSICS_R0.md`` (sections 1 and 3) with explicit
+``docs/experiments/frozen/R12_VS_A_PHYSICS_R0.md`` (sections 1 and 3) with explicit
 ``math``/literal arithmetic, so the tests cannot be satisfied by re-running the
 implementation's own expression.
 

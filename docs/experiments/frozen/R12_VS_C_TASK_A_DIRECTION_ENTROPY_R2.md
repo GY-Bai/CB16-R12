@@ -153,7 +153,7 @@ Outcomes:
 - `CONTROL_INVALID`
 - `DIRECTION_ENTROPY_NOT_SUFFICIENT`
 
-A gate miss is `SCIENTIFIC_FAIL` scoped to **L2 — optimization-mechanism attribution** for the frozen direction-exploration hypothesis. It says the tested categorical-direction entropy intervention did not support that mechanism strongly enough; it does not establish that controlled learnability or the broader learner family is impossible. It is not permission to tune entropy or increase training under the same identity.
+A gate miss is `SCIENTIFIC_FAIL`, not permission to tune entropy or increase training under the same identity.
 
 ## Implementation constraints
 

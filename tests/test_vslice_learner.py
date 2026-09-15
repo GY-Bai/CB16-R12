@@ -1,6 +1,6 @@
 """Trajectory / return-to-go / generation-boundary regression tests: 4, 18-31.
 
-Required by ``docs/tasks/R12_VS_B_LEARNER_SPINE_R0.md`` (sections "Trajectory /
+Required by ``docs/experiments/frozen/R12_VS_B_LEARNER_SPINE_R0.md`` (sections "Trajectory /
 returns" and "Generation boundary / update"), plus required test 4 (the frozen
 sensory buffer survives a valid update).
 

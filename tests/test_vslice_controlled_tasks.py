@@ -1,6 +1,6 @@
 """R12 VS-C controlled-task regression tests (contract requirements 1-12).
 
-Required by ``docs/tasks/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md`` section
+Required by ``docs/experiments/frozen/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md`` section
 "Required implementation tests":
 
 1. Task-A flat raw window passes canonical N0 and yields identical normalized

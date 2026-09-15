@@ -2,6 +2,8 @@
 
 Status: **V1 OPERATIONAL DESIGN — READY TO IMPLEMENT**
 
+Authority class: `CURRENT_OPERATIONAL`; scientific claim interpretation remains subordinate to `docs/authority/`.
+
 Purpose: define the smallest trusted path by which Chat-SOL can schedule bounded Builder work and formal scientific runs through GitHub into the OCI execution host.
 
 ## 1. Control-plane rule
@@ -192,14 +194,16 @@ bounded execution log
 
 Large caches, datasets, model weights, and ordinary intermediate files stay on OCI and are not copied to GitHub.
 
-## 12. Failure semantics
+## 12. Execution and qualification status separation
 
 - DSH/code/test failure with a functioning execution path -> Builder report and PR remains reviewable.
 - dispatcher/runner failure -> `EXECUTION_BLOCKED`.
 - insufficient machine capacity -> `HARDWARE_LIMIT`.
-- formal experiment executes correctly and misses its gate -> `SCIENTIFIC_FAIL` **for that experiment's frozen claim**.
+- formal experiment executes validly but misses its frozen gate -> dispatcher-compatible `SCIENTIFIC_FAIL`.
 - task/spec conflicts with canonical authority -> `CONTRACT_MISMATCH`.
 
-The dispatcher status is intentionally coarse. Scientific interpretation must preserve failure locality: identify the tested layer and narrow failed claim, retain still-valid upstream evidence, and mark stronger untested downstream claims as not reached. See `docs/R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`.
+The dispatcher owns transport/execution classification. It does **not** infer scientific root cause, falsification, architecture feasibility, or promotion beyond what the experiment/result declares. A red GitHub Actions conclusion caused by a scientific gate miss is not evidence that infra failed.
 
-Infrastructure must not silently change the scientific method to convert a failure into a pass. Scientific reporting must likewise not silently widen a local failure into a project-wide negative conclusion.
+Where the result schema supports it, preserve separate `execution_status`, `validity_status`, `gate_results`, `claim_assessments`, and `promotion_decision`. Older result schemas remain reviewable; Chat-SOL applies `docs/authority/R12_EVIDENCE_SCOPE_AND_CLAIM_AUTHORITY.md` when interpreting them.
+
+Infrastructure must not silently change the scientific method to convert a gate miss into a pass. Scientific reporting must likewise not widen PASS or FAIL beyond the tested claim scope.

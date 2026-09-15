@@ -5,7 +5,7 @@ The N0 transform itself is the already-reviewed
 module only adapts the caller-facing contract and never re-implements,
 duplicates or alters the N0 math.
 
-Contract (``docs/tasks/R12_VS_A_PHYSICS_R0.md`` section 2):
+Contract (``docs/experiments/frozen/R12_VS_A_PHYSICS_R0.md`` section 2):
 
 * input contains exactly ``L`` represented bars plus the one retained
   predecessor used by the common normalization package;

@@ -1,7 +1,7 @@
 """Canonical R12 VS-A contracts: direction, action, account truth/state, config.
 
 Every semantic rule in this module is copied literally from
-``docs/tasks/R12_VS_A_PHYSICS_R0.md`` (sections 0, 1 and 3).  The module is
+``docs/experiments/frozen/R12_VS_A_PHYSICS_R0.md`` (sections 0, 1 and 3).  The module is
 pure: no market data, no dispatcher/GitHub/OCI code, no Central Brain, no
 mutable account object, no learning.
 

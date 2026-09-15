@@ -1,7 +1,7 @@
 """Frozen contract constants for the R12 normalization ablation.
 
 Every value in this module is copied literally from
-``docs/tasks/R12_NORMALIZATION_ABLATION_R0.md``.  The module is pure data: it
+``docs/experiments/frozen/R12_NORMALIZATION_ABLATION_R0.md``.  The module is pure data: it
 imports nothing, touches no market data, and knows nothing about GitHub, OCI,
 the dispatcher, account state or Central Brain code.
 """
@@ -15,7 +15,7 @@ from __future__ import annotations
 SCHEMA_SPEC = "cb16.normalization_ablation.spec.v1"
 SCHEMA_RESULT = "cb16.normalization_ablation.result.v1"
 RESULT_COMMAND = "cb16.normalization-ablation@v1"
-CONTRACT_FILE = "docs/tasks/R12_NORMALIZATION_ABLATION_R0.md"
+CONTRACT_FILE = "docs/experiments/frozen/R12_NORMALIZATION_ABLATION_R0.md"
 LOGICAL_DATA_NAME = "binance_um_1m_klines_10pairs"
 DEFAULT_KLINES_ROOT = "/cb16/raw/klines_1m"
 

@@ -1,7 +1,7 @@
 """Deterministic R12 VS-A account physics: mark, permission, execution, reward.
 
-Formulas are copied literally from ``docs/tasks/R12_VS_A_PHYSICS_R0.md``
-sections 3-7 and from ``docs/R12_ACTION_PERMISSION_ACCOUNT_PHYSICS.md``.  The
+Formulas are copied literally from ``docs/experiments/frozen/R12_VS_A_PHYSICS_R0.md``
+sections 3-7 and from ``docs/design/current/R12_ACTION_PERMISSION_ACCOUNT_PHYSICS.md``.  The
 module is pure: every function is deterministic, stateless and locally
 testable.  There is no hidden mutable account object, no venue identity, no
 market forecast, no strategy logic, no forced liquidation and no principal

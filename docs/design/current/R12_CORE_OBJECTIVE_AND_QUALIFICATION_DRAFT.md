@@ -2,6 +2,8 @@
 
 Status: **MASTER-ALIGNED DRAFT — NOT YET FINAL AUTHORITY**
 
+Authority class: `CURRENT_DESIGN_CANDIDATE`; subordinate to `docs/authority/`.
+
 ## 1. Product objective
 
 CB16 builds an autonomous, continuing Trader. Human authority stays outside the runtime policy. Runtime input must not include human macro direction, asset-name tokens, or other identity shortcuts.
@@ -273,11 +275,13 @@ The Pareto Archive stores qualified non-dominated policies. Active Champion is t
 
 `wiring works != controlled learning works != historical improvement exists != economic superiority exists != production profitability is established`.
 
-These are nested scientific layers, not one binary verdict. A failure at a later layer rejects only the narrow claim preregistered for that layer; it does not retroactively erase valid upstream evidence or prove that broader hypothesis families are impossible. The canonical interpretation rule is `docs/R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`.
+These are distinct claims with explicit dependencies, not one universal nested scientific ladder. Execution validity, reward semantics, optimization behavior, controlled learning, historical decision value, economics, robustness, and deployment scope may interact but do not inherit authority merely from an ordering label. The canonical claim-graph rule is `docs/authority/R12_EVIDENCE_SCOPE_AND_CLAIM_AUTHORITY.md`.
 
-R12 vertical slices are deliberately reduced component proofs. They are not compressed substitutes for the eventual full CB16 system. Their authority is compositional: establish one interface/mechanism strongly enough to reuse downstream, or identify the local component that must be repaired/replaced before composition. A reduced slice is never authorized to declare the final architecture feasible or infeasible.
+A formal gate decides only its declared qualification. A miss normally means the qualification was not earned; it is not automatically a falsification or a root-cause diagnosis. PASS is equally local and does not automatically transfer to a new configuration or composition.
 
-Formal experiments freeze question, data, transforms, metrics, and gates before execution. No silent rescue. Final holdout remains protected. The same discipline applies to negative interpretation: no post-hoc widening of what a failed gate is allowed to mean.
+R12 vertical slices are reduced qualification scaffolds, not compressed substitutes for the eventual full CB16 system. Component qualification permits only the explicitly named next use; composition and interaction require their own evidence. A local result propagates to a larger architecture only through a scope-matched logical necessity, promotion dependency, transfer assessment, or explicit synthesis of multiple results.
+
+Formal experiments freeze question, data, transforms, metrics, and gates before execution. No silent rescue. Final holdout remains protected. The same discipline forbids post-hoc widening of positive or negative conclusions.
 
 ## 10. Open decisions
 

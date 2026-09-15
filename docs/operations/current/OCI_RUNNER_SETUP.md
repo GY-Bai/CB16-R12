@@ -1,5 +1,7 @@
 # OCI Runner Setup (operator note)
 
+Authority class: `CURRENT_OPERATIONAL_NOTE`; this is setup/provenance, not scientific authority.
+
 This file records the one-time host setup that cannot be committed to the
 repository. It contains **no secret values** — only names, paths, and the
 commands needed to reproduce the state.
@@ -838,7 +840,7 @@ Once the workflows exist on `main`, GitHub Actions uses its own ephemeral
 
 ## 6. Repository visibility
 
-`docs/OCI_DSH_DISPATCH_CONTRACT.md` §8 prefers either a private development
+`docs/operations/current/OCI_DSH_DISPATCH_CONTRACT.md` §8 prefers either a private development
 repository or a separate private control repository while a self-hosted runner
 is active. `GY-Bai/CB16-R12` is currently **public** (as is `CB16-R10`).
 

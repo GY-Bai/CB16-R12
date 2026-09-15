@@ -67,8 +67,6 @@ Aggregate PASS additionally requires at least 6/8 passing seeds and strictly pos
 
 PASS means only `HISTORICAL_MARKET_INFORMATION_QUALIFIED`: under zero friction, a true historical context-to-consequence relation produced out-of-sample economic improvement beyond both shuffled-relation training and the untrained policy.
 
-FAIL is `SCIENTIFIC_FAIL / HISTORICAL_MARKET_INFORMATION_NOT_QUALIFIED` at **L4 — Historical information extraction**. It rejects only this frozen N0 + sensory + learner/objective/horizon/configuration claim on this BTCUSDT Jan-Feb→March development slice. It does **not** negate upstream controlled-learnability evidence, does not establish that markets contain no learnable information, and does not evaluate downstream cost-aware/continuing-account profitability or production authority. See `docs/R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`.
-
-Do not rescue by adding data, costs, features, generations, model capacity or threshold changes under this experiment identity.
+FAIL is `SCIENTIFIC_FAIL`; do not rescue by adding data, costs, features, generations, model capacity or threshold changes under this experiment identity.
 
 If PASS, the next experiment may test cost-aware / continuing-account historical behavior. If FAIL, investigate representation/objective/horizon as a new preregistered question rather than opening final holdout.

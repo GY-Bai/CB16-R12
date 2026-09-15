@@ -529,7 +529,7 @@ class EntrypointTests(ProbeTestCase):
             {
                 "mode": "science",
                 "commit_sha": "0" * 40,
-                "experiment_spec": "docs/tasks/INFRA_BOUNDARY_PROBE_R0.md",
+                "experiment_spec": "docs/experiments/frozen/INFRA_BOUNDARY_PROBE_R0.md",
                 "result_command": probe.RESULT_COMMAND,
             },
             "science",

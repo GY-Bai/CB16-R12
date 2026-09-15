@@ -1,6 +1,6 @@
 """R12 VS-C qualification-runner regression tests (contract requirements 13-20).
 
-Required by ``docs/tasks/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md`` section
+Required by ``docs/experiments/frozen/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md`` section
 "Required implementation tests":
 
 13. PRE evaluation occurs before any learner update and POST only after exactly
@@ -1102,7 +1102,7 @@ class AllowlistTests(unittest.TestCase):
             {
                 "mode": "science",
                 "commit_sha": "0" * 40,
-                "experiment_spec": "docs/tasks/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md",
+                "experiment_spec": "docs/experiments/frozen/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md",
                 "result_command": COMMAND,
             },
             "science",

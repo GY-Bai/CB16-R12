@@ -1,0 +1,72 @@
+{
+  "schema": "cb16.frozen-doc-index.v1",
+  "policy": "Files listed here are immutable historical contract snapshots. Later interpretation belongs in docs/authority, never by editing these bytes.",
+  "entries": [
+    {
+      "current_path": "docs/experiments/frozen/INFRA_BOUNDARY_PROBE_R0.md",
+      "historical_path": "docs/tasks/INFRA_BOUNDARY_PROBE_R0.md",
+      "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
+      "sha256": "9751fe0bc735dcbd2f1fd0654337f87d1c350a99be36ca78054b664ec0df4b4e"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_NORMALIZATION_ABLATION_R0.md",
+      "historical_path": "docs/tasks/R12_NORMALIZATION_ABLATION_R0.md",
+      "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
+      "sha256": "ca60f74f036600c36e0dff92c538c0130059ed827bb819dbb81d6aa2f37543df"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_NORMALIZATION_CORE_A_R0.md",
+      "historical_path": "docs/tasks/R12_NORMALIZATION_CORE_A_R0.md",
+      "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
+      "sha256": "16f79b05129083ed44cba72d123961feb2a719a730e1891ad6e8d893a93cd92c"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_A_PHYSICS_R0.md",
+      "historical_path": "docs/tasks/R12_VS_A_PHYSICS_R0.md",
+      "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
+      "sha256": "a23dfd460ba68701f1a53314267cfb0b72d900386537996cc75c365257ae8a1b"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_B_LEARNER_SPINE_R0.md",
+      "historical_path": "docs/tasks/R12_VS_B_LEARNER_SPINE_R0.md",
+      "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
+      "sha256": "131f63d795ce52947779d7a26c7dc5555eb3377bfa06273c85fd078f195cad52"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_FIRST_VERTICAL_SLICE_TASK.md",
+      "historical_path": "docs/R12_FIRST_VERTICAL_SLICE_TASK.md",
+      "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
+      "sha256": "54b2d665b875005a6686936d73f6336b981938fbc32e75be02f58652a49df7e3"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md",
+      "historical_path": "docs/tasks/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md",
+      "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
+      "sha256": "dfd34968659cb8551024bdf59a5235955f606b91445deac3255537a55b7846e0"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_C_TASK_A_VARIANCE_R1.md",
+      "historical_path": "docs/tasks/R12_VS_C_TASK_A_VARIANCE_R1.md",
+      "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
+      "sha256": "f7eaadbc3912cf71858611f115ebcdcb9ed33859ae3c38fba86f3bd343dec36a"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_C_TASK_A_DIRECTION_ENTROPY_R2.md",
+      "historical_path": "docs/tasks/R12_VS_C_TASK_A_DIRECTION_ENTROPY_R2.md",
+      "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
+      "sha256": "61e617e02062f6ece89093330cf3b1fceb1912293f32dabca3d358ffeb941ead"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_C_JOINT_CONFIRMATION_R3.md",
+      "historical_path": "docs/tasks/R12_VS_C_JOINT_CONFIRMATION_R3.md",
+      "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
+      "sha256": "ecf5b465b6fcf98e0c3e15f8398bae03831db399cb4bf786fbddc54be442c055"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_D_HISTORICAL_MARKET_CANARY_R0.md",
+      "historical_path": "docs/tasks/R12_VS_D_HISTORICAL_MARKET_CANARY_R0.md",
+      "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
+      "sha256": "bf310bab0599db894e308477f94d87fb9e6c0fb96f522538b2a0c6acc7f3bacb"
+    }
+  ]
+}

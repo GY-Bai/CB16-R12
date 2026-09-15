@@ -6,7 +6,7 @@ Authority (used literally):
   authority.  Every budget, formula, seed and control construction below is
   read from, or pinned to, that file; nothing here invents a scientific
   parameter.
-* ``docs/tasks/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md`` -- the task contract.
+* ``docs/experiments/frozen/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md`` -- the task contract.
 
 The module builds two known-answer synthetic environments on top of the merged
 VS-A Physics and VS-B learner spine and never modifies either:
