@@ -210,6 +210,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-d-historical-market-canary-r0@v1": {
+      "description": "R12 VS-D Historical Market-Information Canary R0. Verifies the frozen BTCUSDT 2020-01..03 archives and final-holdout manifest state, aggregates UTC 1h bars, trains true-context and shuffled-consequence learners on Jan-Feb, and evaluates untouched March development validation with preregistered day-block bootstrap gates.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.historical_market_canary_r0"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-d-historical-r0-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-d-historical-r0-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }

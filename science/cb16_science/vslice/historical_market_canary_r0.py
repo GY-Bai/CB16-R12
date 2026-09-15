@@ -62,6 +62,10 @@ COMPARISON_CONTROL = 1
 COMPARISON_PRE = 2
 
 
+class HistoricalDataUnavailable(RuntimeError):
+    """Required frozen data is not mounted/readable in the execution environment."""
+
+
 @dataclass(frozen=True)
 class HistoricalDataset:
     train_market: np.ndarray
@@ -274,7 +278,7 @@ def _sha256_file(path: Path) -> str:
             for chunk in iter(lambda: handle.read(1 << 20), b""):
                 digest.update(chunk)
     except OSError as exc:
-        raise ContractError(f"cannot read allowed archive {path.name}: {exc}") from exc
+        raise HistoricalDataUnavailable(f"cannot read allowed archive {path.name}: {exc}") from exc
     return digest.hexdigest()
 
 
@@ -284,7 +288,7 @@ def _load_manifest(spec: Mapping[str, Any]) -> Mapping[str, Any]:
     try:
         parsed = json.loads(path.read_text(encoding="utf-8"))
     except OSError as exc:
-        raise ContractError(f"cannot read frozen data manifest: {exc}") from exc
+        raise HistoricalDataUnavailable(f"cannot read frozen data manifest: {exc}") from exc
     except json.JSONDecodeError as exc:
         raise ContractError(f"frozen data manifest is invalid JSON: {exc}") from exc
     manifest = tasks.spec_mapping(parsed, "data manifest")
@@ -307,7 +311,7 @@ def _read_allowed_minutes(spec: Mapping[str, Any]) -> Tuple[np.ndarray, np.ndarr
         name = tasks.spec_str(entry["name"], "archive.name")
         path = source_dir / name
         if not path.is_file():
-            raise ContractError(f"required allowed archive is missing: {name}")
+            raise HistoricalDataUnavailable(f"required allowed archive is missing: {name}")
         digest = _sha256_file(path)
         expected_digest = tasks.spec_str(entry["sha256"], "archive.sha256")
         if digest != expected_digest:
@@ -324,6 +328,8 @@ def _read_allowed_minutes(spec: Mapping[str, Any]) -> Tuple[np.ndarray, np.ndarr
         valid, reasons = norm_data.validate_ohlcv(values)
         if not bool(valid.all()):
             raise ContractError(f"archive {name} contains invalid OHLCV rows: {reasons!r}")
+        if not bool((values[:, 4] >= 0.0).all()):
+            raise ContractError(f"archive {name} contains negative volume")
         all_times.append(times)
         all_values.append(values)
         archive_evidence.append({"name": name, "sha256": digest, "rows": int(len(times)), "member_name": info.member_name})
@@ -361,6 +367,11 @@ def aggregate_utc_hourly(times: np.ndarray, values: np.ndarray) -> Tuple[np.ndar
     ))
     if not np.all(np.isfinite(hourly)):
         raise ContractError("hourly OHLCV must be finite")
+    valid, reasons = norm_data.validate_ohlcv(hourly)
+    if not bool(valid.all()):
+        raise ContractError(f"aggregated hourly OHLCV is invalid: {reasons!r}")
+    if not bool((hourly[:, 4] >= 0.0).all()):
+        raise ContractError("aggregated hourly volume must be non-negative")
     return grouped_times[:, 0].copy(), hourly
 
 
@@ -765,6 +776,7 @@ def run_experiment(spec: Mapping[str, Any], dataset: HistoricalDataset, implemen
     if not test_gate["passed"]:
         raise ContractError("exact-commit implementation test gate is not green")
     records = run_seed_set(spec, dataset, model_seeds(spec))
+    _load_manifest(spec)  # final holdout must still be untouched after training/evaluation
     gate = aggregate_gate(spec, records)
     classification = "PASS" if gate["passed"] else "SCIENTIFIC_FAIL"
     outcome = "HISTORICAL_MARKET_INFORMATION_QUALIFIED" if gate["passed"] else "HISTORICAL_MARKET_INFORMATION_NOT_QUALIFIED"
@@ -778,7 +790,10 @@ def run_experiment(spec: Mapping[str, Any], dataset: HistoricalDataset, implemen
         "runtime": runtime_record(),
         "implementation_tests": {**dict(implementation_tests), "gate": test_gate, "required_by_global_gate": True, "runner_executed_suite": True},
         "preregistered_spec": {"path": str(CONFIG_PATH.relative_to(REPO_ROOT)), "canonical_sha256": spec_sha256(spec), "model_seeds": list(model_seeds(spec)), "declared_status": spec.get("status")},
-        "data_evidence": dict(dataset.evidence),
+        "data_evidence": {
+            **dict(dataset.evidence),
+            "manifest_final_holdout_accessed_post_run": False,
+        },
         "seeds": records,
         "aggregate_gate": gate,
         "verdicts": {"global": "PASS" if gate["passed"] else "FAIL"},
@@ -896,6 +911,15 @@ def main() -> int:
         return EXIT_EXECUTION_BLOCKED
     try:
         _spec, result, exit_code = run_qualification(result_dir)
+    except HistoricalDataUnavailable as exc:
+        try:
+            spec = load_spec()
+        except ContractError:
+            spec = None
+        result = failure_result(spec, "EXECUTION_BLOCKED", f"{type(exc).__name__}: {exc}")
+        write_failure(result_dir, spec, result)
+        print(f"{RESULT_COMMAND}: EXECUTION_BLOCKED: {exc}", file=sys.stderr)
+        return EXIT_EXECUTION_BLOCKED
     except ContractError as exc:
         try:
             spec = load_spec()
