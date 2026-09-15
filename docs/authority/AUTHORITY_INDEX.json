@@ -2,7 +2,8 @@
   "schema": "cb16.docs.authority-index.v1",
   "current_canonical": [
     "docs/authority/R12_EVIDENCE_SCOPE_AND_CLAIM_AUTHORITY.md",
-    "docs/authority/TASK_REVIEW_PROTOCOL.md"
+    "docs/authority/TASK_REVIEW_PROTOCOL.md",
+    "docs/authority/R12_HISTORICAL_DATA_ROLE_AND_ACCESS_POLICY.md"
   ],
   "authority_classes": {
     "CURRENT_CANONICAL": {
@@ -49,7 +50,9 @@
     "verification_pass_implies_validation_pass": false,
     "diagnostic_screening_or_exploratory_result_grants_qualification": false,
     "protocol_may_be_rescued_after_result_inspection": false,
-    "new_complexity_requires_declared_admission_basis": true
+    "new_complexity_requires_declared_admission_basis": true,
+    "unassigned_historical_data_default_deny": true,
+    "experiment_may_self_assign_new_data_role": false
   },
   "removed_from_current_tree": [
     "docs/BOOTSTRAP_NEXT.md",

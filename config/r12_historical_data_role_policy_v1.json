@@ -1,0 +1,59 @@
+{
+  "schema": "cb16.historical-data-role-policy.v1",
+  "status": "CURRENT_CANONICAL",
+  "authority_doc": "docs/authority/R12_HISTORICAL_DATA_ROLE_AND_ACCESS_POLICY.md",
+  "principles": {
+    "default_for_unassigned_market_data": "UNASSIGNED_PROTECTED",
+    "unassigned_protected_is_not_final_holdout": true,
+    "availability_does_not_grant_scientific_access": true,
+    "experiment_identity_does_not_assign_data_role": true,
+    "role_assignment_must_precede_experiment_preregistration": true,
+    "adaptive_exposure_history_is_not_reset_by_role_change": true
+  },
+  "explicit_assignments": [
+    {
+      "dataset": "binance_um_1m_klines_10pairs",
+      "symbol": "BTCUSDT",
+      "month": "2020-01",
+      "role": "EXPOSED_DEVELOPMENT",
+      "exposure": [
+        "R0_training",
+        "R1_training",
+        "R2A_training",
+        "R3-R9_adaptive_development"
+      ]
+    },
+    {
+      "dataset": "binance_um_1m_klines_10pairs",
+      "symbol": "BTCUSDT",
+      "month": "2020-02",
+      "role": "EXPOSED_DEVELOPMENT",
+      "exposure": [
+        "R0-R1_training_or_context",
+        "R2A_training",
+        "R3-R9_adaptive_development"
+      ]
+    },
+    {
+      "dataset": "binance_um_1m_klines_10pairs",
+      "symbol": "BTCUSDT",
+      "month": "2020-03",
+      "role": "EXPOSED_DEVELOPMENT",
+      "exposure": [
+        "R0_development_validation",
+        "R1_reused_development",
+        "R7_robustness"
+      ]
+    }
+  ],
+  "protected_holdout": {
+    "repository_role_assignment": "NOT_ASSIGNED",
+    "access_authorized": false,
+    "note": "This policy intentionally does not infer a final-holdout date range from chronology or raw-data availability."
+  },
+  "formal_science_access_rule": {
+    "EXPOSED_DEVELOPMENT": "may_be_used_only_with_explicit_adaptive_exposure_record_and_claim_local_authority",
+    "UNASSIGNED_PROTECTED": "forbidden_until_a_separate_current-canonical_policy_change_assigns_a_role_before_protocol_preregistration",
+    "FINAL_HOLDOUT": "forbidden_until_separately_authorized_by_current_canonical_authority"
+  }
+}

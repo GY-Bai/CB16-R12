@@ -115,6 +115,12 @@
       "historical_path": "docs/tasks/active/R12_VS_D_BOUNDED_RIDGE_REGULARIZATION_ACCESSIBILITY_SCREEN_R8.md",
       "snapshot_commit": "4d7fd045567f2d3d4f770eaed9c51e172143c71a",
       "sha256": "431e85a5ce3c4b289eab07814db94492b5d1607b913c201cecdadfc82da10c40"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_D_LINEAR_ACTION_CONTRAST_DIAGNOSTIC_R9.md",
+      "historical_path": "docs/tasks/active/R12_VS_D_LINEAR_ACTION_CONTRAST_DIAGNOSTIC_R9.md",
+      "snapshot_commit": "58dfde86ec26a8909c04913ac908cb05556cf277",
+      "sha256": "db94a5d557b05a7661cd008ff911b6abb61b6a95ecaf5dce916c6aae5a956df5"
     }
   ]
 }
