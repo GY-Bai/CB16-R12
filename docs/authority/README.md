@@ -9,6 +9,7 @@ Files in this directory are the first documentation context for present scientif
 - `AUTHORITY_INDEX.json` — machine-readable authority classes, default-context policy, and reading order.
 - `R12_EVIDENCE_SCOPE_AND_CLAIM_AUTHORITY.md` — claim scope, experiment roles, verification vs validation, estimand/inference boundaries, PASS/FAIL interpretation, dependency types, promotion authority, adaptive data exposure, and temporal governance.
 - `TASK_REVIEW_PROTOCOL.md` — task construction, two-stage scientific protocol/result review, immutable execution, diagnostic/screening rules, complexity admission, and evidence handling.
+- `R12_HISTORICAL_DATA_ROLE_AND_ACCESS_POLICY.md` — explicit historical-data roles, default-deny access for unassigned slices, and the rule that data-role authority must precede experiment preregistration.
 
 ## Precedence
 
