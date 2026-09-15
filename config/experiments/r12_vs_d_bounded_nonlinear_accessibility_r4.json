@@ -1,0 +1,320 @@
+{
+  "schema": "cb16.experiment.v2",
+  "experiment_id": "r12.vs_d.bounded_nonlinear_accessibility_diagnostic.r4",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "parent_experiment_ids": [
+    "r12.vs_d.historical_market_information_canary.r0",
+    "r12.vs_d.evaluation_adapter_transfer_diagnostic.r1",
+    "r12.vs_d.objective_balance_entropy_gradient_diagnostic.r2a",
+    "r12.vs_d.representation_accessibility_diagnostic.r3"
+  ],
+  "tested_object": "Bounded supervised nonlinear accessibility of next-hour arithmetic return from flattened N0, compared with matched shuffled-target MLP controls and the exact R3 linear ridge baseline",
+  "claim_scope": {
+    "data": "BTCUSDT_2020-01_2020-02_reused_development_only",
+    "probe_fit": "January_679_decisions",
+    "probe_validation": "February_696_decisions_29_day_blocks",
+    "march_read_forbidden": true,
+    "final_holdout_access_forbidden": true,
+    "representation": "N0_FLATTENED_64x5_only",
+    "target": "next_hour_arithmetic_return_close_over_open_minus_1",
+    "nonlinear_probe": "MLP_64x64_tanh_full_batch_MSE",
+    "linear_baseline": "exact_R3_closed_form_ridge_lambda_1"
+  },
+  "research_series_policy": {
+    "series_id": "r12.vs_d.historical_development",
+    "parent_results_inspected": true,
+    "adaptation_rationale": "R3 N0 linear point correlation was positive (+0.060759778) but preregistered day-block accessibility gates were not met; R4 tests one bounded nonlinear probe under a new identity without changing R3",
+    "r3_n0_point_corr_observed": 0.060759778,
+    "r3_n0_corr_lcb_observed": -0.016041388,
+    "freshness_status": "DIAGNOSTIC_REUSED_JAN_FEB_AFTER_R3_INSPECTION",
+    "new_experiment_id_does_not_reset_adaptation_history": true,
+    "march_read_forbidden": true,
+    "final_holdout_access_forbidden": true,
+    "no_validation_based_model_selection": true,
+    "if_both_claims_qualify": "may promote a separately preregistered supervised/trainable-sensory candidate hypothesis only",
+    "if_only_nonlinear_accessibility_qualifies": "may promote bounded nonlinear accessibility as a candidate relation, but not a sensory replacement",
+    "if_nonlinear_accessibility_does_not_qualify": "do_not_rescue_R4; do not infer general nonlinear inaccessibility or absence of market information"
+  },
+  "claims": [
+    {
+      "claim_id": "C_N0_BOUNDED_NONLINEAR_ACCESSIBILITY",
+      "tested_object": "fixed two-hidden-layer tanh MLP on January-standardized flattened N0",
+      "claim_domain": "representation/nonlinear_accessibility",
+      "claim_scope": {
+        "surface": "N0_FLATTENED_64x5",
+        "probe": "fixed_MLP_64_64_tanh",
+        "validation": "reused_February_development",
+        "model_seeds": "4501..4508"
+      },
+      "estimand": {
+        "primary": [
+          "per_seed_MLP_true_corr_bootstrap_LCB",
+          "per_seed_MLP_true_minus_matched_shuffle_corr_bootstrap_LCB"
+        ],
+        "unit": "model_seed",
+        "aggregate": "at_least_6_of_8_seed_passes_plus_positive_cross_seed_medians"
+      },
+      "authority_scope": [
+        "may support bounded nonlinear accessibility of the specified next-hour relation from N0 under this exact supervised probe",
+        "may record that this bounded nonlinear accessibility gate was not met"
+      ],
+      "promotion_scope": [
+        "PROMOTE_BOUNDED_NONLINEAR_ACCESSIBILITY_HYPOTHESIS",
+        "PROMOTE_SUPERVISED_SENSORY_CANDIDATE_HYPOTHESIS"
+      ],
+      "invalid_inferences": [
+        "does_not_qualify_historical_market_information",
+        "does_not_prove_general_nonlinear_accessibility_or_inaccessibility",
+        "does_not_establish_economic_profitability",
+        "does_not_make_this_MLP_a_final_sensory_model",
+        "does_not_authorize_final_holdout"
+      ],
+      "composition_dependencies": [
+        {
+          "type": "validity_dependency",
+          "ref": "same_R3_January_February_chronology_and_N0_surface"
+        },
+        {
+          "type": "validity_dependency",
+          "ref": "matched_true_vs_shuffled_target_initialization_and_training_schedule"
+        }
+      ]
+    },
+    {
+      "claim_id": "C_NONLINEAR_OVER_LINEAR_GAIN",
+      "tested_object": "paired February correlation gain of the fixed nonlinear MLP over the exact R3 ridge baseline",
+      "claim_domain": "representation/probe_family_gain",
+      "claim_scope": {
+        "comparison": "MLP_true_corr_minus_R3_linear_true_corr",
+        "validation": "reused_February_development",
+        "model_seeds": "4501..4508"
+      },
+      "estimand": {
+        "primary": "per-seed paired day-block bootstrap lower bound of MLP true correlation minus R3 linear true correlation",
+        "unit": "model_seed",
+        "aggregate": "at_least_6_of_8_seed_passes_plus_positive_median_point_gain"
+      },
+      "authority_scope": [
+        "may support that this bounded nonlinear probe extracts more February-accessible relation than the exact R3 linear baseline",
+        "may reject promotion of a nonlinear-over-linear gain hypothesis"
+      ],
+      "promotion_scope": [
+        "PROMOTE_SUPERVISED_SENSORY_CANDIDATE_HYPOTHESIS"
+      ],
+      "invalid_inferences": [
+        "does_not_prove_nonlinearity_is_the_unique_missing_mechanism",
+        "does_not_prove_FrozenSensory_is_the_root_cause",
+        "does_not_qualify_market_information_or_profitability",
+        "does_not_authorize_integration_into_R4"
+      ],
+      "composition_dependencies": [
+        {
+          "type": "promotion_prerequisite",
+          "ref": "C_N0_BOUNDED_NONLINEAR_ACCESSIBILITY"
+        },
+        {
+          "type": "validity_dependency",
+          "ref": "exact_R3_linear_baseline_reproduction"
+        }
+      ]
+    }
+  ],
+  "gate_mapping": {
+    "C_N0_BOUNDED_NONLINEAR_ACCESSIBILITY": [
+      "G_NONLINEAR_SEED",
+      "G_NONLINEAR_AGGREGATE"
+    ],
+    "C_NONLINEAR_OVER_LINEAR_GAIN": [
+      "G_GAIN_SEED",
+      "G_GAIN_AGGREGATE"
+    ]
+  },
+  "allowed_promotion_decisions": [
+    "NO_PROMOTION",
+    "PROMOTE_BOUNDED_NONLINEAR_ACCESSIBILITY_HYPOTHESIS",
+    "PROMOTE_SUPERVISED_SENSORY_CANDIDATE_HYPOTHESIS"
+  ],
+  "promotion_policy": {
+    "if_both_claims_qualified": "PROMOTE_SUPERVISED_SENSORY_CANDIDATE_HYPOTHESIS",
+    "if_only_C_N0_BOUNDED_NONLINEAR_ACCESSIBILITY_qualified": "PROMOTE_BOUNDED_NONLINEAR_ACCESSIBILITY_HYPOTHESIS",
+    "otherwise": "NO_PROMOTION"
+  },
+  "data": {
+    "source_root": "/cb16/raw/klines_1m/BTCUSDT",
+    "manifest_path": "/cb16/raw/DOWNLOAD_MANIFEST.json",
+    "require_manifest_final_holdout_accessed_false": true,
+    "allowed_archives": [
+      {
+        "name": "BTCUSDT-1m-2020-01.zip",
+        "sha256": "b4e13ea185ba96c413ac9167cfbb6e238eb5eae119a7a77f41f4c61c5e099d03",
+        "expected_rows": 44640
+      },
+      {
+        "name": "BTCUSDT-1m-2020-02.zip",
+        "sha256": "f32b20168ea590cd7d04a2995bc5ec500ea06331c8174f7fd14f29c1078e5ed2",
+        "expected_rows": 41760
+      }
+    ],
+    "forbidden_reads": [
+      "BTCUSDT-1m-2020-03.zip",
+      "any_final_holdout_archive"
+    ],
+    "hourly_aggregation": {
+      "timezone": "UTC",
+      "require_exactly_60_contiguous_1m_rows_per_hour": true,
+      "expected_hourly_bars": 1440
+    },
+    "context": {
+      "normalization": "N0_ENDPOINT_ANCHORED_V1",
+      "represented_hours": 64,
+      "retained_predecessor_hours": 1,
+      "raw_window_hours": 65
+    },
+    "probe_fit": {
+      "consequence_hour_start_utc": "2020-01-03T17:00:00Z",
+      "consequence_hour_end_utc": "2020-01-31T23:00:00Z",
+      "expected_decisions": 679
+    },
+    "probe_validation": {
+      "consequence_hour_start_utc": "2020-02-01T00:00:00Z",
+      "consequence_hour_end_utc": "2020-02-29T23:00:00Z",
+      "expected_decisions": 696,
+      "expected_day_blocks": 29,
+      "hours_per_day": 24
+    }
+  },
+  "representation": {
+    "surface": "N0_FLATTENED_64x5",
+    "input_width_before_constant_drop": 320
+  },
+  "target": {
+    "formula": "close_next / open_next - 1.0",
+    "January_fit_only": true,
+    "February_evaluation_only": true,
+    "realized_winner_label": false
+  },
+  "preprocessing": {
+    "feature_standardization": "January_mean_and_population_std; drop std<=1e-12; freeze for February",
+    "target_standardization": "January_mean_and_population_std; train MLP on standardized target; inverse-transform predictions for evaluation",
+    "validation_refit_forbidden": true
+  },
+  "nonlinear_probe": {
+    "framework": "torch_cpu",
+    "dtype": "float32",
+    "architecture": [
+      "Linear(active_features,64)",
+      "Tanh",
+      "Linear(64,64)",
+      "Tanh",
+      "Linear(64,1)"
+    ],
+    "loss": "full_batch_mean_squared_error_on_standardized_January_target",
+    "optimizer": "Adam",
+    "learning_rate": 0.001,
+    "betas": [
+      0.9,
+      0.999
+    ],
+    "eps": 1e-08,
+    "weight_decay": 0.0,
+    "epochs": 256,
+    "batch": "all_679_January_rows_each_epoch_in_fixed_order",
+    "dropout": 0.0,
+    "early_stopping": false,
+    "validation_monitoring_during_training": false,
+    "torch_num_threads": 1,
+    "deterministic_algorithms": true,
+    "model_seeds": [
+      4501,
+      4502,
+      4503,
+      4504,
+      4505,
+      4506,
+      4507,
+      4508
+    ]
+  },
+  "negative_control": {
+    "type": "shuffle_January_training_target_only",
+    "permutation": "controlled_tasks.no_fixed_point_permutation",
+    "control_permutation_seeds": [
+      14501,
+      14502,
+      14503,
+      14504,
+      14505,
+      14506,
+      14507,
+      14508
+    ],
+    "generation_argument": 0,
+    "matched_model_initialization": true,
+    "same_training_schedule": true,
+    "February_true_target_unchanged": true
+  },
+  "linear_baseline": {
+    "source": "R3_exact_closed_form_ridge",
+    "ridge_lambda": 1.0,
+    "same_January_feature_standardization": true,
+    "same_February_validation": true
+  },
+  "uncertainty_protocol": {
+    "validation_blocks": "29_UTC_calendar_days_x_24_hours",
+    "bootstrap_replicates": 4096,
+    "bootstrap_seeds": [
+      15401,
+      15402,
+      15403,
+      15404,
+      15405,
+      15406,
+      15407,
+      15408
+    ],
+    "lower_bound_order_index_zero_based": 204,
+    "paired_within_seed_across_MLP_control_and_linear": true,
+    "correlation": "Pearson"
+  },
+  "seed_gates": {
+    "G_NONLINEAR_SEED": {
+      "conditions": {
+        "MLP_true_corr_LCB_strictly_gt": 0.0,
+        "MLP_true_minus_matched_control_corr_LCB_strictly_gt": 0.0
+      }
+    },
+    "G_GAIN_SEED": {
+      "conditions": {
+        "MLP_true_minus_R3_linear_corr_LCB_strictly_gt": 0.0
+      }
+    }
+  },
+  "aggregate_gates": {
+    "G_NONLINEAR_AGGREGATE": {
+      "seed_pass_count_min": 6,
+      "median_MLP_true_corr_strictly_gt": 0.0,
+      "median_MLP_true_minus_control_corr_strictly_gt": 0.0
+    },
+    "G_GAIN_AGGREGATE": {
+      "seed_pass_count_min": 6,
+      "median_MLP_true_minus_R3_linear_corr_strictly_gt": 0.0
+    }
+  },
+  "implementation_gate": {
+    "full_repository_suite_must_pass_at_exact_commit": true,
+    "result_schema": "cb16.result.v2"
+  },
+  "no_rescue": [
+    "no_architecture_change",
+    "no_epoch_change",
+    "no_learning_rate_change",
+    "no_model_seed_change",
+    "no_control_seed_change",
+    "no_split_change",
+    "no_target_change",
+    "no_bootstrap_change",
+    "no_early_stopping",
+    "no_March_read",
+    "no_final_holdout_read"
+  ]
+}
