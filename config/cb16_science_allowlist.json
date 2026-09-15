@@ -262,6 +262,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-d-objective-balance-r2a@v1": {
+      "description": "R12 VS-D R2A training-only objective-balance diagnostic. Reads only frozen BTCUSDT Jan-Feb 2020 training archives, reproduces the R0 true-context and shuffled-consequence training arms, and before every unchanged update decomposes reward-driven categorical-direction policy-gradient versus lambda-weighted categorical entropy gradient on the same theta/batch. March and final holdout are forbidden. Emits cb16.result.v2 claim-local authority.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.objective_balance_entropy_gradient_r2a"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-d-objective-balance-r2a-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-d-objective-balance-r2a-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
