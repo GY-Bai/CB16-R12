@@ -2,7 +2,7 @@
 """CB16-R12 deterministic OCI dispatcher.
 
 Implements the trusted GitHub -> OCI dispatch contract described in
-``docs/OCI_DSH_DISPATCH_CONTRACT.md``.
+``docs/operations/current/OCI_DSH_DISPATCH_CONTRACT.md``.
 
 This file is deterministic glue.  It validates trusted metadata, manages one
 task worktree, runs either the Builder lane (headless DSH) or the immutable
@@ -61,7 +61,7 @@ LANE_SCIENCE = "science"
 
 LABEL_LANE = {BUILDER_LABEL: LANE_BUILDER, SCIENCE_LABEL: LANE_SCIENCE}
 
-#: Failure vocabulary from docs/TASK_REVIEW_PROTOCOL.md.
+#: Failure vocabulary from docs/authority/TASK_REVIEW_PROTOCOL.md.
 CLASS_OK = "OK"
 CLASS_SCIENTIFIC_FAIL = "SCIENTIFIC_FAIL"
 CLASS_EXECUTION_BLOCKED = "EXECUTION_BLOCKED"
@@ -81,7 +81,7 @@ EXIT_EVIDENCE_INSUFFICIENT = 6
 EXIT_BUILDER_FAIL = 7
 
 #: Classifications that still publish a reviewable result.  Per
-#: docs/OCI_DSH_DISPATCH_CONTRACT.md section 12, a Builder failure with a
+#: docs/operations/current/OCI_DSH_DISPATCH_CONTRACT.md section 12, a Builder failure with a
 #: functioning execution path must remain reviewable, and a formal experiment
 #: that executes correctly but misses its gate keeps its evidence (negative
 #: results are preserved).
@@ -96,7 +96,7 @@ CONTROL_PLANE_PATTERNS: Tuple[str, ...] = (
     ".github/",
     "scripts/cb16_dispatch.py",
     "config/cb16_science_allowlist.json",
-    "docs/OCI_DSH_DISPATCH_CONTRACT.md",
+    "docs/operations/current/OCI_DSH_DISPATCH_CONTRACT.md",
 )
 
 LOG_LIMIT = 20000

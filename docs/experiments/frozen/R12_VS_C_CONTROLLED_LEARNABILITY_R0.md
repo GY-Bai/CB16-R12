@@ -22,7 +22,7 @@ Task B: early action -> immediate reward carries no information
         -> later account consequence carries the credit signal
 ```
 
-The final formal run must use the merged VS-A Physics and VS-B learner unchanged unless a genuine contract mismatch is found before qualification. A gate miss is `SCIENTIFIC_FAIL` at **L3 — Controlled learnability** for the specific R0 claim, not permission to rescue R0 and not a project-wide scientific verdict.
+The final formal run must use the merged VS-A Physics and VS-B learner unchanged unless a genuine contract mismatch is found before qualification. A gate miss is `SCIENTIFIC_FAIL`, not permission to rescue R0.
 
 ## Existing authority
 
@@ -294,11 +294,9 @@ Task B aggregate PASS requires all four JSON aggregate conditions.
 
 Both Task A and Task B aggregate gates PASS and the full implementation test suite is green.
 
-If implementation is correct but a scientific gate misses, top-level result classification is exactly:
+If implementation is correct but a scientific gate misses, result classification is exactly:
 
 `SCIENTIFIC_FAIL`
-
-Its semantic scope is **L3 — Controlled learnability**: only the frozen R0 controlled-learning proposition is rejected. L0/L1 implementation and reward-loop evidence that independently passed remains evidence; L4 historical-information and L5 economic-robustness claims are not reached. See `docs/R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`.
 
 Do not rerun with different thresholds, learning rates, budgets, architectures, seeds, friction, gap magnitude, sensory seed, or controls under the same R0 identity.
 

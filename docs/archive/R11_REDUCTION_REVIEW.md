@@ -43,7 +43,7 @@ Latest R12 decisions override conflicting legacy requirements.
 | Multi-objective qualification | Economic Value and Survival/Path Risk are not collapsed into one arbitrary weighted score. | Pareto comparator. |
 | Evidence != objective | Evidence controls confidence in claims; it is not tradeable for return. | Objective estimates and uncertainty reported separately. |
 | Pareto archive | Statistically non-dominated qualified policies may coexist. | Machine-maintained archive. |
-| Scientific claim ladder | Wiring, controlled learning, historical improvement, economic superiority and production profitability are distinct claims; reduced MVP slices are component proofs, not verdicts on the feasibility of the eventual full CB16 design. | Stage-specific, component-scoped tests; PASS licenses composition, FAIL blocks only the tested component/configuration. |
+| Scientific claim ladder | Wiring, controlled learning, historical improvement, economic superiority and production profitability are distinct claims. | Stage-specific tests. |
 | Final-holdout protection | Final holdout remains unopened until explicitly authorized. | Dataset-access guard. |
 | Historical knowledge not manually erased by recency | New evidence may recalibrate behavior without mandatory deletion of historical information. | No default chronological expiry/reset. |
 | No handcrafted recurrence engine | Recurrence should primarily live in learned parameters and current normalized inputs. | No default manual cycle/regime switch tables. |
@@ -73,7 +73,7 @@ Latest R12 decisions override conflicting legacy requirements.
 | Permission boundary | Impossible/illegal execution is prevented independently of Trader intent. | Simple in-process checks. |
 | Provenance | Formal results identify code/config/data strongly enough to reproduce the claim. | Git commit + compact run manifest + external-artifact hashes only where needed. |
 | CPU-first development | Start with CPU to minimize system complexity. | Single host; bounded multiprocessing only when measured useful. |
-| Failure taxonomy | Distinguish execution/contract failures from scientific gate misses **and preserve failure locality across nested scientific layers**. | Top-level `SCIENTIFIC_FAIL`, `EXECUTION_BLOCKED`, `HARDWARE_LIMIT`, `EVIDENCE_INSUFFICIENT`, `CONTRACT_MISMATCH`; every scientific FAIL also names its layer, narrow failed claim, preserved upstream evidence, and downstream claims not reached. See `R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`. |
+| Failure taxonomy | Distinguish scientific failure from execution/hardware/evidence problems. | `SCIENTIFIC_FAIL`, `EXECUTION_BLOCKED`, `HARDWARE_LIMIT`, `EVIDENCE_INSUFFICIENT`, `CONTRACT_MISMATCH`. |
 
 ---
 

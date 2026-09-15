@@ -135,13 +135,13 @@ class DispatchTestCase(unittest.TestCase):
 
     def _make_repo(self):
         repo = self.tmp / "repo"
-        (repo / "docs" / "tasks").mkdir(parents=True)
+        (repo / "docs" / "tasks" / "active").mkdir(parents=True)
         (repo / "config").mkdir(parents=True)
         (repo / "tests").mkdir(parents=True)
         shutil.copy(REPO_ROOT / ".gitignore", repo / ".gitignore")
         shutil.copy(ALLOWLIST_PATH, repo / "config" / "cb16_science_allowlist.json")
         shutil.copytree(REPO_ROOT / "science", repo / "science")
-        (repo / "docs" / "tasks" / "TASK.md").write_text(
+        (repo / "docs" / "tasks" / "active" / "TASK.md").write_text(
             "# Objective\n\nBounded task.\n", encoding="utf-8"
         )
         (repo / "docs" / "TASK_SPEC.json").write_text("{}\n", encoding="utf-8")
@@ -166,7 +166,7 @@ class DispatchTestCase(unittest.TestCase):
             "mode": "build",
             "base_sha": self.sha,
             "branch": "ds/test-task",
-            "task_file": "docs/tasks/TASK.md",
+            "task_file": "docs/tasks/active/TASK.md",
         }
         meta.update(overrides)
         return meta
@@ -333,7 +333,7 @@ class MetadataValidationTests(DispatchTestCase):
                 self.assertEqual(spec.branch, branch)
 
     def test_escaping_task_file_paths_are_rejected(self):
-        for path in ("/etc/passwd", "../outside.md", "docs/../../etc/passwd", "docs/tasks/x.md\nrm"):
+        for path in ("/etc/passwd", "../outside.md", "docs/../../etc/passwd", "docs/tasks/active/x.md\nrm"):
             with self.subTest(path=path):
                 with self.assertRaises(dispatcher.ContractMismatch):
                     dispatcher.validate_metadata(self.builder_meta(task_file=path), "builder")
@@ -349,7 +349,7 @@ class ShellTextTests(DispatchTestCase):
         marker = self.tmp / "PWNED"
         payloads = (
             self.builder_meta(branch=f"ds/x; touch {marker}"),
-            self.builder_meta(task_file=f"docs/tasks/TASK.md; touch {marker}"),
+            self.builder_meta(task_file=f"docs/tasks/active/TASK.md; touch {marker}"),
             self.builder_meta(mode=f"build; touch {marker}"),
         )
         for meta in payloads:
@@ -416,7 +416,7 @@ class LabelAndLaneTests(DispatchTestCase):
         with self.assertRaises(dispatcher.ContractMismatch):
             dispatcher.validate_metadata(mixed_builder, "builder")
         mixed_science = self.science_meta()
-        mixed_science["task_file"] = "docs/tasks/TASK.md"
+        mixed_science["task_file"] = "docs/tasks/active/TASK.md"
         with self.assertRaises(dispatcher.ContractMismatch):
             dispatcher.validate_metadata(mixed_science, "science")
 

@@ -1,5 +1,7 @@
 # CB16-R12 AI Infra Architecture
 
+Authority class: `CURRENT_OPERATIONAL`; this document does not define scientific claim scope.
+
 ## Goal
 Minimize coordination and transport overhead while preserving enough independent review to safely develop a stateful ML/RL system. The AI infrastructure must remain thinner than the system it helps build.
 

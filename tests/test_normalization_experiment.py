@@ -400,7 +400,7 @@ class AllowlistTests(unittest.TestCase):
                     {
                         "mode": "science",
                         "commit_sha": "0" * 40,
-                        "experiment_spec": "docs/tasks/R12_NORMALIZATION_ABLATION_R0.md",
+                        "experiment_spec": "docs/experiments/frozen/R12_NORMALIZATION_ABLATION_R0.md",
                         "result_command": command,
                     },
                     "science",
@@ -493,7 +493,7 @@ class ContractAlignmentTests(unittest.TestCase):
         self.assertEqual(PROJECTION_SHAPE, (32, CONTEXT_LENGTH * 5))
 
     def test_candidate_ids_match_the_contract_document(self):
-        contract = (REPO_ROOT / "docs" / "tasks" / "R12_NORMALIZATION_ABLATION_R0.md").read_text(
+        contract = (REPO_ROOT / "docs" / "experiments" / "frozen" / "R12_NORMALIZATION_ABLATION_R0.md").read_text(
             encoding="utf-8"
         )
         for candidate_id in CANDIDATE_IDS:

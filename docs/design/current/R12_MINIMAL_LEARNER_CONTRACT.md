@@ -2,6 +2,8 @@
 
 Status: **MASTER-ALIGNED V1 CANDIDATE — FOR CONTROLLED LEARNABILITY FIRST**
 
+Authority class: `CURRENT_DESIGN_CANDIDATE`; subordinate to `docs/authority/`.
+
 Purpose: prove that the R12 closed loop can learn account-conditioned sequential behavior from economic consequences before adding replay, off-policy correction, PPO, distributed training, or a more elaborate critic.
 
 This learner is a minimal scientific baseline, not a claim that it is the final historical/production learner.
@@ -228,15 +230,15 @@ The following are diagnostics only:
 - parameter movement;
 - checkpoint creation.
 
-Scientific success requires preregistered frozen-policy behavioral evidence.
+Scientific qualification requires preregistered frozen-policy behavioral evidence. Actor/critic loss is not required to decrease monotonically across on-policy generations: the policy and visited state/action distribution are changing, so a monotonic cross-generation loss curve is not a generic correctness criterion unless an experiment explicitly defines one.
 
-Failure under a valid implementation is `SCIENTIFIC_FAIL` for the **specific preregistered claim being tested**, not permission to add PPO/replay/Teacher/V-trace within the same run identity and not evidence that the entire learner/scientific program is invalid. Controlled-learnability failure, historical-information failure, and economic-robustness failure are distinct layers. See `docs/R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`.
+For a valid implementation, `SCIENTIFIC_FAIL` means the frozen qualification gate was not met. The tested learner/configuration does not earn that qualification under the declared scope. This is not permission to rescue the same run, but neither is it automatically a falsification of the whole learner family or a diagnosis of the failing mechanism. Record qualification, inference, attribution, and promotion separately under `docs/authority/R12_EVIDENCE_SCOPE_AND_CLAIM_AUTHORITY.md`.
 
-This minimal learner is an intentionally reduced component test. Its job is to establish whether one simple learning spine can satisfy its local contracts strongly enough to compose with later CB16 modules. Failure requires local diagnosis/replacement; it does not define what a richer final Central Brain with additional organs, routing, memory, objectives, or coordination can ultimately achieve.
+This minimal learner is an intentionally reduced candidate component. Its job is to provide scoped evidence about one simple learning spine and expose measurable capability gaps before richer composition. A PASS does not prove future composition; a FAIL blocks only the promotion that depends on the missed qualification unless a broader logical dependency is separately established.
 
 ## 13. Escalation rule
 
-Only consider a more complex learner after the minimal baseline exposes a diagnosed blocker.
+Only consider a more complex learner after the minimal baseline exposes a **measured capability gap, stability problem, or explicit interaction hypothesis** that the added mechanism is intended to address. A uniquely proven root cause is not required before research can continue, but generic complexity without a falsifiable reason is not authorized.
 
 Examples:
 

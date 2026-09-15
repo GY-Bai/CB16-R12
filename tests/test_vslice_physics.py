@@ -1,6 +1,6 @@
 """Known-answer tests for R12 VS-A Permission, Execution, and account physics.
 
-Required tests 12-28 of ``docs/tasks/R12_VS_A_PHYSICS_R0.md`` section 9.
+Required tests 12-28 of ``docs/experiments/frozen/R12_VS_A_PHYSICS_R0.md`` section 9.
 Expected values are hand-computed from the contract formulas with literal
 arithmetic; the predicate is never re-derived from a second risk rule.
 

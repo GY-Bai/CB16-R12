@@ -1,6 +1,6 @@
 """Frozen-sensory regression tests: required tests 1-5 of the R12 VS-B contract.
 
-Required by ``docs/tasks/R12_VS_B_LEARNER_SPINE_R0.md`` (section "Required
+Required by ``docs/experiments/frozen/R12_VS_B_LEARNER_SPINE_R0.md`` (section "Required
 tests", "Frozen sensory").  Test 4 (the projection buffer survives a valid
 Actor/Critic update) needs a learner and lives in ``test_vslice_learner.py``.
 

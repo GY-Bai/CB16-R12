@@ -6,7 +6,7 @@ Authority:
   spec.  The formal entrypoint reads exactly that file; there is no CLI
   argument, environment variable or alternate path that can override a
   scientific parameter.
-* ``docs/tasks/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md`` -- the task contract.
+* ``docs/experiments/frozen/R12_VS_C_CONTROLLED_LEARNABILITY_R0.md`` -- the task contract.
 
 The runner implements the preregistered protocol literally:
 

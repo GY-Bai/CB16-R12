@@ -1,5 +1,7 @@
 # Example Task Contract
 
+Authority class: `TEMPLATE_ONLY` — copy into `docs/tasks/active/`; do not dispatch this file itself.
+
 > Copy this file when opening a new bounded task. Replace every section.
 > The matching GitHub Issue carries the trusted metadata block; this file is
 > what the Builder reads for scope and acceptance.
@@ -26,7 +28,7 @@ it literally rather than delegating invention.
 
 - authoritative semantics, thresholds, interfaces outside the listed scope
 - anything under the dispatch control plane (`.github/`, `scripts/cb16_dispatch.py`,
-  `config/cb16_science_allowlist.json`, `docs/OCI_DSH_DISPATCH_CONTRACT.md`)
+  `config/cb16_science_allowlist.json`, `docs/operations/current/OCI_DSH_DISPATCH_CONTRACT.md`)
   unless the Issue metadata sets `allow_control_plane: true`
 
 # Required tests
