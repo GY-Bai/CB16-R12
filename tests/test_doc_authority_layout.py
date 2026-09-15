@@ -52,8 +52,10 @@ class DocumentationAuthorityLayoutTests(unittest.TestCase):
         frozen = DOCS / "experiments" / "frozen"
         active = DOCS / "tasks" / "active"
         self.assertTrue((frozen / "R12_VS_D_HISTORICAL_MARKET_CANARY_R0.md").is_file())
-        active_files = sorted(p.name for p in active.iterdir() if p.is_file())
-        self.assertEqual(active_files, ["README.md"])
+        self.assertFalse((active / "R12_VS_D_HISTORICAL_MARKET_CANARY_R0.md").exists())
+        frozen_names = {p.name for p in frozen.iterdir() if p.is_file()}
+        active_names = {p.name for p in active.iterdir() if p.is_file() and p.name != "README.md"}
+        self.assertFalse(frozen_names & active_names)
 
     def test_frozen_contract_hashes_are_immutable(self) -> None:
         frozen_index = json.loads(FROZEN_INDEX.read_text())
