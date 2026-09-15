@@ -80,7 +80,7 @@ median PRE->POST true delayed log-growth improvement >= 0.02
 
 If either control exceeds its preregistered maximum, outcome is `CONTROL_INVALID`.
 
-If controls remain valid but any confirmation condition fails, outcome is `JOINT_CONFIRMATION_FAILED` and classification is `SCIENTIFIC_FAIL`. No rescue, threshold change, extra generations or coefficient tuning is allowed under R3.
+If controls remain valid but any confirmation condition fails, outcome is `JOINT_CONFIRMATION_FAILED` and top-level classification is `SCIENTIFIC_FAIL` scoped to **L3 — Controlled learnability confirmation**. This would reject only the fresh-seed joint-confirmation claim for the frozen learner configuration; it would not by itself decide historical-information or profitability layers. No rescue, threshold change, extra generations or coefficient tuning is allowed under R3.
 
 ## Formal runtime
 

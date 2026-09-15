@@ -197,7 +197,9 @@ Large caches, datasets, model weights, and ordinary intermediate files stay on O
 - DSH/code/test failure with a functioning execution path -> Builder report and PR remains reviewable.
 - dispatcher/runner failure -> `EXECUTION_BLOCKED`.
 - insufficient machine capacity -> `HARDWARE_LIMIT`.
-- formal experiment executes correctly and misses its gate -> `SCIENTIFIC_FAIL`.
+- formal experiment executes correctly and misses its gate -> `SCIENTIFIC_FAIL` **for that experiment's frozen claim**.
 - task/spec conflicts with canonical authority -> `CONTRACT_MISMATCH`.
 
-Infrastructure must not silently change the scientific method to convert a failure into a pass.
+The dispatcher status is intentionally coarse. Scientific interpretation must preserve failure locality: identify the tested layer and narrow failed claim, retain still-valid upstream evidence, and mark stronger untested downstream claims as not reached. See `docs/R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`.
+
+Infrastructure must not silently change the scientific method to convert a failure into a pass. Scientific reporting must likewise not silently widen a local failure into a project-wide negative conclusion.

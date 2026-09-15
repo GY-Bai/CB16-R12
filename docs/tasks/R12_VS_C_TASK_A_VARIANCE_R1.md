@@ -170,7 +170,7 @@ Interpretation:
 
 `all_flat_post` is a mechanism diagnostic only; it is not part of the gate.
 
-A complete experiment whose variance-support gate is not met is `SCIENTIFIC_FAIL` for this R1 hypothesis. It is not permission to change thresholds under the same identity.
+A complete experiment whose variance-support gate is not met is `SCIENTIFIC_FAIL` for this **L2 optimization-mechanism attribution hypothesis**: the preregistered claim that the tested batch-size variance change is sufficient is not supported. It does not mean the learner, Task A relation, or broader scientific program is impossible. It is not permission to change thresholds under the same identity.
 
 ## Implementation requirements
 
@@ -214,6 +214,6 @@ Do not add entropy regularization, behavior-policy floors, supervised targets, a
 - implementation or spec mismatch: `CONTRACT_MISMATCH`
 - environment/runtime cannot complete the frozen run: `EXECUTION_BLOCKED`
 - hardware cannot support the frozen run: `HARDWARE_LIMIT`
-- complete valid run but variance-support gate misses: `SCIENTIFIC_FAIL`
+- complete valid run but variance-support gate misses: `SCIENTIFIC_FAIL` scoped to **L2 / the frozen variance-sufficiency hypothesis**
 
-No same-identity rescue.
+No same-identity rescue. Apply the failure-locality rule from `docs/R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`; this outcome does not erase upstream contract evidence or decide later historical/economic layers.

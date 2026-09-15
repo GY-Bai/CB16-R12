@@ -197,7 +197,12 @@ experiment_spec.json
 - seed-level behavioral metric(s);
 - aggregate gate result;
 - PASS / SCIENTIFIC_FAIL / EXECUTION_BLOCKED / HARDWARE_LIMIT / EVIDENCE_INSUFFICIENT / CONTRACT_MISMATCH;
+- for any `SCIENTIFIC_FAIL`, the scoped scientific layer and exact failed claim; later R12 result schemas should also record preserved upstream evidence and stronger downstream claims not reached;
 - relevant test-suite result.
+
+The top-level classification is operational vocabulary, not a project-wide scientific verdict. Interpret it according to `docs/R12_FAILURE_LOCALITY_AND_SCIENTIFIC_LAYERS.md`.
+
+This first vertical slice is deliberately a minimal verification scaffold. It is not a miniature authority for the eventual full CB16 architecture. PASS licenses only the tested interfaces/mechanisms for later composition; FAIL blocks only the tested component/configuration until it is repaired, replaced, or re-hypothesized. Neither outcome is authorized to decide final-system feasibility.
 
 `REPORT.md` must distinguish:
 
