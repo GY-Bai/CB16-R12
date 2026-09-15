@@ -49,11 +49,16 @@
     "verification_pass_implies_validation_pass": false,
     "diagnostic_screening_or_exploratory_result_grants_qualification": false,
     "protocol_may_be_rescued_after_result_inspection": false,
-    "new_complexity_requires_measured_gap_or_explicit_requirement": true
+    "new_complexity_requires_declared_admission_basis": true
   },
   "removed_from_current_tree": [
     "docs/BOOTSTRAP_NEXT.md",
     "docs/OCI_AGENT_SCIENCE_SANDBOX_CLOSURE_PROMPT.md",
     "docs/tasks/DRY_RUN_SMOKE.md"
+  ],
+  "complexity_admission_bases": [
+    "EXPLICIT_SEMANTIC_DEPLOYMENT_OR_SAFETY_REQUIREMENT",
+    "MEASURED_CAPABILITY_RELIABILITY_OR_PERFORMANCE_GAP",
+    "PREREGISTERED_INTERACTION_HYPOTHESIS_REQUIRING_THE_MECHANISM"
   ]
 }

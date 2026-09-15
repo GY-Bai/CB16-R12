@@ -40,7 +40,7 @@ Formal scientific work has two distinct review phases.
 
 **Stage 1 — protocol review, before results are known.** The reviewer checks that the experiment is capable of answering its declared question and freezes, as applicable:
 
-- `experiment_role` and `claim_kind` (`VERIFICATION` or `VALIDATION`);
+- `experiment_role` and, where applicable, `vv_classification` (`VERIFICATION`, `VALIDATION`, or `NOT_APPLICABLE`);
 - scientific question, tested object, claim/domain/scope;
 - estimand, estimator, replication/dependence unit, and uncertainty procedure;
 - validity prerequisites and conditions that would make the result invalid for the claim;
@@ -72,7 +72,7 @@ Use explicit negative/random/shuffle controls when they materially test leakage 
 
 Every formal experiment also declares one role before execution: `QUALIFICATION`, `FALSIFICATION`, `DIAGNOSTIC`, `SCREENING`, `EXPLORATORY`, `ROBUSTNESS`, or `TRANSFER`. Diagnostic, screening, and exploratory work may guide the next hypothesis but do not silently become qualification evidence. A falsification experiment must be designed so the evidence can actually support the scoped negative proposition; a qualification gate miss alone is insufficient.
 
-For claims that cross implementation correctness and scientific capability, state them separately. **Verification** asks whether the declared system was built correctly; **Validation** asks whether that verified system does the scientifically/economically intended job in the declared context. Neither substitutes for the other.
+For claims that cross implementation correctness and scientific capability, state them separately. **Verification** asks whether the declared system was built correctly; **Validation** asks whether that verified system does the scientifically/economically intended job in the declared context. Neither substitutes for the other. This V&V classification is not exhaustive: a mechanism-local diagnostic or screening claim may be `NOT_APPLICABLE` while its `experiment_role` still governs its inference authority.
 
 The top-level dispatcher/run vocabulary remains:
 

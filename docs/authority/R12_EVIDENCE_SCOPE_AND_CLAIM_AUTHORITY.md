@@ -49,7 +49,7 @@ CB16's scientific authority is a graph of scoped claims and typed dependencies. 
 Each formal experiment should declare one `experiment_role`: `QUALIFICATION`, `FALSIFICATION`, `DIAGNOSTIC`, `SCREENING`, `EXPLORATORY`, `ROBUSTNESS`, or `TRANSFER`. Each claim inside it should identify:
 
 - `claim_id`: stable identifier;
-- `claim_kind`: `VERIFICATION` when the question is whether an implementation satisfies a declared contract, or `VALIDATION` when the question is whether the system has the intended scientific/economic capability in a declared use context;
+- `vv_classification`: `VERIFICATION` when the claim asks whether an implementation satisfies a declared contract, `VALIDATION` when it asks whether a verified system has the intended capability in a declared use context, or `NOT_APPLICABLE` when the claim is neither kind (for example, a mechanism-local diagnostic measurement);
 - `tested_object`: component, interface, learner, configuration, integration, or composed system;
 - `claim_domain`: semantics, optimization, controlled behavior, decision value, economics, robustness, generalization, or another declared domain;
 - `claim_scope`: data, asset, time, environment, account semantics, costs, budget, horizon, evaluation adapter, and version boundaries;
@@ -202,7 +202,7 @@ parent_experiment_ids
 experiment_role
 tested_object
 claims[]
-claim_kind
+vv_classification
 claim_scope
 estimand
 estimator
@@ -324,7 +324,7 @@ R12 uses the systems-engineering distinction explicitly:
 - **Verification** asks whether the implementation satisfies the declared contract: formulas, invariants, interfaces, determinism, accounting, masks, timing, provenance, and other specified behavior.
 - **Validation** asks whether the verified system has the intended scientific/economic capability in the declared use context: learns the relation, improves the decision, transfers, survives costs, or supports deployment.
 
-Verification is often a prerequisite for validation, but it is not validation evidence by itself. Conversely, an observed validation improvement does not excuse a contract-invalid implementation. Reviews should state which kind of claim each gate supports. Here `VALIDATION` is a systems-engineering claim kind; it is not the same thing as a dataset role named development/validation.
+Verification is often a prerequisite for validation, but it is not validation evidence by itself. Conversely, an observed validation improvement does not excuse a contract-invalid implementation. `vv_classification` is an orthogonal applicability annotation, not an exhaustive scientific-claim taxonomy: mechanism-local diagnostic, screening, or exploratory claims may be `NOT_APPLICABLE`. Here `VALIDATION` is a systems-engineering classification; it is not the same thing as a dataset role named development/validation.
 
 ## 18. Claim argument and credible alternatives
 

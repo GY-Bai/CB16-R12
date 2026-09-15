@@ -27,4 +27,4 @@ Canonical R12 documents are forward-looking specifications. Write what the syste
 - Prefer squash merge for completed bounded tasks.
 
 ## Default restraint
-Do not add new distributed services, custom authority databases, custom lease/fencing systems, speculative performance infrastructure, or compatibility layers for abandoned behavior unless an explicit task requires them. Permanent new machinery should be justified by an explicit semantic/deployment requirement or a measured capability, reliability, or performance gap under `docs/authority/TASK_REVIEW_PROTOCOL.md`.
+Do not add new distributed services, custom authority databases, custom lease/fencing systems, speculative performance infrastructure, or compatibility layers for abandoned behavior unless an explicit task requires them. Permanent new machinery should have a declared admission basis under `docs/authority/TASK_REVIEW_PROTOCOL.md`: an explicit semantic/deployment/safety requirement, a measured capability/reliability/performance gap, or a preregistered interaction hypothesis that specifically requires the mechanism.

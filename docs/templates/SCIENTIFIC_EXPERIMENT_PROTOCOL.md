@@ -9,7 +9,7 @@ Use the smallest subset that is scientifically material, but do not omit a field
 - `experiment_id`:
 - `parent_experiment_ids`:
 - `experiment_role`: `QUALIFICATION | FALSIFICATION | DIAGNOSTIC | SCREENING | EXPLORATORY | ROBUSTNESS | TRANSFER`
-- `claim_kind`: `VERIFICATION | VALIDATION` (split into multiple claims when both are needed; `VALIDATION` here is a claim kind, not a validation-data split)
+- `vv_classification`: `VERIFICATION | VALIDATION | NOT_APPLICABLE` (split into multiple claims when needed; mechanism-local diagnostics may be `NOT_APPLICABLE`; `VALIDATION` here is not a validation-data split)
 - `tested_object`:
 
 ## Scientific question and claims
@@ -73,4 +73,4 @@ The result review should report separately:
 
 ## Escalation or complexity trigger
 
-If the experiment is intended to justify a more complex learner, replay path, service, database, GPU/distributed dependency, or other permanent mechanism, state the measured gap/requirement it addresses and what follow-up evidence would justify retaining that complexity.
+If the experiment is intended to justify a more complex learner, replay path, service, database, GPU/distributed dependency, or other permanent mechanism, state its admission basis: an explicit semantic/deployment/safety requirement, a measured capability/reliability/performance gap, or a preregistered interaction hypothesis that specifically requires it. Also state what follow-up evidence would justify retaining the added complexity.
