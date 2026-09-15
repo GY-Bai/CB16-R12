@@ -366,6 +366,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-d-bounded-context-length-accessibility-screen-r6@v1": {
+      "description": "R12 VS-D R6 bounded context-length accessibility SCREENING. Reads only frozen BTCUSDT Jan-Feb 2020 common chronology, compares N0 contexts 16/32/64/128h on the same one-hour target with exact ridge lambda=1, matched shuffled-January-target controls, and paired 48h circular moving-block bootstrap. Screening only; March and final holdout forbidden. Emits cb16.result.v2.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.bounded_context_length_accessibility_screen_r6"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-d-context-r6-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-d-context-r6-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
