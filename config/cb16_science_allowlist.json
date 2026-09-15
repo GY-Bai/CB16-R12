@@ -236,6 +236,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-d-evaluation-adapter-transfer-r1@v1": {
+      "description": "R12 VS-D R1 evaluation-adapter transfer diagnostic. Reuses the exact VS-D R0 BTCUSDT Jan-Feb training / March reused-development protocol and frozen learner, then compares the original deterministic argmax-direction + Beta-mean adapter against deterministic expected one-step log-growth under the complete stochastic policy distribution using 64-node Gauss-Legendre quadrature. Emits cb16.result.v2 claim-local gate/assessment/promotion fields. March is not fresh confirmation and final holdout remains unopened.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.evaluation_adapter_transfer_r1"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-d-adapter-r1-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-d-adapter-r1-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
