@@ -340,6 +340,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-d-bounded-horizon-accessibility-screen-r5@v1": {
+      "description": "R12 VS-D R5 bounded horizon accessibility SCREENING. Reads only frozen BTCUSDT Jan-Feb 2020 common chronology, compares 1h/4h/12h/24h forward-return targets with exact N0 ridge lambda=1, eight matched shuffled-January-target controls per horizon, and paired 48h circular moving-block bootstrap. Screening only; March and final holdout forbidden. Emits cb16.result.v2.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.bounded_horizon_accessibility_screen_r5"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-d-horizon-r5-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-d-horizon-r5-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
