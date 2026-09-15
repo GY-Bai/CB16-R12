@@ -1,0 +1,34 @@
+elapsed_s 1.8430643398314714
+         321132 function calls (310689 primitive calls) in 1.840 seconds
+
+   Ordered by: cumulative time
+   List reduced from 805 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    1.843    1.843 task_a_direction_entropy_r2.py:291(run_seed)
+        2    0.000    0.000    1.825    0.912 task_a_direction_entropy_r2.py:249(_arm_result)
+        4    0.004    0.001    1.773    0.443 qualification_vectorized.py:24(_train_task_a)
+       64    0.001    0.000    0.993    0.016 learner.py:319(update_one_step_batch)
+       64    0.001    0.000    0.724    0.011 vectorized_tasks.py:191(build_task_a_one_step_batch)
+       64    0.007    0.000    0.697    0.011 vectorized_tasks.py:165(_task_a_generation_tensors)
+       64    0.007    0.000    0.571    0.009 learner.py:463(_objectives_from_tensors)
+      216    0.026    0.000    0.457    0.002 policy.py:412(forward)
+ 1816/352    0.005    0.000    0.456    0.001 module.py:1779(_wrapped_call_impl)
+ 1816/352    0.008    0.000    0.455    0.001 module.py:1787(_call_impl)
+      280    0.004    0.000    0.422    0.002 container.py:254(forward)
+       64    0.037    0.001    0.418    0.007 vectorized_tasks.py:115(task_a_reward_batch)
+       64    0.003    0.000    0.410    0.006 learner.py:336(_commit_update)
+      128    0.052    0.000    0.355    0.003 vectorized_tasks.py:91(_boundary_batch)
+      560    0.001    0.000    0.263    0.000 activation.py:429(forward)
+      632    0.263    0.000    0.263    0.000 {built-in method torch.tanh}
+      128    0.001    0.000    0.257    0.002 _tensor.py:566(backward)
+      128    0.002    0.000    0.256    0.002 __init__.py:255(backward)
+      128    0.002    0.000    0.249    0.002 graph.py:1059(_engine_run_backward)
+       64    0.001    0.000    0.248    0.004 policy.py:456(log_prob_batch)
+      128    0.246    0.002    0.246    0.002 {method 'run_backward' of 'torch._C._EngineBase' objects}
+     3328    0.153    0.000    0.244    0.000 vectorized_tasks.py:75(_candidate_feasible_batch)
+       64    0.014    0.000    0.234    0.004 vectorized_tasks.py:42(sample_action_batch)
+       64    0.003    0.000    0.226    0.004 policy.py:427(_log_prob_impl)
+       64    0.001    0.000    0.182    0.003 policy.py:469(direction_entropy_batch)
+
+

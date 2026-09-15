@@ -1,0 +1,34 @@
+elapsed_s 1.9084195997565985
+         322540 function calls (312097 primitive calls) in 1.905 seconds
+
+   Ordered by: cumulative time
+   List reduced from 806 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    1.908    1.908 task_a_direction_entropy_r2.py:291(run_seed)
+        2    0.000    0.000    1.890    0.945 task_a_direction_entropy_r2.py:249(_arm_result)
+        4    0.005    0.001    1.838    0.460 qualification_vectorized.py:24(_train_task_a)
+       64    0.001    0.000    1.034    0.016 learner.py:318(update_one_step_batch)
+       64    0.001    0.000    0.748    0.012 vectorized_tasks.py:191(build_task_a_one_step_batch)
+       64    0.008    0.000    0.719    0.011 vectorized_tasks.py:165(_task_a_generation_tensors)
+       64    0.007    0.000    0.585    0.009 learner.py:465(_objectives_from_tensors)
+      216    0.026    0.000    0.469    0.002 policy.py:412(forward)
+ 1816/352    0.005    0.000    0.469    0.001 module.py:1779(_wrapped_call_impl)
+ 1816/352    0.008    0.000    0.468    0.001 module.py:1787(_call_impl)
+       64    0.037    0.001    0.435    0.007 vectorized_tasks.py:115(task_a_reward_batch)
+      280    0.004    0.000    0.433    0.002 container.py:254(forward)
+       64    0.004    0.000    0.414    0.006 learner.py:335(_commit_update)
+      128    0.055    0.000    0.371    0.003 vectorized_tasks.py:91(_boundary_batch)
+      560    0.001    0.000    0.263    0.000 activation.py:429(forward)
+      632    0.263    0.000    0.263    0.000 {built-in method torch.tanh}
+      128    0.001    0.000    0.258    0.002 _tensor.py:566(backward)
+      128    0.003    0.000    0.257    0.002 __init__.py:255(backward)
+       64    0.001    0.000    0.255    0.004 policy.py:456(log_prob_batch)
+     3328    0.159    0.000    0.253    0.000 vectorized_tasks.py:75(_candidate_feasible_batch)
+      128    0.002    0.000    0.249    0.002 graph.py:1059(_engine_run_backward)
+      128    0.247    0.002    0.247    0.002 {method 'run_backward' of 'torch._C._EngineBase' objects}
+       64    0.014    0.000    0.238    0.004 vectorized_tasks.py:42(sample_action_batch)
+       64    0.003    0.000    0.232    0.004 policy.py:427(_log_prob_impl)
+       64    0.001    0.000    0.188    0.003 policy.py:469(direction_entropy_batch)
+
+

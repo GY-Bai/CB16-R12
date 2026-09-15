@@ -1,0 +1,3382 @@
+{
+  "classification": "PASS",
+  "commit_sha": "465c8c916d0f67472b1575e177e8e24b1e29a4cf",
+  "experiment_id": "r12.vs_c.joint_confirmation.r3",
+  "implementation_tests": {
+    "command": [
+      "/tmp/cb16-vs-c-joint-confirmation-r3-venv/bin/python",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-t",
+      "."
+    ],
+    "commit_sha": "465c8c916d0f67472b1575e177e8e24b1e29a4cf",
+    "copied_file_count": 96,
+    "copy_matches_source": true,
+    "copy_sha256": "1a092e85774bcd6457e357860f09c5797933ce93f14d0727940c899261fa360f",
+    "exit_code": 0,
+    "gate": {
+      "components": {
+        "command": [
+          "/tmp/cb16-vs-c-joint-confirmation-r3-venv/bin/python",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "tests",
+          "-t",
+          "."
+        ],
+        "commit_sha": "465c8c916d0f67472b1575e177e8e24b1e29a4cf",
+        "copied_file_count": 96,
+        "copy_sha256": "1a092e85774bcd6457e357860f09c5797933ce93f14d0727940c899261fa360f",
+        "exit_code": 0,
+        "git_head": "465c8c916d0f67472b1575e177e8e24b1e29a4cf",
+        "git_head_matches_declared_commit": true,
+        "git_snapshot": true,
+        "skipped": null,
+        "source_sha256": "1a092e85774bcd6457e357860f09c5797933ce93f14d0727940c899261fa360f",
+        "status": "PASS",
+        "tests_run": 467
+      },
+      "conditions": {
+        "copy_matches_source": true,
+        "exact_commit": true,
+        "source_sha256_matches_current_tree": true,
+        "source_unchanged": true,
+        "suite_green": true
+      },
+      "passed": true
+    },
+    "git_head": "465c8c916d0f67472b1575e177e8e24b1e29a4cf",
+    "git_snapshot": true,
+    "note": "The suite is executed by this runner against a byte-identical copy of the exact commit's implementation surface; a non-green suite is CONTRACT_MISMATCH and no scientific verdict is produced.",
+    "passed": true,
+    "preregistered_requirement": "global_gate.implementation_tests_must_pass: the full implementation test suite must be green at the exact commit",
+    "required_by_global_gate": true,
+    "runner_executed_suite": true,
+    "skipped": null,
+    "source_sha256": "1a092e85774bcd6457e357860f09c5797933ce93f14d0727940c899261fa360f",
+    "source_unchanged": true,
+    "status": "PASS",
+    "stderr_tail": "...................................................................................................................................................................................................................................................................................................................................................................................................................................................................................\n----------------------------------------------------------------------\nRan 467 tests in 67.740s\n\nOK\n",
+    "stdout_tail": "",
+    "tests_run": 467,
+    "unittest_ok": true
+  },
+  "joint_gate": {
+    "controls_valid": true,
+    "outcome": "JOINT_LEARNABILITY_CONFIRMED",
+    "passed": true,
+    "task_a": {
+      "components": {
+        "control_seed_pass_count": 0,
+        "paired_positive_target_mae_strictly_better_than_control_count": 8,
+        "positive_median_pre_to_post_target_mae_improvement": 0.4982339726828743,
+        "positive_seed_pass_count": 8
+      },
+      "conditions": {
+        "control_seed_pass_count": true,
+        "paired_positive_target_mae_strictly_better_than_control_count": true,
+        "positive_median_pre_to_post_target_mae_improvement": true,
+        "positive_seed_pass_count": true
+      },
+      "passed": true,
+      "preregistered": {
+        "control_seed_pass_count_max": 1,
+        "paired_positive_target_mae_strictly_better_than_control_count_min": 7,
+        "positive_median_pre_to_post_target_mae_improvement_min": 0.15,
+        "positive_seed_pass_count_min": 7
+      },
+      "seed_count": 8
+    },
+    "task_b": {
+      "components": {
+        "control_seed_pass_count": 0,
+        "paired_positive_growth_minus_control_count": 8,
+        "paired_positive_growth_minus_control_min_observed": 0.08727025990372532,
+        "positive_median_pre_to_post_true_delayed_log_growth_improvement": 0.08816077539895895,
+        "positive_seed_pass_count": 8
+      },
+      "conditions": {
+        "control_seed_pass_count": true,
+        "paired_positive_growth_minus_control_count": true,
+        "positive_median_pre_to_post_true_delayed_log_growth_improvement": true,
+        "positive_seed_pass_count": true
+      },
+      "passed": true,
+      "preregistered": {
+        "control_seed_pass_count_max": 1,
+        "paired_positive_growth_minus_control_count_min": 7,
+        "paired_positive_growth_minus_control_min": 0.02,
+        "positive_median_pre_to_post_true_delayed_log_growth_improvement_min": 0.02,
+        "positive_seed_pass_count_min": 7
+      },
+      "seed_count": 8
+    }
+  },
+  "preregistered_spec": {
+    "canonical_sha256": "ae0f5778a3d509eb9a31d657cfa29665a3eced0b5463b7e53b79aaefe94827c8",
+    "declared_status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+    "paired_seeds": [
+      2201,
+      2202,
+      2203,
+      2204,
+      2205,
+      2206,
+      2207,
+      2208
+    ],
+    "path": "config/experiments/r12_vs_c_joint_confirmation_r3.json"
+  },
+  "result_command": "cb16.vs-c-joint-confirmation-r3@v1",
+  "runtime": {
+    "deterministic_algorithms": false,
+    "device": "cpu",
+    "direction_entropy_coefficient": 0.005,
+    "engine": "vectorized-batched-v1",
+    "max_seed_workers": 4,
+    "numpy": "2.5.3",
+    "python": "3.12.13",
+    "torch": "2.14.0+cpu",
+    "torch_num_threads": 4,
+    "uv_project_environment": "/tmp/cb16-vs-c-joint-confirmation-r3-venv"
+  },
+  "schema": "cb16.result.v1",
+  "scientific_outcome": "JOINT_LEARNABILITY_CONFIRMED",
+  "seeds": [
+    {
+      "seed": 2201,
+      "task_a": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": -0.031429534061172416,
+            "first_critic_loss": 0.0021226569808717954,
+            "generations": 256,
+            "last_actor_loss": -0.005523709046433927,
+            "last_critic_loss": 0.0005476239246307008,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10498563296239088,
+                "requested_risk": 0.49662542324538805,
+                "target_absolute_error": 0.996625423245388,
+                "target_exposure": 0.49662542324538805
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05106563746657484,
+                "requested_risk": 0.49783701305059846,
+                "target_absolute_error": 0.49783701305059846,
+                "target_exposure": 0.49783701305059846
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -8.716204531175663e-05,
+                "requested_risk": 0.49912841753188875,
+                "target_absolute_error": 0.0008715824681112538,
+                "target_exposure": 0.49912841753188875
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.05204614415809249,
+            "target_exposure_mae": 0.49844467292136585
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 1,
+              "target_exposure_mae": 0.3333333333333333
+            },
+            "conditions": {
+              "direction_correct_count": false,
+              "target_exposure_mae": false
+            },
+            "passed": false,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        },
+        "paired": {
+          "control_target_mae_improvement": 0.16511133958803254,
+          "positive_post_target_mae_strictly_better_than_control": true,
+          "positive_target_mae_improvement": 0.495098855173575,
+          "post_control_target_mae": 0.3333333333333333,
+          "post_positive_target_mae": 0.003345817747790858,
+          "pre_control_target_mae": 0.49844467292136585,
+          "pre_positive_target_mae": 0.49844467292136585
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": -0.0328485485773477,
+            "first_critic_loss": 0.0022243121404903338,
+            "generations": 256,
+            "last_actor_loss": -0.006624465781015025,
+            "last_critic_loss": 6.339419680071812e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "SHORT",
+                "direction_correct": true,
+                "one_step_log_growth": -0.0006280735226824906,
+                "requested_risk": 0.4937212367420554,
+                "target_absolute_error": 0.006278763257944575,
+                "target_exposure": -0.4937212367420554
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -0.00037593965500044087,
+                "requested_risk": 0.496241310014572,
+                "target_absolute_error": 0.0037586899854279987,
+                "target_exposure": 0.496241310014572
+              }
+            ],
+            "direction_correct_count": 3,
+            "mean_one_step_log_growth": -0.0003346710592276438,
+            "target_exposure_mae": 0.003345817747790858
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10498563296239088,
+                "requested_risk": 0.49662542324538805,
+                "target_absolute_error": 0.996625423245388,
+                "target_exposure": 0.49662542324538805
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05106563746657484,
+                "requested_risk": 0.49783701305059846,
+                "target_absolute_error": 0.49783701305059846,
+                "target_exposure": 0.49783701305059846
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -8.716204531175663e-05,
+                "requested_risk": 0.49912841753188875,
+                "target_absolute_error": 0.0008715824681112538,
+                "target_exposure": 0.49912841753188875
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.05204614415809249,
+            "target_exposure_mae": 0.49844467292136585
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 3,
+              "target_exposure_mae": 0.003345817747790858
+            },
+            "conditions": {
+              "direction_correct_count": true,
+              "target_exposure_mae": true
+            },
+            "passed": true,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        }
+      },
+      "task_b": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": 0.021145036490966794,
+            "first_critic_loss": 0.0027946473964512416,
+            "generations": 256,
+            "last_actor_loss": 0.012396559158586607,
+            "last_critic_loss": 0.0025747899714207247,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": -0.005215749144554138,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.2781645655632019,
+                "LONG": 0.36645954847335815,
+                "SHORT": 0.35537591576576233
+              },
+              "delayed_log_growth": -0.04738453962631595,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.46279416289214903,
+              "target_exposure": 0.46279416289214903
+            },
+            "mean_true_delayed_log_growth": -0.0009745481752527277,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.27513474225997925,
+                "LONG": 0.36275869607925415,
+                "SHORT": 0.3621065616607666
+              },
+              "delayed_log_growth": 0.04543544327581049,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.4648344489013423,
+              "target_exposure": 0.4648344489013423
+            }
+          },
+          "pre": {
+            "direction_probability_margin": -0.00041854381561279297,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.330070436000824,
+                "LONG": 0.34734153747558594,
+                "SHORT": 0.3225879967212677
+              },
+              "delayed_log_growth": -0.05105100574122713,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.49769797899441365,
+              "target_exposure": 0.49769797899441365
+            },
+            "mean_true_delayed_log_growth": -0.001227690719438259,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.32923656702041626,
+                "LONG": 0.347339928150177,
+                "SHORT": 0.32342347502708435
+              },
+              "delayed_log_growth": 0.048595624302350614,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.4979575300730017,
+              "target_exposure": 0.4979575300730017
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "LONG",
+              "down_requested_risk": 0.46279416289214903,
+              "mean_true_delayed_log_growth": -0.0009745481752527277,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.4648344489013423
+            },
+            "conditions": {
+              "down_direction": false,
+              "down_requested_risk": false,
+              "mean_true_delayed_log_growth": false,
+              "up_direction": true,
+              "up_requested_risk": false
+            },
+            "passed": false,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        },
+        "paired": {
+          "control_true_delayed_log_growth_improvement": 0.0002531425441855313,
+          "positive_minus_control_true_delayed_log_growth": 0.08799536793855492,
+          "positive_true_delayed_log_growth_improvement": 0.08824851048274046,
+          "post_control_true_delayed_log_growth": -0.0009745481752527277,
+          "post_positive_true_delayed_log_growth": 0.0870208197633022,
+          "pre_control_true_delayed_log_growth": -0.001227690719438259,
+          "pre_positive_true_delayed_log_growth": -0.001227690719438259
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": 0.02011621101689877,
+            "first_critic_loss": 0.0027195065330724074,
+            "generations": 256,
+            "last_actor_loss": -0.006929205621072037,
+            "last_critic_loss": 6.465825054383464e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": 0.9942126096575521,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.0061593009158968925,
+                "LONG": 0.00045977465924806893,
+                "SHORT": 0.9933809041976929
+              },
+              "delayed_log_growth": 0.08716024044143048,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9107149949001531,
+              "target_exposure": -0.9107149949001531
+            },
+            "mean_true_delayed_log_growth": 0.0870208197633022,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.00413846131414175,
+                "LONG": 0.9956828355789185,
+                "SHORT": 0.00017874580225907266
+              },
+              "delayed_log_growth": 0.08688139908517392,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9076730604615193,
+              "target_exposure": 0.9076730604615193
+            }
+          },
+          "pre": {
+            "direction_probability_margin": -0.00041854381561279297,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.330070436000824,
+                "LONG": 0.34734153747558594,
+                "SHORT": 0.3225879967212677
+              },
+              "delayed_log_growth": -0.05105100574122713,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.49769797899441365,
+              "target_exposure": 0.49769797899441365
+            },
+            "mean_true_delayed_log_growth": -0.001227690719438259,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.32923656702041626,
+                "LONG": 0.347339928150177,
+                "SHORT": 0.32342347502708435
+              },
+              "delayed_log_growth": 0.048595624302350614,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.4979575300730017,
+              "target_exposure": 0.4979575300730017
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "SHORT",
+              "down_requested_risk": 0.9107149949001531,
+              "mean_true_delayed_log_growth": 0.0870208197633022,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.9076730604615193
+            },
+            "conditions": {
+              "down_direction": true,
+              "down_requested_risk": true,
+              "mean_true_delayed_log_growth": true,
+              "up_direction": true,
+              "up_requested_risk": true
+            },
+            "passed": true,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "seed": 2202,
+      "task_a": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": -0.04573779454961825,
+            "first_critic_loss": 0.0030207131179351165,
+            "generations": 256,
+            "last_actor_loss": -0.005888214305772765,
+            "last_critic_loss": 0.0005346571324203301,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "SHORT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10771503965670629,
+                "requested_risk": 0.5211657885331806,
+                "target_absolute_error": 1.0211657885331806,
+                "target_exposure": -0.5211657885331806
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.05300277801475228,
+            "target_exposure_mae": 0.5070552628443935
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 1,
+              "target_exposure_mae": 0.3333333333333333
+            },
+            "conditions": {
+              "direction_correct_count": false,
+              "target_exposure_mae": false
+            },
+            "passed": false,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        },
+        "paired": {
+          "control_target_mae_improvement": 0.1737219295110602,
+          "positive_post_target_mae_strictly_better_than_control": true,
+          "positive_target_mae_improvement": 0.5049145105353691,
+          "post_control_target_mae": 0.3333333333333333,
+          "post_positive_target_mae": 0.002140752309024422,
+          "pre_control_target_mae": 0.5070552628443935,
+          "pre_positive_target_mae": 0.5070552628443935
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": -0.04805784895010953,
+            "first_critic_loss": 0.003203566345283492,
+            "generations": 256,
+            "last_actor_loss": -0.005741435897622475,
+            "last_critic_loss": 5.34341885772364e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "SHORT",
+                "direction_correct": true,
+                "one_step_log_growth": -0.000579849389089548,
+                "requested_risk": 0.49420318691078785,
+                "target_absolute_error": 0.0057968130892121494,
+                "target_exposure": -0.49420318691078785
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -6.254633976758532e-05,
+                "requested_risk": 0.5006254438378611,
+                "target_absolute_error": 0.0006254438378611171,
+                "target_exposure": 0.5006254438378611
+              }
+            ],
+            "direction_correct_count": 3,
+            "mean_one_step_log_growth": -0.00021413190961904445,
+            "target_exposure_mae": 0.002140752309024422
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "SHORT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10771503965670629,
+                "requested_risk": 0.5211657885331806,
+                "target_absolute_error": 1.0211657885331806,
+                "target_exposure": -0.5211657885331806
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.05300277801475228,
+            "target_exposure_mae": 0.5070552628443935
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 3,
+              "target_exposure_mae": 0.002140752309024422
+            },
+            "conditions": {
+              "direction_correct_count": true,
+              "target_exposure_mae": true
+            },
+            "passed": true,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        }
+      },
+      "task_b": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": 0.007506470199905548,
+            "first_critic_loss": 0.0020675380632013797,
+            "generations": 256,
+            "last_actor_loss": 0.0002658926111853543,
+            "last_critic_loss": 0.0019155264021239401,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": -9.611248970031738e-06,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3098319470882416,
+                "LONG": 0.31451615691185,
+                "SHORT": 0.37565192580223083
+              },
+              "delayed_log_growth": 0.0519812199868479,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5335596028882196,
+              "target_exposure": -0.5335596028882196
+            },
+            "mean_true_delayed_log_growth": -0.0016002138492179734,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.30530643463134766,
+                "LONG": 0.3167692720890045,
+                "SHORT": 0.37792426347732544
+              },
+              "delayed_log_growth": -0.055181647685283844,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5368676326868699,
+              "target_exposure": -0.5368676326868699
+            }
+          },
+          "pre": {
+            "direction_probability_margin": 0.000505790114402771,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3615615963935852,
+                "LONG": 0.2842336595058441,
+                "SHORT": 0.3542047441005707
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            },
+            "mean_true_delayed_log_growth": 0.0,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3632681965827942,
+                "LONG": 0.2838861346244812,
+                "SHORT": 0.3528456389904022
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "SHORT",
+              "down_requested_risk": 0.5335596028882196,
+              "mean_true_delayed_log_growth": -0.0016002138492179734,
+              "up_direction": "SHORT",
+              "up_requested_risk": 0.5368676326868699
+            },
+            "conditions": {
+              "down_direction": true,
+              "down_requested_risk": true,
+              "mean_true_delayed_log_growth": false,
+              "up_direction": false,
+              "up_requested_risk": true
+            },
+            "passed": false,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        },
+        "paired": {
+          "control_true_delayed_log_growth_improvement": -0.0016002138492179734,
+          "positive_minus_control_true_delayed_log_growth": 0.0885432441408643,
+          "positive_true_delayed_log_growth_improvement": 0.08694303029164632,
+          "post_control_true_delayed_log_growth": -0.0016002138492179734,
+          "post_positive_true_delayed_log_growth": 0.08694303029164632,
+          "pre_control_true_delayed_log_growth": 0.0,
+          "pre_positive_true_delayed_log_growth": 0.0
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": 0.008449208955408804,
+            "first_critic_loss": 0.0019471808034986935,
+            "generations": 256,
+            "last_actor_loss": -0.009079374271218691,
+            "last_critic_loss": 0.00011735455257854164,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": 0.9961543177741987,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.0035342006012797356,
+                "LONG": 0.00033091226941905916,
+                "SHORT": 0.996134877204895
+              },
+              "delayed_log_growth": 0.08695920884142065,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9085218168639109,
+              "target_exposure": -0.9085218168639109
+            },
+            "mean_true_delayed_log_growth": 0.08694303029164632,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.0033540786243975163,
+                "LONG": 0.9965752959251404,
+                "SHORT": 7.062531221890822e-05
+              },
+              "delayed_log_growth": 0.08692685174187201,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9081688544480042,
+              "target_exposure": 0.9081688544480042
+            }
+          },
+          "pre": {
+            "direction_probability_margin": 0.000505790114402771,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3615615963935852,
+                "LONG": 0.2842336595058441,
+                "SHORT": 0.3542047441005707
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            },
+            "mean_true_delayed_log_growth": 0.0,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3632681965827942,
+                "LONG": 0.2838861346244812,
+                "SHORT": 0.3528456389904022
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "SHORT",
+              "down_requested_risk": 0.9085218168639109,
+              "mean_true_delayed_log_growth": 0.08694303029164632,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.9081688544480042
+            },
+            "conditions": {
+              "down_direction": true,
+              "down_requested_risk": true,
+              "mean_true_delayed_log_growth": true,
+              "up_direction": true,
+              "up_requested_risk": true
+            },
+            "passed": true,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "seed": 2203,
+      "task_a": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": -0.20404571593187112,
+            "first_critic_loss": 0.03808791948462473,
+            "generations": 256,
+            "last_actor_loss": -0.005094266711494015,
+            "last_critic_loss": 0.0005291463551740639,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10624611595418168,
+                "requested_risk": 0.5079668744133343,
+                "target_absolute_error": 1.0079668744133343,
+                "target_exposure": 0.5079668744133343
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05202271876721772,
+                "requested_risk": 0.5069270049365668,
+                "target_absolute_error": 0.5069270049365668,
+                "target_exposure": 0.5069270049365668
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 0,
+            "mean_one_step_log_growth": -0.06985404303631666,
+            "target_exposure_mae": 0.6716312931166337
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 1,
+              "target_exposure_mae": 0.3333333333333333
+            },
+            "conditions": {
+              "direction_correct_count": false,
+              "target_exposure_mae": false
+            },
+            "passed": false,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        },
+        "paired": {
+          "control_target_mae_improvement": 0.3382979597833004,
+          "positive_post_target_mae_strictly_better_than_control": true,
+          "positive_target_mae_improvement": 0.670872382118163,
+          "post_control_target_mae": 0.3333333333333333,
+          "post_positive_target_mae": 0.0007589109984706965,
+          "pre_control_target_mae": 0.6716312931166337,
+          "pre_positive_target_mae": 0.6716312931166337
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": -0.20698992574410363,
+            "first_critic_loss": 0.038318462654151224,
+            "generations": 256,
+            "last_actor_loss": -0.007037195356968492,
+            "last_critic_loss": 6.591350188011818e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "SHORT",
+                "direction_correct": true,
+                "one_step_log_growth": -0.00017078900915227079,
+                "requested_risk": 0.5017077442553962,
+                "target_absolute_error": 0.0017077442553962152,
+                "target_exposure": -0.5017077442553962
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -5.690049280395772e-05,
+                "requested_risk": 0.4994310112599841,
+                "target_absolute_error": 0.0005689887400158744,
+                "target_exposure": 0.4994310112599841
+              }
+            ],
+            "direction_correct_count": 3,
+            "mean_one_step_log_growth": -7.589650065207617e-05,
+            "target_exposure_mae": 0.0007589109984706965
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10624611595418168,
+                "requested_risk": 0.5079668744133343,
+                "target_absolute_error": 1.0079668744133343,
+                "target_exposure": 0.5079668744133343
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05202271876721772,
+                "requested_risk": 0.5069270049365668,
+                "target_absolute_error": 0.5069270049365668,
+                "target_exposure": 0.5069270049365668
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 0,
+            "mean_one_step_log_growth": -0.06985404303631666,
+            "target_exposure_mae": 0.6716312931166337
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 3,
+              "target_exposure_mae": 0.0007589109984706965
+            },
+            "conditions": {
+              "direction_correct_count": true,
+              "target_exposure_mae": true
+            },
+            "passed": true,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        }
+      },
+      "task_b": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": -0.1579665505973662,
+            "first_critic_loss": 0.02444178937999908,
+            "generations": 256,
+            "last_actor_loss": 0.005397509457851904,
+            "last_critic_loss": 0.0025610354448425132,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": 0.01073049008846283,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3219481110572815,
+                "LONG": 0.29976144433021545,
+                "SHORT": 0.37829044461250305
+              },
+              "delayed_log_growth": 0.0487494136176878,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.4995721279247562,
+              "target_exposure": -0.4995721279247562
+            },
+            "mean_true_delayed_log_growth": -0.0012953466201213737,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3230826258659363,
+                "LONG": 0.3099246919155121,
+                "SHORT": 0.366992712020874
+              },
+              "delayed_log_growth": -0.05134010685793055,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5004447080595877,
+              "target_exposure": -0.5004447080595877
+            }
+          },
+          "pre": {
+            "direction_probability_margin": 0.0020108819007873535,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.34298405051231384,
+                "LONG": 0.3593069314956665,
+                "SHORT": 0.29770907759666443
+              },
+              "delayed_log_growth": -0.05208174804954995,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5074873576838207,
+              "target_exposure": 0.5074873576838207
+            },
+            "mean_true_delayed_log_growth": -0.00134013793850013,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3417680561542511,
+                "LONG": 0.36192578077316284,
+                "SHORT": 0.29630616307258606
+              },
+              "delayed_log_growth": 0.04940147217254969,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5064206963443166,
+              "target_exposure": 0.5064206963443166
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "SHORT",
+              "down_requested_risk": 0.4995721279247562,
+              "mean_true_delayed_log_growth": -0.0012953466201213737,
+              "up_direction": "SHORT",
+              "up_requested_risk": 0.5004447080595877
+            },
+            "conditions": {
+              "down_direction": true,
+              "down_requested_risk": false,
+              "mean_true_delayed_log_growth": false,
+              "up_direction": false,
+              "up_requested_risk": true
+            },
+            "passed": false,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        },
+        "paired": {
+          "control_true_delayed_log_growth_improvement": 4.479131837875627e-05,
+          "positive_minus_control_true_delayed_log_growth": 0.08814578357515969,
+          "positive_true_delayed_log_growth_improvement": 0.08819057489353845,
+          "post_control_true_delayed_log_growth": -0.0012953466201213737,
+          "post_positive_true_delayed_log_growth": 0.08685043695503832,
+          "pre_control_true_delayed_log_growth": -0.00134013793850013,
+          "pre_positive_true_delayed_log_growth": -0.00134013793850013
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": -0.15890327289109835,
+            "first_critic_loss": 0.024077760239351736,
+            "generations": 256,
+            "last_actor_loss": -0.006955871607140663,
+            "last_critic_loss": 6.43647048059888e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": 0.9953296390158357,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.0034547809045761824,
+                "LONG": 0.00024128184304572642,
+                "SHORT": 0.996303915977478
+              },
+              "delayed_log_growth": 0.08692295323059017,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9081263289115541,
+              "target_exposure": -0.9081263289115541
+            },
+            "mean_true_delayed_log_growth": 0.08685043695503832,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.004808657802641392,
+                "LONG": 0.9948940277099609,
+                "SHORT": 0.0002973838127218187
+              },
+              "delayed_log_growth": 0.08677792067948646,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.906544410239932,
+              "target_exposure": 0.906544410239932
+            }
+          },
+          "pre": {
+            "direction_probability_margin": 0.0020108819007873535,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.34298405051231384,
+                "LONG": 0.3593069314956665,
+                "SHORT": 0.29770907759666443
+              },
+              "delayed_log_growth": -0.05208174804954995,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5074873576838207,
+              "target_exposure": 0.5074873576838207
+            },
+            "mean_true_delayed_log_growth": -0.00134013793850013,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3417680561542511,
+                "LONG": 0.36192578077316284,
+                "SHORT": 0.29630616307258606
+              },
+              "delayed_log_growth": 0.04940147217254969,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5064206963443166,
+              "target_exposure": 0.5064206963443166
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "SHORT",
+              "down_requested_risk": 0.9081263289115541,
+              "mean_true_delayed_log_growth": 0.08685043695503832,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.906544410239932
+            },
+            "conditions": {
+              "down_direction": true,
+              "down_requested_risk": true,
+              "mean_true_delayed_log_growth": true,
+              "up_direction": true,
+              "up_requested_risk": true
+            },
+            "passed": true,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "seed": 2204,
+      "task_a": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": -0.0839143147379647,
+            "first_critic_loss": 0.007062579756936828,
+            "generations": 256,
+            "last_actor_loss": -0.005420184292620217,
+            "last_critic_loss": 0.0005666542085250244,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 1,
+              "target_exposure_mae": 0.3333333333333333
+            },
+            "conditions": {
+              "direction_correct_count": false,
+              "target_exposure_mae": false
+            },
+            "passed": false,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        },
+        "paired": {
+          "control_target_mae_improvement": 0.0,
+          "positive_post_target_mae_strictly_better_than_control": true,
+          "positive_target_mae_improvement": 0.33114119672531767,
+          "post_control_target_mae": 0.3333333333333333,
+          "post_positive_target_mae": 0.0021921366080156677,
+          "pre_control_target_mae": 0.3333333333333333,
+          "pre_positive_target_mae": 0.3333333333333333
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": -0.08354191364146783,
+            "first_critic_loss": 0.006745380476794291,
+            "generations": 256,
+            "last_actor_loss": -0.006244665233446967,
+            "last_critic_loss": 5.733983004355786e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "SHORT",
+                "direction_correct": true,
+                "one_step_log_growth": -0.00031497915666229214,
+                "requested_risk": 0.5031492955593557,
+                "target_absolute_error": 0.003149295559355725,
+                "target_exposure": -0.5031492955593557
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -0.0003427701654507797,
+                "requested_risk": 0.4965728857353087,
+                "target_absolute_error": 0.0034271142646912778,
+                "target_exposure": 0.4965728857353087
+              }
+            ],
+            "direction_correct_count": 3,
+            "mean_one_step_log_growth": -0.00021924977403769063,
+            "target_exposure_mae": 0.0021921366080156677
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 3,
+              "target_exposure_mae": 0.0021921366080156677
+            },
+            "conditions": {
+              "direction_correct_count": true,
+              "target_exposure_mae": true
+            },
+            "passed": true,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        }
+      },
+      "task_b": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": -0.03502418556447295,
+            "first_critic_loss": 0.002620372821334066,
+            "generations": 256,
+            "last_actor_loss": -0.007779193219088507,
+            "last_critic_loss": 0.002021712888599041,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": -0.006411299109458923,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3728811740875244,
+                "LONG": 0.31738895177841187,
+                "SHORT": 0.30972981452941895
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            },
+            "mean_true_delayed_log_growth": 0.0,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3706248104572296,
+                "LONG": 0.31210586428642273,
+                "SHORT": 0.31726932525634766
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            }
+          },
+          "pre": {
+            "direction_probability_margin": -6.273388862609863e-05,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3551139533519745,
+                "LONG": 0.3069705069065094,
+                "SHORT": 0.3379155397415161
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            },
+            "mean_true_delayed_log_growth": 0.0,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3530130982398987,
+                "LONG": 0.3079582154750824,
+                "SHORT": 0.3390287160873413
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "FLAT",
+              "down_requested_risk": 0.0,
+              "mean_true_delayed_log_growth": 0.0,
+              "up_direction": "FLAT",
+              "up_requested_risk": 0.0
+            },
+            "conditions": {
+              "down_direction": false,
+              "down_requested_risk": false,
+              "mean_true_delayed_log_growth": false,
+              "up_direction": false,
+              "up_requested_risk": false
+            },
+            "passed": false,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        },
+        "paired": {
+          "control_true_delayed_log_growth_improvement": 0.0,
+          "positive_minus_control_true_delayed_log_growth": 0.08727025990372532,
+          "positive_true_delayed_log_growth_improvement": 0.08727025990372532,
+          "post_control_true_delayed_log_growth": 0.0,
+          "post_positive_true_delayed_log_growth": 0.08727025990372532,
+          "pre_control_true_delayed_log_growth": 0.0,
+          "pre_positive_true_delayed_log_growth": 0.0
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": -0.04266581947569679,
+            "first_critic_loss": 0.002947315797774244,
+            "generations": 256,
+            "last_actor_loss": -0.006742261604410778,
+            "last_critic_loss": 4.436332626680796e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": 0.9939006230852101,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.005687656346708536,
+                "LONG": 0.000587315356824547,
+                "SHORT": 0.9937250018119812
+              },
+              "delayed_log_growth": 0.08726760852045247,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9118865203010054,
+              "target_exposure": -0.9118865203010054
+            },
+            "mean_true_delayed_log_growth": 0.08727025990372532,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.0037809486966580153,
+                "LONG": 0.9954413175582886,
+                "SHORT": 0.0007777578430250287
+              },
+              "delayed_log_growth": 0.08727291128699817,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.911944383641213,
+              "target_exposure": 0.911944383641213
+            }
+          },
+          "pre": {
+            "direction_probability_margin": -6.273388862609863e-05,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3551139533519745,
+                "LONG": 0.3069705069065094,
+                "SHORT": 0.3379155397415161
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            },
+            "mean_true_delayed_log_growth": 0.0,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3530130982398987,
+                "LONG": 0.3079582154750824,
+                "SHORT": 0.3390287160873413
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "SHORT",
+              "down_requested_risk": 0.9118865203010054,
+              "mean_true_delayed_log_growth": 0.08727025990372532,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.911944383641213
+            },
+            "conditions": {
+              "down_direction": true,
+              "down_requested_risk": true,
+              "mean_true_delayed_log_growth": true,
+              "up_direction": true,
+              "up_requested_risk": true
+            },
+            "passed": true,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "seed": 2205,
+      "task_a": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": -0.06824237291867567,
+            "first_critic_loss": 0.005394321201232594,
+            "generations": 256,
+            "last_actor_loss": -0.0055811073665895244,
+            "last_critic_loss": 0.0005347174585437542,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10546180517702831,
+                "requested_risk": 0.5009115595063266,
+                "target_absolute_error": 1.0009115595063265,
+                "target_exposure": 0.5009115595063266
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.0515745748114489,
+                "requested_risk": 0.5026717882485542,
+                "target_absolute_error": 0.5026717882485542,
+                "target_exposure": 0.5026717882485542
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -5.3899080247231596e-05,
+                "requested_risk": 0.500538976277179,
+                "target_absolute_error": 0.0005389762771790263,
+                "target_exposure": 0.500538976277179
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.05236342635624148,
+            "target_exposure_mae": 0.5013741080106866
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 1,
+              "target_exposure_mae": 0.3333333333333333
+            },
+            "conditions": {
+              "direction_correct_count": false,
+              "target_exposure_mae": false
+            },
+            "passed": false,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        },
+        "paired": {
+          "control_target_mae_improvement": 0.1680407746773533,
+          "positive_post_target_mae_strictly_better_than_control": true,
+          "positive_target_mae_improvement": 0.49804212615272847,
+          "post_control_target_mae": 0.3333333333333333,
+          "post_positive_target_mae": 0.003331981857958133,
+          "pre_control_target_mae": 0.5013741080106866,
+          "pre_positive_target_mae": 0.5013741080106866
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": -0.06793587207828108,
+            "first_critic_loss": 0.005025470052973649,
+            "generations": 256,
+            "last_actor_loss": -0.005494844675902802,
+            "last_critic_loss": 5.1883580382308407e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "SHORT",
+                "direction_correct": true,
+                "one_step_log_growth": -0.000645986833039108,
+                "requested_risk": 0.4935422177153411,
+                "target_absolute_error": 0.006457782284658875,
+                "target_exposure": -0.4935422177153411
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -0.0003538789366870157,
+                "requested_risk": 0.4964618367107845,
+                "target_absolute_error": 0.0035381632892155235,
+                "target_exposure": 0.4964618367107845
+              }
+            ],
+            "direction_correct_count": 3,
+            "mean_one_step_log_growth": -0.0003332885899087079,
+            "target_exposure_mae": 0.003331981857958133
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10546180517702831,
+                "requested_risk": 0.5009115595063266,
+                "target_absolute_error": 1.0009115595063265,
+                "target_exposure": 0.5009115595063266
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.0515745748114489,
+                "requested_risk": 0.5026717882485542,
+                "target_absolute_error": 0.5026717882485542,
+                "target_exposure": 0.5026717882485542
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -5.3899080247231596e-05,
+                "requested_risk": 0.500538976277179,
+                "target_absolute_error": 0.0005389762771790263,
+                "target_exposure": 0.500538976277179
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.05236342635624148,
+            "target_exposure_mae": 0.5013741080106866
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 3,
+              "target_exposure_mae": 0.003331981857958133
+            },
+            "conditions": {
+              "direction_correct_count": true,
+              "target_exposure_mae": true
+            },
+            "passed": true,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        }
+      },
+      "task_b": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": -0.01934126506188908,
+            "first_critic_loss": 0.0017649899896586758,
+            "generations": 256,
+            "last_actor_loss": 0.005320262071063904,
+            "last_critic_loss": 0.0020244677286690516,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": -0.0017181634902954102,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3381872773170471,
+                "LONG": 0.349446564912796,
+                "SHORT": 0.3123661279678345
+              },
+              "delayed_log_growth": -0.05094710171314412,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.4967106002429424,
+              "target_exposure": 0.4967106002429424
+            },
+            "mean_true_delayed_log_growth": -0.0012465742440223165,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.34183022379875183,
+                "LONG": 0.34590694308280945,
+                "SHORT": 0.3122628331184387
+              },
+              "delayed_log_growth": 0.04845395322509949,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.49647037846645187,
+              "target_exposure": 0.49647037846645187
+            }
+          },
+          "pre": {
+            "direction_probability_margin": -0.0013343393802642822,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3516136407852173,
+                "LONG": 0.3637601137161255,
+                "SHORT": 0.2846262454986572
+              },
+              "delayed_log_growth": -0.051525690827541715,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5022075096612872,
+              "target_exposure": 0.5022075096612872
+            },
+            "mean_true_delayed_log_growth": -0.0012177381918540321,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3524225354194641,
+                "LONG": 0.3620213270187378,
+                "SHORT": 0.2855561375617981
+              },
+              "delayed_log_growth": 0.04909021444383365,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.503151000586872,
+              "target_exposure": 0.503151000586872
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "LONG",
+              "down_requested_risk": 0.4967106002429424,
+              "mean_true_delayed_log_growth": -0.0012465742440223165,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.49647037846645187
+            },
+            "conditions": {
+              "down_direction": false,
+              "down_requested_risk": false,
+              "mean_true_delayed_log_growth": false,
+              "up_direction": true,
+              "up_requested_risk": false
+            },
+            "passed": false,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        },
+        "paired": {
+          "control_true_delayed_log_growth_improvement": -2.8836052168284415e-05,
+          "positive_minus_control_true_delayed_log_growth": 0.08815981195654772,
+          "positive_true_delayed_log_growth_improvement": 0.08813097590437943,
+          "post_control_true_delayed_log_growth": -0.0012465742440223165,
+          "post_positive_true_delayed_log_growth": 0.0869132377125254,
+          "pre_control_true_delayed_log_growth": -0.0012177381918540321,
+          "pre_positive_true_delayed_log_growth": -0.0012177381918540321
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": -0.02040869649177088,
+            "first_critic_loss": 0.0022949884522914833,
+            "generations": 256,
+            "last_actor_loss": -0.014267121271607057,
+            "last_critic_loss": 0.00022708604208273995,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": 0.9948200231738156,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.005424146540462971,
+                "LONG": 0.0004304378235246986,
+                "SHORT": 0.994145393371582
+              },
+              "delayed_log_growth": 0.08661029115388393,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9047163046010035,
+              "target_exposure": -0.9047163046010035
+            },
+            "mean_true_delayed_log_growth": 0.0869132377125254,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.0035368669778108597,
+                "LONG": 0.9961941242218018,
+                "SHORT": 0.0002690334222279489
+              },
+              "delayed_log_growth": 0.0872161842711669,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9113253991561496,
+              "target_exposure": 0.9113253991561496
+            }
+          },
+          "pre": {
+            "direction_probability_margin": -0.0013343393802642822,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3516136407852173,
+                "LONG": 0.3637601137161255,
+                "SHORT": 0.2846262454986572
+              },
+              "delayed_log_growth": -0.051525690827541715,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5022075096612872,
+              "target_exposure": 0.5022075096612872
+            },
+            "mean_true_delayed_log_growth": -0.0012177381918540321,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3524225354194641,
+                "LONG": 0.3620213270187378,
+                "SHORT": 0.2855561375617981
+              },
+              "delayed_log_growth": 0.04909021444383365,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.503151000586872,
+              "target_exposure": 0.503151000586872
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "SHORT",
+              "down_requested_risk": 0.9047163046010035,
+              "mean_true_delayed_log_growth": 0.0869132377125254,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.9113253991561496
+            },
+            "conditions": {
+              "down_direction": true,
+              "down_requested_risk": true,
+              "mean_true_delayed_log_growth": true,
+              "up_direction": true,
+              "up_requested_risk": true
+            },
+            "passed": true,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "seed": 2206,
+      "task_a": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": 0.012353240356666986,
+            "first_critic_loss": 0.002167524647449661,
+            "generations": 256,
+            "last_actor_loss": -0.006082309327066131,
+            "last_critic_loss": 0.0005630414251901766,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10542260640916229,
+                "requested_risk": 0.5005587994137073,
+                "target_absolute_error": 1.0005587994137073,
+                "target_exposure": 0.5005587994137073
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05156347096318487,
+                "requested_risk": 0.502566330771685,
+                "target_absolute_error": 0.502566330771685,
+                "target_exposure": 0.502566330771685
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -5.528380718654695e-05,
+                "requested_risk": 0.4994471772093489,
+                "target_absolute_error": 0.0005528227906511085,
+                "target_exposure": 0.4994471772093489
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.052347120393177904,
+            "target_exposure_mae": 0.5012259843253478
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 1,
+              "target_exposure_mae": 0.3333333333333333
+            },
+            "conditions": {
+              "direction_correct_count": false,
+              "target_exposure_mae": false
+            },
+            "passed": false,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        },
+        "paired": {
+          "control_target_mae_improvement": 0.1678926509920145,
+          "positive_post_target_mae_strictly_better_than_control": true,
+          "positive_target_mae_improvement": 0.49842581921302015,
+          "post_control_target_mae": 0.3333333333333333,
+          "post_positive_target_mae": 0.0028001651123276496,
+          "pre_control_target_mae": 0.5012259843253478,
+          "pre_positive_target_mae": 0.5012259843253478
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": 0.01709815774935753,
+            "first_critic_loss": 0.0021515331493693946,
+            "generations": 256,
+            "last_actor_loss": -0.004257733995895469,
+            "last_critic_loss": 4.8447159497707446e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "SHORT",
+                "direction_correct": true,
+                "one_step_log_growth": -0.0001585999874525216,
+                "requested_risk": 0.49841412588860656,
+                "target_absolute_error": 0.0015858741113934371,
+                "target_exposure": -0.49841412588860656
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -0.0006816944234133213,
+                "requested_risk": 0.4931853787744105,
+                "target_absolute_error": 0.006814621225589512,
+                "target_exposure": 0.4931853787744105
+              }
+            ],
+            "direction_correct_count": 3,
+            "mean_one_step_log_growth": -0.00028009813695528094,
+            "target_exposure_mae": 0.0028001651123276496
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10542260640916229,
+                "requested_risk": 0.5005587994137073,
+                "target_absolute_error": 1.0005587994137073,
+                "target_exposure": 0.5005587994137073
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05156347096318487,
+                "requested_risk": 0.502566330771685,
+                "target_absolute_error": 0.502566330771685,
+                "target_exposure": 0.502566330771685
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -5.528380718654695e-05,
+                "requested_risk": 0.4994471772093489,
+                "target_absolute_error": 0.0005528227906511085,
+                "target_exposure": 0.4994471772093489
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.052347120393177904,
+            "target_exposure_mae": 0.5012259843253478
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 3,
+              "target_exposure_mae": 0.0028001651123276496
+            },
+            "conditions": {
+              "direction_correct_count": true,
+              "target_exposure_mae": true
+            },
+            "passed": true,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        }
+      },
+      "task_b": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": 0.06444601246590623,
+            "first_critic_loss": 0.0069830335884330805,
+            "generations": 256,
+            "last_actor_loss": -0.010332745246810396,
+            "last_critic_loss": 0.002300025065315352,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": 0.0017156898975372314,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.324341744184494,
+                "LONG": 0.344215452671051,
+                "SHORT": 0.3314427435398102
+              },
+              "delayed_log_growth": -0.04493769232360254,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.43942950329417735,
+              "target_exposure": 0.43942950329417735
+            },
+            "mean_true_delayed_log_growth": -0.0009025330516148102,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3256728947162628,
+                "LONG": 0.34526562690734863,
+                "SHORT": 0.3290615379810333
+              },
+              "delayed_log_growth": 0.04313262622037292,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.4407635756960127,
+              "target_exposure": 0.4407635756960127
+            }
+          },
+          "pre": {
+            "direction_probability_margin": -0.00019443035125732422,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.2968418598175049,
+                "LONG": 0.37055298686027527,
+                "SHORT": 0.33260518312454224
+              },
+              "delayed_log_growth": -0.051569639080540984,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5026249118764717,
+              "target_exposure": 0.5026249118764717
+            },
+            "mean_true_delayed_log_growth": -0.0012720288259842824,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.2966097593307495,
+                "LONG": 0.37047457695007324,
+                "SHORT": 0.33291563391685486
+              },
+              "delayed_log_growth": 0.04902558142857242,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5024721722055593,
+              "target_exposure": 0.5024721722055593
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "LONG",
+              "down_requested_risk": 0.43942950329417735,
+              "mean_true_delayed_log_growth": -0.0009025330516148102,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.4407635756960127
+            },
+            "conditions": {
+              "down_direction": false,
+              "down_requested_risk": false,
+              "mean_true_delayed_log_growth": false,
+              "up_direction": true,
+              "up_requested_risk": false
+            },
+            "passed": false,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        },
+        "paired": {
+          "control_true_delayed_log_growth_improvement": 0.00036949577436947226,
+          "positive_minus_control_true_delayed_log_growth": 0.08824415355247778,
+          "positive_true_delayed_log_growth_improvement": 0.08861364932684726,
+          "post_control_true_delayed_log_growth": -0.0009025330516148102,
+          "post_positive_true_delayed_log_growth": 0.08734162050086297,
+          "pre_control_true_delayed_log_growth": -0.0012720288259842824,
+          "pre_positive_true_delayed_log_growth": -0.0012720288259842824
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": 0.06013104591804441,
+            "first_critic_loss": 0.006927836033964484,
+            "generations": 256,
+            "last_actor_loss": -0.009625266277921367,
+            "last_critic_loss": 0.0001132810122310202,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": 0.9965946390511817,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.003363869385793805,
+                "LONG": 0.00018921864102594554,
+                "SHORT": 0.9964469075202942
+              },
+              "delayed_log_growth": 0.08714226684874468,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9105188919152699,
+              "target_exposure": -0.9105188919152699
+            },
+            "mean_true_delayed_log_growth": 0.08734162050086297,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.002632318064570427,
+                "LONG": 0.997149646282196,
+                "SHORT": 0.00021805705910082906
+              },
+              "delayed_log_growth": 0.08754097415298125,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9148698628147868,
+              "target_exposure": 0.9148698628147868
+            }
+          },
+          "pre": {
+            "direction_probability_margin": -0.00019443035125732422,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.2968418598175049,
+                "LONG": 0.37055298686027527,
+                "SHORT": 0.33260518312454224
+              },
+              "delayed_log_growth": -0.051569639080540984,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5026249118764717,
+              "target_exposure": 0.5026249118764717
+            },
+            "mean_true_delayed_log_growth": -0.0012720288259842824,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.2966097593307495,
+                "LONG": 0.37047457695007324,
+                "SHORT": 0.33291563391685486
+              },
+              "delayed_log_growth": 0.04902558142857242,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5024721722055593,
+              "target_exposure": 0.5024721722055593
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "SHORT",
+              "down_requested_risk": 0.9105188919152699,
+              "mean_true_delayed_log_growth": 0.08734162050086297,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.9148698628147868
+            },
+            "conditions": {
+              "down_direction": true,
+              "down_requested_risk": true,
+              "mean_true_delayed_log_growth": true,
+              "up_direction": true,
+              "up_requested_risk": true
+            },
+            "passed": true,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "seed": 2207,
+      "task_a": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": -0.023434166222506374,
+            "first_critic_loss": 0.0017525323408459882,
+            "generations": 256,
+            "last_actor_loss": -0.005409759572631688,
+            "last_critic_loss": 0.0005398656594348535,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 1,
+              "target_exposure_mae": 0.3333333333333333
+            },
+            "conditions": {
+              "direction_correct_count": false,
+              "target_exposure_mae": false
+            },
+            "passed": false,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        },
+        "paired": {
+          "control_target_mae_improvement": 0.0,
+          "positive_post_target_mae_strictly_better_than_control": true,
+          "positive_target_mae_improvement": 0.3317946048188679,
+          "post_control_target_mae": 0.3333333333333333,
+          "post_positive_target_mae": 0.001538728514465404,
+          "pre_control_target_mae": 0.3333333333333333,
+          "pre_positive_target_mae": 0.3333333333333333
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": -0.02232322604914591,
+            "first_critic_loss": 0.0015738044939000268,
+            "generations": 256,
+            "last_actor_loss": -0.005834334611143329,
+            "last_critic_loss": 6.506326630441409e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "SHORT",
+                "direction_correct": true,
+                "one_step_log_growth": -0.0002852778107990475,
+                "requested_risk": 0.5028523712295361,
+                "target_absolute_error": 0.002852371229536077,
+                "target_exposure": -0.5028523712295361
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -0.00017639698842010715,
+                "requested_risk": 0.49823618568613987,
+                "target_absolute_error": 0.0017638143138601348,
+                "target_exposure": 0.49823618568613987
+              }
+            ],
+            "direction_correct_count": 3,
+            "mean_one_step_log_growth": -0.00015389159973971822,
+            "target_exposure_mae": 0.001538728514465404
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 3,
+              "target_exposure_mae": 0.001538728514465404
+            },
+            "conditions": {
+              "direction_correct_count": true,
+              "target_exposure_mae": true
+            },
+            "passed": true,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        }
+      },
+      "task_b": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": 0.02375346785458459,
+            "first_critic_loss": 0.002562668169974131,
+            "generations": 256,
+            "last_actor_loss": -0.0021205492379503697,
+            "last_critic_loss": 0.0018200271874836914,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": -0.004395186901092529,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.31002572178840637,
+                "LONG": 0.36174193024635315,
+                "SHORT": 0.32823237776756287
+              },
+              "delayed_log_growth": -0.048349779246159096,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.4719954104100055,
+              "target_exposure": 0.4719954104100055
+            },
+            "mean_true_delayed_log_growth": -0.0011398758076265302,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.30612149834632874,
+                "LONG": 0.35929882526397705,
+                "SHORT": 0.3345796465873718
+              },
+              "delayed_log_growth": 0.046070027630906035,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.47147737664736605,
+              "target_exposure": 0.47147737664736605
+            }
+          },
+          "pre": {
+            "direction_probability_margin": 0.001073405146598816,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.39016368985176086,
+                "LONG": 0.2999766767024994,
+                "SHORT": 0.30985960364341736
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            },
+            "mean_true_delayed_log_growth": 0.0,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3884067237377167,
+                "LONG": 0.3019285500049591,
+                "SHORT": 0.30966466665267944
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "LONG",
+              "down_requested_risk": 0.4719954104100055,
+              "mean_true_delayed_log_growth": -0.0011398758076265302,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.47147737664736605
+            },
+            "conditions": {
+              "down_direction": false,
+              "down_requested_risk": false,
+              "mean_true_delayed_log_growth": false,
+              "up_direction": true,
+              "up_requested_risk": false
+            },
+            "passed": false,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        },
+        "paired": {
+          "control_true_delayed_log_growth_improvement": -0.0011398758076265302,
+          "positive_minus_control_true_delayed_log_growth": 0.08822532058399538,
+          "positive_true_delayed_log_growth_improvement": 0.08708544477636884,
+          "post_control_true_delayed_log_growth": -0.0011398758076265302,
+          "post_positive_true_delayed_log_growth": 0.08708544477636884,
+          "pre_control_true_delayed_log_growth": 0.0,
+          "pre_positive_true_delayed_log_growth": 0.0
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": 0.02905077474341325,
+            "first_critic_loss": 0.0029690476574658767,
+            "generations": 256,
+            "last_actor_loss": -0.008133077139921306,
+            "last_critic_loss": 6.570598933165513e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": 0.9941918438416906,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.005478485021740198,
+                "LONG": 0.00023358824546448886,
+                "SHORT": 0.99428790807724
+              },
+              "delayed_log_growth": 0.0867680740796556,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9064370183903104,
+              "target_exposure": -0.9064370183903104
+            },
+            "mean_true_delayed_log_growth": 0.08708544477636884,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.005060562398284674,
+                "LONG": 0.9946343898773193,
+                "SHORT": 0.0003050220257136971
+              },
+              "delayed_log_growth": 0.0874028154730821,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.913361982969011,
+              "target_exposure": 0.913361982969011
+            }
+          },
+          "pre": {
+            "direction_probability_margin": 0.001073405146598816,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.39016368985176086,
+                "LONG": 0.2999766767024994,
+                "SHORT": 0.30985960364341736
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            },
+            "mean_true_delayed_log_growth": 0.0,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3884067237377167,
+                "LONG": 0.3019285500049591,
+                "SHORT": 0.30966466665267944
+              },
+              "delayed_log_growth": 0.0,
+              "direction": "FLAT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.0,
+              "target_exposure": 0.0
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "SHORT",
+              "down_requested_risk": 0.9064370183903104,
+              "mean_true_delayed_log_growth": 0.08708544477636884,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.913361982969011
+            },
+            "conditions": {
+              "down_direction": true,
+              "down_requested_risk": true,
+              "mean_true_delayed_log_growth": true,
+              "up_direction": true,
+              "up_requested_risk": true
+            },
+            "passed": true,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        }
+      }
+    },
+    {
+      "seed": 2208,
+      "task_a": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": -0.2195939178275246,
+            "first_critic_loss": 0.04520064165322784,
+            "generations": 256,
+            "last_actor_loss": -0.006384655222687086,
+            "last_critic_loss": 0.0005427020571170844,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 1,
+            "mean_one_step_log_growth": -0.034195529591700385,
+            "target_exposure_mae": 0.3333333333333333
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10599121850892276,
+                "requested_risk": 0.5056745359987472,
+                "target_absolute_error": 1.0056745359987471,
+                "target_exposure": 0.5056745359987472
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05168702093737616,
+                "requested_risk": 0.5037396659721428,
+                "target_absolute_error": 0.5037396659721428,
+                "target_exposure": 0.5037396659721428
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 0,
+            "mean_one_step_log_growth": -0.06965717794461651,
+            "target_exposure_mae": 0.6698047339902966
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 1,
+              "target_exposure_mae": 0.3333333333333333
+            },
+            "conditions": {
+              "direction_correct_count": false,
+              "target_exposure_mae": false
+            },
+            "passed": false,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        },
+        "paired": {
+          "control_target_mae_improvement": 0.3364714006569633,
+          "positive_post_target_mae_strictly_better_than_control": true,
+          "positive_target_mae_improvement": 0.6691695679180385,
+          "post_control_target_mae": 0.3333333333333333,
+          "post_positive_target_mae": 0.0006351660722581457,
+          "pre_control_target_mae": 0.6698047339902966,
+          "pre_positive_target_mae": 0.6698047339902966
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": -0.2228239700844434,
+            "first_critic_loss": 0.04526448578207347,
+            "generations": 256,
+            "last_actor_loss": -0.006315303050541634,
+            "last_critic_loss": 5.8127911803690644e-05,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "SHORT",
+                "direction_correct": true,
+                "one_step_log_growth": -3.706395654116382e-06,
+                "requested_risk": 0.5000370638878538,
+                "target_absolute_error": 3.706388785384984e-05,
+                "target_exposure": -0.5000370638878538
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "FLAT",
+                "direction_correct": true,
+                "one_step_log_growth": 0.0,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.0,
+                "target_exposure": 0.0
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "LONG",
+                "direction_correct": true,
+                "one_step_log_growth": -0.0001868608903007682,
+                "requested_risk": 0.4981315656710794,
+                "target_absolute_error": 0.0018684343289205874,
+                "target_exposure": 0.4981315656710794
+              }
+            ],
+            "direction_correct_count": 3,
+            "mean_one_step_log_growth": -6.35224286516282e-05,
+            "target_exposure_mae": 0.0006351660722581457
+          },
+          "pre": {
+            "cases": [
+              {
+                "case": "SHORT_HALF",
+                "desired_target_exposure": -0.5,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.10599121850892276,
+                "requested_risk": 0.5056745359987472,
+                "target_absolute_error": 1.0056745359987471,
+                "target_exposure": 0.5056745359987472
+              },
+              {
+                "case": "FLAT",
+                "desired_target_exposure": 0.0,
+                "direction": "LONG",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05168702093737616,
+                "requested_risk": 0.5037396659721428,
+                "target_absolute_error": 0.5037396659721428,
+                "target_exposure": 0.5037396659721428
+              },
+              {
+                "case": "LONG_HALF",
+                "desired_target_exposure": 0.5,
+                "direction": "FLAT",
+                "direction_correct": false,
+                "one_step_log_growth": -0.05129329438755058,
+                "requested_risk": 0.0,
+                "target_absolute_error": 0.5,
+                "target_exposure": 0.0
+              }
+            ],
+            "direction_correct_count": 0,
+            "mean_one_step_log_growth": -0.06965717794461651,
+            "target_exposure_mae": 0.6698047339902966
+          },
+          "seed_gate": {
+            "components": {
+              "direction_correct_count": 3,
+              "target_exposure_mae": 0.0006351660722581457
+            },
+            "conditions": {
+              "direction_correct_count": true,
+              "target_exposure_mae": true
+            },
+            "passed": true,
+            "preregistered": {
+              "direction_correct_count_min": 3,
+              "target_exposure_mae_max": 0.15
+            }
+          }
+        }
+      },
+      "task_b": {
+        "control": {
+          "diagnostics": {
+            "first_actor_loss": -0.17497163989673425,
+            "first_critic_loss": 0.029473872490229182,
+            "generations": 256,
+            "last_actor_loss": -0.015462393440934967,
+            "last_critic_loss": 0.0019941772061834303,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": 8.018314838409424e-05,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3362732231616974,
+                "LONG": 0.37213563919067383,
+                "SHORT": 0.2915911376476288
+              },
+              "delayed_log_growth": -0.05184285327610886,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.505219375132945,
+              "target_exposure": 0.505219375132945
+            },
+            "mean_true_delayed_log_growth": -0.0012924177755588573,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.33214735984802246,
+                "LONG": 0.3742787539958954,
+                "SHORT": 0.29357388615608215
+              },
+              "delayed_log_growth": 0.049258017724991145,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5049136116690888,
+              "target_exposure": 0.5049136116690888
+            }
+          },
+          "pre": {
+            "direction_probability_margin": 0.00047338008880615234,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3353809118270874,
+                "LONG": 0.3382495641708374,
+                "SHORT": 0.32636958360671997
+              },
+              "delayed_log_growth": -0.05168332341331427,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5037045532561444,
+              "target_exposure": 0.5037045532561444
+            },
+            "mean_true_delayed_log_growth": -0.001264591497049685,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3349252939224243,
+                "LONG": 0.3389507234096527,
+                "SHORT": 0.326123982667923
+              },
+              "delayed_log_growth": 0.0491541404192149,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5038224462203393,
+              "target_exposure": 0.5038224462203393
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "LONG",
+              "down_requested_risk": 0.505219375132945,
+              "mean_true_delayed_log_growth": -0.0012924177755588573,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.5049136116690888
+            },
+            "conditions": {
+              "down_direction": false,
+              "down_requested_risk": true,
+              "mean_true_delayed_log_growth": false,
+              "up_direction": true,
+              "up_requested_risk": true
+            },
+            "passed": false,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        },
+        "paired": {
+          "control_true_delayed_log_growth_improvement": -2.7826278509172214e-05,
+          "positive_minus_control_true_delayed_log_growth": 0.088517953036691,
+          "positive_true_delayed_log_growth_improvement": 0.08849012675818183,
+          "post_control_true_delayed_log_growth": -0.0012924177755588573,
+          "post_positive_true_delayed_log_growth": 0.08722553526113214,
+          "pre_control_true_delayed_log_growth": -0.001264591497049685,
+          "pre_positive_true_delayed_log_growth": -0.001264591497049685
+        },
+        "positive": {
+          "diagnostics": {
+            "first_actor_loss": -0.17147630917532003,
+            "first_critic_loss": 0.029269049809442088,
+            "generations": 256,
+            "last_actor_loss": -0.009454556863604977,
+            "last_critic_loss": 0.00011321459685432835,
+            "note": "loss diagnostics only; no gate is derived from them"
+          },
+          "post": {
+            "direction_probability_margin": 0.9954814302254817,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.004241893999278545,
+                "LONG": 0.00018302818352822214,
+                "SHORT": 0.9955750703811646
+              },
+              "delayed_log_growth": 0.08717299122646059,
+              "direction": "SHORT",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9108541159685288,
+              "target_exposure": -0.9108541159685288
+            },
+            "mean_true_delayed_log_growth": 0.08722553526113214,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.00395623967051506,
+                "LONG": 0.9958072900772095,
+                "SHORT": 0.00023647182388231158
+              },
+              "delayed_log_growth": 0.0872780792958037,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.9120007768115914,
+              "target_exposure": 0.9120007768115914
+            }
+          },
+          "pre": {
+            "direction_probability_margin": 0.00047338008880615234,
+            "down": {
+              "categorical_probabilities": {
+                "FLAT": 0.3353809118270874,
+                "LONG": 0.3382495641708374,
+                "SHORT": 0.32636958360671997
+              },
+              "delayed_log_growth": -0.05168332341331427,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5037045532561444,
+              "target_exposure": 0.5037045532561444
+            },
+            "mean_true_delayed_log_growth": -0.001264591497049685,
+            "up": {
+              "categorical_probabilities": {
+                "FLAT": 0.3349252939224243,
+                "LONG": 0.3389507234096527,
+                "SHORT": 0.326123982667923
+              },
+              "delayed_log_growth": 0.0491541404192149,
+              "direction": "LONG",
+              "immediate_reward": 0.0,
+              "requested_risk": 0.5038224462203393,
+              "target_exposure": 0.5038224462203393
+            }
+          },
+          "seed_gate": {
+            "components": {
+              "down_direction": "SHORT",
+              "down_requested_risk": 0.9108541159685288,
+              "mean_true_delayed_log_growth": 0.08722553526113214,
+              "up_direction": "LONG",
+              "up_requested_risk": 0.9120007768115914
+            },
+            "conditions": {
+              "down_direction": true,
+              "down_requested_risk": true,
+              "mean_true_delayed_log_growth": true,
+              "up_direction": true,
+              "up_requested_risk": true
+            },
+            "passed": true,
+            "preregistered": {
+              "down_direction": "SHORT",
+              "down_requested_risk_min": 0.5,
+              "mean_true_delayed_log_growth_min": 0.03,
+              "up_direction": "LONG",
+              "up_requested_risk_min": 0.5
+            }
+          }
+        }
+      }
+    }
+  ],
+  "verdicts": {
+    "global": "PASS",
+    "task_a": "PASS",
+    "task_b": "PASS"
+  }
+}

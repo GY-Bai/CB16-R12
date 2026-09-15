@@ -96,6 +96,18 @@ class DispatchTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="cb16-test-"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        # Guard: an unstubbed report rescue would spawn a real `dsh` process and
+        # make a real model call from the test suite. Tests that exercise the
+        # rescue inject `report_invoker`; everything else must never reach it.
+        original_rescue = dispatcher.summarize_round_report
+
+        def guarded(*args, **kwargs):
+            raise AssertionError(
+                "the test suite reached the real report rescue; inject report_invoker"
+            )
+
+        dispatcher.summarize_round_report = guarded  # type: ignore[assignment]
+        self.addCleanup(setattr, dispatcher, "summarize_round_report", original_rescue)
         self.repo, self.sha = self._make_repo()
         self.home = self.tmp / "home"
         self.home.mkdir()
@@ -185,6 +197,7 @@ class DispatchTestCase(unittest.TestCase):
         work_root=None,
         base_env=None,
         session_invoker=None,
+        report_invoker=None,
     ):
         if event is None:
             payload = meta if meta is not None else (
@@ -208,6 +221,7 @@ class DispatchTestCase(unittest.TestCase):
             github_token=token,
             dsh_invoker=dsh_invoker,
             session_invoker=session_invoker,
+            report_invoker=report_invoker,
             science_invoker=science_invoker,
             base_env=base_env or self.base_env,
         )
@@ -695,6 +709,637 @@ class PrTimelineTests(DispatchTestCase):
         self.assertIn("One semantic blocker.", text)
 
 
+class SessionAffinityDisabledTests(DispatchTestCase):
+    """Resume is off by policy; rounds pass information through the packet.
+
+    A resumed session carries each earlier round's packet - and each of those
+    contains its own "newest instruction" - so later rounds have to be told in
+    prose which of several contradictory blocks is current. A cold round has no
+    such ambiguity, and measured marginally cheaper.
+    """
+
+    def _affinity_meta(self, branch="ds/disabled-affinity"):
+        meta = self.builder_meta(branch=branch)
+        meta["session_affinity"] = "branch-v1"
+        return meta
+
+    def test_declared_affinity_still_parses_but_does_not_route(self):
+        session = self._session_spy_never_called()
+        legacy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"})
+        outcome = self.dispatch(meta=self._affinity_meta(), dsh_invoker=legacy, session_invoker=session)
+        route = outcome.summary["session_route"]
+        self.assertEqual(route["action"], "declined-affinity-disabled")
+        self.assertEqual(route["declared"], "branch-v1")
+        self.assertIsNone(route["session_id"])
+        self.assertFalse(route["persisted"])
+        self.assertIn("disabled by dispatcher policy", route["detail"])
+        self.assertEqual(outcome.summary["session_profile"], "headless")
+        self.assertTrue(legacy.captured, "the round must run on the legacy fresh path")
+        self.assertEqual(session.calls, [])
+
+    def test_disabled_affinity_writes_no_state(self):
+        legacy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"})
+        self.dispatch(meta=self._affinity_meta(), dsh_invoker=legacy,
+                      session_invoker=self._session_spy_never_called())
+        base = self.tmp / "state" / "session-affinity"
+        self.assertFalse(base.exists(), "a declined round must not create a registry")
+
+    def test_unknown_affinity_contract_is_still_rejected(self):
+        meta = self._affinity_meta()
+        meta["session_affinity"] = "branch-v9"
+        with self.assertRaises(dispatcher.ContractMismatch):
+            self.dispatch(meta=meta)
+
+    def test_science_still_cannot_request_affinity(self):
+        meta = self.science_meta()
+        meta["session_affinity"] = "branch-v1"
+        with self.assertRaises(dispatcher.ContractMismatch):
+            self.dispatch(lane="science", meta=meta)
+
+    def _session_spy_never_called(self):
+        calls = []
+
+        def spy(worktree, **kwargs):
+            calls.append(kwargs)
+            raise AssertionError("the session profile must not run when affinity is off")
+
+        spy.calls = calls  # type: ignore[attr-defined]
+        return spy
+
+
+class FixRoundHandoffTests(DispatchTestCase):
+    """Rounds hand off through the packet, not through a remembered session."""
+
+    def _fix_meta(self, branch="ds/handoff"):
+        meta = self.builder_meta(branch=branch)
+        meta["mode"] = "fix"
+        meta["pr_number"] = 36
+        meta["review_delta"] = "a bounded change"
+        return meta
+
+    def test_fix_round_prompt_states_the_ranking(self):
+        captured = {}
+
+        def spy(worktree, **kwargs):
+            captured.update(kwargs)
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
+
+        meta = self._fix_meta()
+        original = dispatcher.github_api
+        dispatcher.github_api = lambda *a, **k: (404, {})
+        try:
+            self.dispatch(meta=meta, dsh_invoker=spy)
+        finally:
+            dispatcher.github_api = original
+        prompt = captured["prompt"]
+        self.assertIn("fix round on an existing branch", prompt)
+        self.assertIn("Nothing from an earlier round", prompt)
+        self.assertIn("newest unaddressed reviewer instruction", prompt)
+        self.assertIn("no previous BUILD_REPORT is recorded", prompt)
+
+    def test_second_round_receives_the_first_rounds_report(self):
+        first = self.builder_spy(
+            {"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"},
+            report="BUILD_REPORT\n- round one settled the dataclass shape\n",
+        )
+        meta = self._fix_meta()
+        original = dispatcher.github_api
+        dispatcher.github_api = lambda *a, **k: (404, {})
+        try:
+            self.dispatch(meta=meta, dsh_invoker=first)
+            captured = {}
+
+            def spy(worktree, **kwargs):
+                captured.update(kwargs)
+                target = Path(worktree) / "docs" / "dispatch_smoke"
+                target.mkdir(parents=True, exist_ok=True)
+                (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+                return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT: ok\n")
+
+            outcome = self.dispatch(meta=meta, dsh_invoker=spy)
+        finally:
+            dispatcher.github_api = original
+
+        packet = (self.tmp / "worktrees" / "ds__handoff" / ".cb16" / "TASK_PACKET.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("## Previous round report", packet)
+        self.assertIn("round one settled the dataclass shape", packet)
+        self.assertIn("do not redo what it reports as done", packet)
+        self.assertIn("previous round's BUILD_REPORT is reproduced in the packet", captured["prompt"])
+        self.assertNotIn("no previous BUILD_REPORT", captured["prompt"])
+
+    def test_first_round_has_no_previous_report(self):
+        spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"})
+        self.dispatch(meta=self.builder_meta(), dsh_invoker=spy)
+        packet = (self.tmp / "worktrees" / "ds__test-task" / ".cb16" / "TASK_PACKET.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("## Previous round report", packet)
+
+    def test_report_round_trips_through_the_state_dir(self):
+        path = dispatcher.branch_report_path(self.tmp / "state", TRUSTED_REPO, "ds/handoff")
+        self.assertIsNone(dispatcher.read_branch_report(path))
+        dispatcher.write_branch_report(path, "BUILD_REPORT\n- settled\n")
+        self.assertIn("settled", dispatcher.read_branch_report(path))
+        leftovers = [p.name for p in path.parent.iterdir() if ".tmp-" in p.name]
+        self.assertEqual(leftovers, [], "the report must be written atomically")
+
+    def test_previous_report_is_redacted(self):
+        lines = dispatcher.render_previous_report("host /home/bgy/secret", secrets=("/home/bgy",))
+        self.assertNotIn("/home/bgy", "\n".join(lines))
+
+    def test_long_previous_report_is_truncated(self):
+        lines = dispatcher.render_previous_report("x" * (dispatcher.PREVIOUS_REPORT_CHARS + 99))
+        self.assertIn("truncated at", "\n".join(lines))
+
+
+class SessionResultDocumentTests(DispatchTestCase):
+    """The session runner records a document; stdout is only transport."""
+
+    def _result(self, worktree, payload):
+        target = dispatcher.session_result_path(Path(worktree))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    def test_the_document_is_preferred_over_stdout(self):
+        payload = {"session_id": "session-doc", "session_action": "new", "text": "BUILD_REPORT\n- doc\n"}
+        result = dispatcher.RunResult(
+            exit_code=0,
+            stdout=json.dumps({"session_id": "session-stdout", "text": "BUILD_REPORT\n- stdout\n"}),
+            payload=payload,
+            report_text=payload["text"],
+        )
+        self.assertEqual(payload, result.payload)
+        self.assertEqual(result.report_text, "BUILD_REPORT\n- doc\n")
+
+    def test_reading_a_document_round_trips(self):
+        payload = {"session_id": "session-x", "session_action": "resume", "text": "hi"}
+        self._result(self.tmp, payload)
+        self.assertEqual(dispatcher.read_session_result(self.tmp), payload)
+
+    def test_a_missing_document_is_none(self):
+        self.assertIsNone(dispatcher.read_session_result(self.tmp))
+
+    def test_a_malformed_document_is_none(self):
+        target = dispatcher.session_result_path(self.tmp)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("{not json", encoding="utf-8")
+        self.assertIsNone(dispatcher.read_session_result(self.tmp))
+
+    def test_a_document_without_a_session_id_is_not_accepted(self):
+        target = dispatcher.session_result_path(self.tmp)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps({"text": "no id"}), encoding="utf-8")
+        self.assertIsNone(dispatcher.read_session_result(self.tmp))
+
+    def test_the_previous_turns_document_is_cleared(self):
+        self._result(self.tmp, {"session_id": "session-stale", "text": "old"})
+        dispatcher.clear_session_result(self.tmp)
+        self.assertIsNone(dispatcher.read_session_result(self.tmp))
+        dispatcher.clear_session_result(self.tmp)  # absent is not an error
+
+    def test_stdout_parsing_survives_as_a_fallback(self):
+        line = json.dumps({"session_id": "session-legacy", "session_action": "new"})
+        self.assertEqual(
+            dispatcher.parse_session_payload("noise\n" + line + "\n")["session_id"],
+            "session-legacy",
+        )
+        self.assertIsNone(dispatcher.parse_session_payload("no json here\n"))
+
+
+class ReportRescueTests(DispatchTestCase):
+    """A missing report costs one bounded call, not the next round's context."""
+
+    def _silent_turn(self):
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="no report section here\n")
+
+        return spy
+
+    def _rescue(self, text, *, write_file=True):
+        calls = []
+
+        def spy(worktree, **kwargs):
+            calls.append(kwargs)
+            if write_file:
+                target = dispatcher.agent_report_path(Path(worktree))
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(text, encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout=text, report_text=text)
+
+        spy.calls = calls  # type: ignore[attr-defined]
+        return spy
+
+    def test_missing_report_is_recovered_by_one_bounded_call(self):
+        rescue = self._rescue("BUILD_REPORT\n- recovered: changed the loader\n")
+        outcome = self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        self.assertEqual(len(rescue.calls), 1)
+        self.assertEqual(outcome.summary["build_report_source"], "agent-recovered")
+        self.assertIn("recovered: changed the loader", outcome.build_report)
+        self.assertNotIn("Known unresolved: see Actions log", outcome.build_report)
+
+    def test_rescue_prompt_is_read_only_and_asks_only_for_the_report(self):
+        rescue = self._rescue("BUILD_REPORT\n- ok\n")
+        self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        prompt = rescue.calls[0]["prompt"]
+        self.assertIn("do not touch any other file", prompt)
+        self.assertIn(dispatcher.REPORT_FILE_NAME, prompt)
+        self.assertIn(str(dispatcher.REPORT_CHARS_BUILD), prompt)
+
+    def test_rescue_uses_the_fix_round_budget(self):
+        rescue = self._rescue("BUILD_REPORT\n- ok\n")
+        meta = self.builder_meta()
+        meta["mode"] = "fix"
+        meta["pr_number"] = 36
+        meta["review_delta"] = "bounded"
+        original = dispatcher.github_api
+        dispatcher.github_api = lambda *a, **k: (404, {})
+        try:
+            self.dispatch(meta=meta, dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        finally:
+            dispatcher.github_api = original
+        self.assertIn(str(dispatcher.REPORT_CHARS_FIX), rescue.calls[0]["prompt"])
+        self.assertNotIn(str(dispatcher.REPORT_CHARS_BUILD), rescue.calls[0]["prompt"])
+
+    def test_a_written_report_is_not_rescued(self):
+        rescue = self._rescue("BUILD_REPORT\n- should not be used\n")
+        outcome = self.dispatch(
+            dsh_invoker=self.builder_spy(
+                {"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"},
+                report="BUILD_REPORT\n- the agent's own\n",
+            ),
+            report_invoker=rescue,
+        )
+        self.assertEqual(rescue.calls, [], "no call when the agent already complied")
+        self.assertEqual(outcome.summary["build_report_source"], "agent")
+
+    def test_rescue_that_still_produces_nothing_falls_back_to_the_stub(self):
+        rescue = self._rescue("I could not find anything.\n", write_file=False)
+        outcome = self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        self.assertEqual(outcome.summary["build_report_source"], "synthesized")
+        self.assertIn("Known unresolved", outcome.build_report)
+
+    def test_rescue_result_without_a_section_is_not_used_verbatim(self):
+        rescue = self._rescue("some prose that only mentions BUILD_REPORT inline\n",
+                              write_file=False)
+        outcome = self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        self.assertEqual(outcome.summary["build_report_source"], "synthesized")
+
+    def test_the_report_file_wins_over_the_reply_text(self):
+        """The file is the primary channel; the reply is only for the log."""
+
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            report = dispatcher.agent_report_path(Path(worktree))
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text("BUILD_REPORT\n- from the file\n", encoding="utf-8")
+            return dispatcher.RunResult(
+                exit_code=0, stdout="BUILD_REPORT\n- from the reply\n"
+            )
+
+        outcome = self.dispatch(dsh_invoker=spy)
+        self.assertEqual(outcome.summary["build_report_source"], "agent-file")
+        self.assertIn("from the file", outcome.build_report)
+        self.assertNotIn("from the reply", outcome.build_report)
+
+    def test_the_report_file_is_used_even_when_the_reply_has_no_section(self):
+        """The case that used to hand the next round a nine-line stub."""
+
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            report = dispatcher.agent_report_path(Path(worktree))
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text("BUILD_REPORT\n- the turn wrote the file but not the reply\n",
+                              encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="done, see the report file\n")
+
+        rescue = self._rescue("should never run\n")
+        outcome = self.dispatch(dsh_invoker=spy, report_invoker=rescue)
+        self.assertEqual(rescue.calls, [], "no rescue when the file exists")
+        self.assertEqual(outcome.summary["build_report_source"], "agent-file")
+        self.assertIn("wrote the file but not the reply", outcome.build_report)
+
+    def test_the_report_file_never_enters_the_change_set(self):
+        """`.cb16/` is git-ignored, so the report cannot pollute a commit."""
+
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            report = dispatcher.agent_report_path(Path(worktree))
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text("BUILD_REPORT\n- file\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT\n- reply\n")
+
+        outcome = self.dispatch(dsh_invoker=spy)
+        self.assertNotIn(
+            f".cb16/{dispatcher.REPORT_FILE_NAME}", outcome.summary["changed_files"]
+        )
+
+    def test_rescue_is_read_back_from_the_file_it_writes(self):
+        rescue = self._rescue("BUILD_REPORT\n- recovered via the file\n")
+        outcome = self.dispatch(dsh_invoker=self._silent_turn(), report_invoker=rescue)
+        self.assertEqual(outcome.summary["build_report_source"], "agent-recovered")
+        self.assertIn("recovered via the file", outcome.build_report)
+
+    def test_a_stale_report_from_an_earlier_round_is_not_inherited(self):
+        """The worktree is reused, so last round's file must not be read as this one's."""
+
+        stale = dispatcher.agent_report_path(self.tmp)
+        stale.parent.mkdir(parents=True, exist_ok=True)
+        stale.write_text("BUILD_REPORT\n- stale conclusions from an earlier round\n",
+                         encoding="utf-8")
+
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            # This round writes no report at all.
+            return dispatcher.RunResult(exit_code=0, stdout="no report section here\n")
+
+        outcome = self.dispatch(
+            dsh_invoker=spy,
+            report_invoker=lambda worktree, **kwargs: dispatcher.RunResult(
+                exit_code=0, stdout="nothing\n"
+            ),
+        )
+        self.assertNotIn("stale conclusions", outcome.build_report)
+        self.assertEqual(outcome.summary["build_report_source"], "synthesized")
+
+    def test_the_worktree_copy_is_removed_once_recorded(self):
+        def spy(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            report = dispatcher.agent_report_path(Path(worktree))
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text("BUILD_REPORT\n- recorded\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="BUILD_REPORT\n- reply\n")
+
+        outcome = self.dispatch(dsh_invoker=spy)
+        self.assertIn("recorded", outcome.build_report)
+        worktree = Path(outcome.summary["worktree"])
+        self.assertFalse(
+            dispatcher.agent_report_path(worktree).exists(),
+            "the recorded copy is removed from the worktree",
+        )
+        self.assertTrue(
+            dispatcher.read_branch_report(
+                dispatcher.branch_report_path(self.tmp / "state", TRUSTED_REPO, "ds/test-task")
+            ),
+            "but it survives in the state directory",
+        )
+
+    def test_missing_report_file_is_none_not_an_error(self):
+        self.assertIsNone(dispatcher.read_agent_report(Path(self.tmp)))
+
+    def test_default_budgets(self):
+        build = dispatcher.TaskSpec(lane="builder", mode="build", sha="0" * 40, branch="ds/x")
+        fix = dispatcher.TaskSpec(lane="builder", mode="fix", sha="0" * 40, branch="ds/x")
+        self.assertEqual(dispatcher.report_budget(build), 2000)
+        self.assertEqual(dispatcher.report_budget(fix), 500)
+
+
+class RoundVisibilityTests(DispatchTestCase):
+    """A round must leave a readable trace on its PR, and must not read it back."""
+
+    def _ok_round(self, *, pr_number=36, branch="ds/visible"):
+        meta = self.builder_meta(branch=branch)
+        meta["mode"] = "fix"
+        meta["pr_number"] = pr_number
+        meta["review_delta"] = "bounded"
+        return meta
+
+    def test_successful_round_posts_its_report_to_the_pull_request(self):
+        posted = []
+        original_comment = dispatcher.comment_on_issue
+        original_api = dispatcher.github_api
+        dispatcher.comment_on_issue = lambda **kw: posted.append(kw)
+
+        def fake_api(method, path, *, token=None, payload=None, timeout=30):
+            if method == "POST" and path.endswith("/pulls"):
+                return 201, {"number": 36, "html_url": "https://example.invalid/pr/36"}
+            if method == "PATCH" and "/pulls/" in path:
+                return 200, {"number": 36, "html_url": "https://example.invalid/pr/36"}
+            return 200, {}
+
+        dispatcher.github_api = fake_api
+        try:
+            def no_file_changes(worktree, **kwargs):
+                # No changed files, so publish skips the commit/push and the
+                # test exercises the reporting path alone.
+                return dispatcher.RunResult(
+                    exit_code=0,
+                    stdout="BUILD_REPORT\n- settled the dataclass shape\n",
+                )
+
+            self.dispatch(
+                meta=self._ok_round(),
+                publish=True,
+                token="t",
+                dsh_invoker=no_file_changes,
+            )
+        finally:
+            dispatcher.comment_on_issue = original_comment
+            dispatcher.github_api = original_api
+        self.assertEqual(len(posted), 1, "a successful round must not be silent")
+        self.assertEqual(posted[0]["issue_number"], 36, "the report goes on the PR")
+        body = posted[0]["body"]
+        self.assertIn(dispatcher.BUILDER_REPORT_TAG, body)
+        self.assertIn("settled the dataclass shape", body)
+        self.assertIn("`OK`", body)
+        self.assertIn("ds/visible", body)
+
+    def test_failed_round_also_posts_to_the_pull_request(self):
+        posted = []
+        original_comment = dispatcher.comment_on_issue
+        original_api = dispatcher.github_api
+        dispatcher.comment_on_issue = lambda **kw: posted.append(kw)
+
+        def fake_api(method, path, *, token=None, payload=None, timeout=30):
+            if method == "POST" and path.endswith("/pulls"):
+                return 201, {"number": 36, "html_url": "https://example.invalid/pr/36"}
+            if method == "PATCH" and "/pulls/" in path:
+                return 200, {"number": 36, "html_url": "https://example.invalid/pr/36"}
+            return 200, {}
+
+        dispatcher.github_api = fake_api
+        try:
+            outcome = self.dispatch(
+                meta=self._ok_round(),
+                publish=True,
+                token="t",
+                dsh_invoker=self.builder_spy(exit_code=4, report="boom\nBUILD_REPORT\nTask: x\n"),
+            )
+        finally:
+            dispatcher.comment_on_issue = original_comment
+            dispatcher.github_api = original_api
+        self.assertEqual(outcome.classification, dispatcher.CLASS_BUILDER_FAIL)
+        pr_comments = [p for p in posted if p["issue_number"] == 36]
+        self.assertEqual(len(pr_comments), 1, "a failed round must be visible on its PR too")
+        self.assertIn(dispatcher.BUILDER_REPORT_TAG, pr_comments[0]["body"])
+
+    def test_round_comment_names_the_model(self):
+        meta = self._ok_round()
+        spec = dispatcher.TaskSpec(lane="builder", mode="fix", sha="0" * 40,
+                                   branch="ds/visible", pr_number=36)
+        body = dispatcher.render_round_comment(
+            spec=spec, issue_number=35, classification="OK", report_text="BUILD_REPORT\n",
+            changed=["a.py", "b.py"], run_result=dispatcher.RunResult(exit_code=0),
+            model={"model": "deepseek-flash", "reasoningEffort": "max"},
+        )
+        self.assertIn("deepseek-flash", body)
+        self.assertIn("effort `max`", body)
+        self.assertIn("2 file(s)", body)
+
+    def test_round_report_is_not_read_back_as_an_instruction(self):
+        """The Builder's own comment must never become the newest instruction."""
+
+        def fake_api(method, path, *, token=None, payload=None, timeout=30):
+            if path.endswith("/commits"):
+                return 200, [{"sha": "a" * 40, "commit": {"message": "build",
+                               "committer": {"date": "2026-09-14T17:02:17Z"}},
+                              "author": {"login": "GY-Bai"}}]
+            if path.endswith("/reviews"):
+                return 200, []
+            if path.endswith("/issues/36/comments"):
+                return 200, [{
+                    "created_at": "2026-09-14T17:29:28Z",
+                    "body": dispatcher.BUILDER_REPORT_TAG + "\n## CB16 Builder round\nBUILD_REPORT",
+                    "user": {"login": "GY-Bai"},
+                }]
+            return 200, []
+
+        original = dispatcher.github_api
+        dispatcher.github_api = fake_api
+        try:
+            timeline = dispatcher.fetch_pr_timeline(
+                "GY-Bai/CB16-R12", 36, token="t", trusted_actors=("GY-Bai",)
+            )
+        finally:
+            dispatcher.github_api = original
+        self.assertEqual(timeline["unaddressed"], [], "our own report is not an instruction")
+        kinds = [e["kind"] for e in timeline["entries"]]
+        self.assertNotIn("comment", kinds)
+
+    def test_a_real_reviewer_comment_is_still_an_instruction(self):
+        def fake_api(method, path, *, token=None, payload=None, timeout=30):
+            if path.endswith("/commits"):
+                return 200, [{"sha": "a" * 40, "commit": {"message": "build",
+                               "committer": {"date": "2026-09-14T17:02:17Z"}},
+                              "author": {"login": "GY-Bai"}}]
+            if path.endswith("/issues/36/comments"):
+                return 200, [{"created_at": "2026-09-14T17:40:00Z", "body": "please fix X",
+                              "user": {"login": "GY-Bai"}}]
+            return 200, []
+
+        original = dispatcher.github_api
+        dispatcher.github_api = fake_api
+        try:
+            timeline = dispatcher.fetch_pr_timeline(
+                "GY-Bai/CB16-R12", 36, token="t", trusted_actors=("GY-Bai",)
+            )
+        finally:
+            dispatcher.github_api = original
+        self.assertEqual(len(timeline["unaddressed"]), 1)
+        self.assertEqual(timeline["unaddressed"][0]["text"], "please fix X")
+
+
+class BuildReportHandoffTests(DispatchTestCase):
+    """The report is the cross-round carrier once sessions stop being reused."""
+
+    def test_session_runner_report_is_extracted_from_the_payload_not_stdout(self):
+        """A JSON stdout escapes newlines, so a line-anchored scan cannot work."""
+
+        agent_report = "BUILD_REPORT\n\n## Task identity\n- settled the shape\n"
+        payload = {"success": True, "session_id": "s", "session_action": "new",
+                   "text": agent_report}
+        result = dispatcher.RunResult(
+            exit_code=0, stdout=json.dumps(payload) + "\n", payload=payload,
+            report_text=payload["text"],
+        )
+        self.assertIsNone(
+            dispatcher.extract_build_report(result.stdout),
+            "the JSON record itself must not match",
+        )
+        self.assertIsNotNone(
+            dispatcher.extract_build_report(result.report_text),
+            "the payload text is where the agent's report lives",
+        )
+
+    def test_synthesized_report_names_the_issue_not_the_branch(self):
+        spec = dispatcher.TaskSpec(
+            lane="builder", mode="fix", sha="0" * 40, branch="ds/some-branch",
+        )
+        text = dispatcher.synthesize_build_report(
+            spec=spec, issue_number=35, classification="OK", changed=[],
+            test_result=None, run_result=dispatcher.RunResult(exit_code=0),
+        )
+        self.assertIn("Issue #35", text)
+        self.assertNotIn("Issue #ds/", text)
+
+    def test_evidence_says_whether_the_report_was_the_agents_own(self):
+        outcome = self.dispatch(
+            dsh_invoker=self.builder_spy(
+                {"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"},
+                report="BUILD_REPORT\n- mine\n",
+            )
+        )
+        self.assertEqual(outcome.summary["build_report_source"], "agent")
+
+    def test_evidence_marks_a_synthesized_report(self):
+        def silent(worktree, **kwargs):
+            target = Path(worktree) / "docs" / "dispatch_smoke"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "DRY_RUN_FIXTURE.md").write_text("# f\n", encoding="utf-8")
+            return dispatcher.RunResult(exit_code=0, stdout="no report section here\n")
+
+        outcome = self.dispatch(
+            dsh_invoker=silent,
+            # Stub the rescue too: this case is about the evidence label, and an
+            # unstubbed rescue would make a real model call from the suite.
+            report_invoker=lambda worktree, **kwargs: dispatcher.RunResult(
+                exit_code=0, stdout="still no report section\n"
+            ),
+        )
+        self.assertEqual(outcome.summary["build_report_source"], "synthesized")
+
+    def test_agent_report_reaches_the_next_round_instead_of_the_stub(self):
+        agent_report = "BUILD_REPORT\n\n## Task identity\n- round one chose approach A\n"
+        first = self.builder_spy(
+            {"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"}, report=agent_report
+        )
+        meta = self.builder_meta(branch="ds/handoff-two")
+        meta["mode"] = "fix"
+        meta["pr_number"] = 36
+        meta["review_delta"] = "bounded"
+        original = dispatcher.github_api
+        dispatcher.github_api = lambda *a, **k: (404, {})
+        try:
+            self.dispatch(meta=meta, dsh_invoker=first)
+            self.dispatch(meta=meta, dsh_invoker=self.builder_spy(
+                {"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# f\n"}))
+        finally:
+            dispatcher.github_api = original
+        packet = (self.tmp / "worktrees" / "ds__handoff-two" / ".cb16" / "TASK_PACKET.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("round one chose approach A", packet)
+        self.assertNotIn("Known unresolved: see Actions log", packet,
+                         "the synthesized stub must not displace the agent's report")
+
+
 class SessionPluginPackagingTests(unittest.TestCase):
     """The profile is only reproducible if its declared files are in Git.
 
@@ -754,6 +1399,17 @@ class SessionAffinityTests(DispatchTestCase):
     behaviour and, just as importantly, everything that must stay legacy.
     """
 
+    def setUp(self):
+        super().setUp()
+        # Affinity is off by default. This class covers the machinery itself so
+        # that re-enabling it does not run against untested code.
+        self._affinity_default = dispatcher.SESSION_AFFINITY_ENABLED
+        dispatcher.SESSION_AFFINITY_ENABLED = True
+
+    def tearDown(self):
+        dispatcher.SESSION_AFFINITY_ENABLED = self._affinity_default
+        super().tearDown()
+
     def _session_spy(self, *, action="new", session_id="session-fixed-0001", resume_succeeded=None):
         """Stand-in for the session runner: records calls, returns its JSON record."""
         calls = []
@@ -778,7 +1434,14 @@ class SessionAffinityTests(DispatchTestCase):
             target.mkdir(parents=True, exist_ok=True)
             (target / "DRY_RUN_FIXTURE.md").write_text("# fixture\n", encoding="utf-8")
             return dispatcher.RunResult(
-                exit_code=0, stdout=json.dumps(payload) + "\n", note=action, payload=payload
+                exit_code=0,
+                stdout=json.dumps(payload) + "\n",
+                note=action,
+                payload=payload,
+                # The real session runner carries the agent text separately,
+                # because a JSON stdout cannot be scanned for a line-anchored
+                # report section.
+                report_text=payload["text"],
             )
 
         spy.calls = calls  # type: ignore[attr-defined]
@@ -882,10 +1545,13 @@ class SessionAffinityTests(DispatchTestCase):
         for name, *_ in dispatcher.INSTRUCTION_RANKS:
             self.assertIn(name, prompt)
 
-    def test_first_turn_uses_the_standard_packet_prompt(self):
+    def test_first_turn_uses_the_packet_prompt(self):
         session = self._session_spy()
         self.dispatch(meta=self._affinity_meta(), session_invoker=session)
-        self.assertEqual(session.calls[0]["prompt"], dispatcher.DSH_PROMPT)
+        prompt = session.calls[0]["prompt"]
+        self.assertIn(".cb16/TASK_PACKET.md", prompt)
+        self.assertIn("highest", prompt)
+        self.assertIn("newest unaddressed reviewer instruction", prompt)
 
     # ---- fallback --------------------------------------------------------
 
@@ -1758,7 +2424,13 @@ class EvidenceAndClassificationTests(DispatchTestCase):
 
     def test_build_report_is_synthesised_when_the_agent_omits_it(self):
         spy = self.builder_spy({"docs/dispatch_smoke/DRY_RUN_FIXTURE.md": "# fixture\n"}, report="no report here")
-        outcome = self.dispatch(dsh_invoker=spy)
+        outcome = self.dispatch(
+            dsh_invoker=spy,
+            # Even the rescue cannot invent one here, so the stub is the result.
+            report_invoker=lambda worktree, **kwargs: dispatcher.RunResult(
+                exit_code=0, stdout="still nothing\n"
+            ),
+        )
         self.assertIn("BUILD_REPORT", outcome.build_report)
         self.assertIn(dispatcher.CLASS_OK, outcome.build_report)
 

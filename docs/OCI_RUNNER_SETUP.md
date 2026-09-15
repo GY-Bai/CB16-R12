@@ -537,7 +537,169 @@ Properties worth keeping:
 * **redacted** - bodies pass through the same host-identifier scrubbing as the
   rest of the evidence.
 
-## 1m. Which instruction source wins
+## 1l. Rounds hand off through the packet, not through a session
+
+Session affinity is **off** (`SESSION_AFFINITY_ENABLED`). A resumed session
+carries every earlier round's packet, and each of those contains its own
+"newest instruction" block, so a later round has to be told in prose which of
+several contradictory blocks is current. A cold round has no such ambiguity,
+and on the measured VS-C pair resuming also cost about $0.015 more per round:
+prompt caching makes rebuilding context nearly free ($0.003/M) while every
+resumed step carries the whole conversation.
+
+`session_affinity: branch-v1` still parses, and a round that declares it is
+recorded as `declined-affinity-disabled` and runs on the legacy fresh path. Set
+`CB16_SESSION_AFFINITY=enabled` to restore the old behaviour.
+
+Information now travels two ways:
+
+| Carrier | Content |
+| --- | --- |
+| the packet | contract, merged PR timeline, the newest unaddressed reviewer instruction, the instruction ranking |
+| `BUILD_REPORT` | what the round changed, tested, and deliberately did not do |
+
+Each Builder round writes its report to
+`<CB16_STATE_DIR>/reports/<hash>.md`, and the next round reads it into a
+`## Previous round report` section. A fix-round prompt states the ranking,
+notes that nothing from an earlier round is remembered, and points at that
+section when it exists.
+
+### Report budgets
+
+| Round | Budget |
+| --- | --- |
+| build | **~2,000 characters** |
+| fix | **~500 characters** |
+
+A build round carries the design decisions the next round must not re-derive; a
+fix round only has to say what this delta changed. Past the budget the report is
+not more informative - it just costs output tokens and crowds the next round's
+packet. The budget is stated in the turn prompt.
+
+### When the agent omits the report
+
+One in three real turns ended without the `BUILD_REPORT` section it was asked
+for, and that round then handed the next one a nine-line stub. So when a finished
+turn has no report, the dispatcher makes **one bounded read-only call** asking
+the agent to reconstruct it from `git status`, `git diff HEAD` and the packet,
+under the same budget. The result is used only if it actually contains a
+`BUILD_REPORT` section, and discarded if the worktree changed while it ran -
+a report is not worth a silently mutated worktree.
+
+`build_report_source` in `dispatch_summary.json` records which path produced it:
+`agent` (the turn wrote it), `agent-recovered` (the rescue did), or
+`synthesized` (the dispatcher's stub).
+
+**The report is only as good as what the agent writes.** The dispatcher prefers
+the agent's own `BUILD_REPORT` section and only falls back to a synthesized
+stub - classification, changed files, test exit code - when the agent did not
+emit one. Observed on the real VS-C rounds: two of three turns produced a
+proper section (5,180 and 8,480 characters), one did not. The synthesized stub
+is not a substitute for the agent's reasoning, so a round that ends without
+`BUILD_REPORT` degrades the next round's context. Every dispatch records
+`build_report_source: agent | synthesized` in `dispatch_summary.json`, so the
+degradation is visible instead of silent.
+
+Two defects fixed while wiring this up:
+
+* the session runner's stdout is a JSON record, whose newlines are escaped, so
+  a line-anchored `BUILD_REPORT` scan could never match and **every** agent
+  report on the session path was silently replaced by the stub;
+* the synthesized report used the branch name in the `Issue #` field.
+
+## 1m. What a round leaves on its PR
+
+A successful round used to leave the PR silent: the only GitHub write was a
+label on the Issue, and the report went to an Actions artifact that expires.
+
+The PR body does carry the report, but a fix round **overwrites** it, so the body
+only ever shows the latest round - there is no way to read what round 2
+concluded after round 3 has run.
+
+Every published Builder round now also posts its report as a **comment** on its
+own PR, giving the PR an append-only history:
+
+```markdown
+<!-- cb16-builder-report -->
+## CB16 Builder round — `ds/example` (`fix`)
+
+| | |
+| --- | --- |
+| issue | #35 |
+| classification | `OK` |
+| changed | 3 file(s) |
+| model | `deepseek-flash` (effort `max`) |
+| pull request | #36 |
+
+<details><summary>BUILD_REPORT</summary> ... </details>
+```
+
+The hidden `<!-- cb16-builder-report -->` marker matters for more than tidiness:
+the PR timeline treats a trusted actor's comment as an instruction, and the
+Builder posts as the token owner. Without the marker a round would read its own
+report back as the newest thing a reviewer asked for. Timeline collection skips
+tagged comments for exactly that reason.
+
+## 1n. Read a document, do not parse a transport
+
+One rule keeps recurring, and every violation of it has cost a silent defect:
+
+> **If a producer is ours, it writes a document and the consumer reads the
+> document. The transport is never where state lives.**
+
+Why it matters, from this host's own history:
+
+| Violation | What it cost |
+| --- | --- |
+| the report was a text convention inside the agent's reply | one turn in three ended without it |
+| the session runner returned JSON on stdout | JSON escapes newlines, so a line-anchored scan never matched and **every** report on that path was discarded |
+| changed files were read from git's quoted porcelain and unescaped by hand | a non-ASCII filename came back as octal escapes |
+| the DSH model was read by hand-scanning YAML | a quoted value containing `:` was cut in half |
+
+Each is now a document read, or a machine format:
+
+| Consumer | Channel | Fallback |
+| --- | --- | --- |
+| the round's report | `.cb16/BUILD_REPORT.md` | reply text, then a rescue call, then a stub |
+| the session turn record | `.cb16/SESSION_RESULT.json` | stdout parsing (older runner only) |
+| changed files | `git status --porcelain -z` | none - NUL separation needs no unquoting |
+| the DSH model | `yaml.safe_load` | the tiny line scanner, only when PyYAML is absent |
+| the sandbox profile | NUL-delimited argv | none |
+
+The one place that still parses text on purpose is reviewer prose, because
+prose is what a reviewer writes. That is a document read too - it is simply a
+document whose fields are sentences.
+
+## 1o. Reclaiming host state
+
+State accumulates: worktrees hold a virtualenv each, the shared uv cache keeps
+every download, lock files stay behind after a crash, and disabled features leave
+records. Measured on this host before a cleanup: 1.4 GB of worktrees (two of them
+658 MB each) and 5.7 GB of uv cache.
+
+`scripts/cb16_state.py` reports by default and removes only with `--apply`:
+
+```bash
+python3 scripts/cb16_state.py --state-dir "$CB16_STATE_DIR" \
+  --work-root "$CB16_WORK_ROOT" --repo "$CB16_WORK_ROOT/repo"        # report
+python3 scripts/cb16_state.py ... --apply                          # reclaim
+```
+
+It removes only what it can prove dead:
+
+* lock files whose `flock` is not held - the file surviving a crash means
+  nothing, because the lock is a kernel flock and dies with its process;
+* records left by a disabled feature;
+* worktrees whose branch is already merged into `origin/main`.
+
+It refuses to touch worktrees while any lock is held, and it protects the
+dispatcher's own clone - an ancestry test alone would delete it, since it sits on
+the default branch, so it is skipped by path and by branch name.
+
+It never removes session logs, the per-branch reports, or cache contents;
+`uv cache prune` knows which entries are still referenced and this tool does not.
+
+## 1p. Which instruction source wins
 
 Five places can look like an instruction, and a fix round can hold several at
 once. The task packet therefore opens with an explicit ranking so the agent

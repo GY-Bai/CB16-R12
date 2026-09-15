@@ -1,0 +1,63 @@
+{
+  "base_sha": "465c8c916d0f67472b1575e177e8e24b1e29a4cf",
+  "branch": "science/run-465c8c916d0f",
+  "builder_model": {
+    "declared": true,
+    "model": "deepseek-flash",
+    "provider": "deepseek-official",
+    "reasoningEffort": "max",
+    "source": "<host>/.dsh/settings.yaml"
+  },
+  "changed_files": [],
+  "classification": "OK",
+  "control_plane_authorised": false,
+  "credential_warnings": [
+    "host credential file present and readable by the runner user: <host>/.config/gh/hosts.yml (recommend `gh auth logout` on the runner host or a dedicated runner user)",
+    "SSH private keys present for the runner user: id_ed25519 (DSH can read them; prefer a dedicated runner user)"
+  ],
+  "dry_run": false,
+  "experiment_spec": "config/experiments/r12_vs_c_joint_confirmation_r3.json",
+  "host_identifiers_redacted": 3,
+  "issue_number": 53,
+  "label": "science:run",
+  "lane": "science",
+  "lane_exit_status": 0,
+  "mode": "science",
+  "project_store": "/cb16/store",
+  "published": true,
+  "read_only_data": {
+    "binance_um_1m_klines_10pairs": "/cb16/raw/klines_1m",
+    "binance_um_funding_rates_10pairs": "/cb16/raw/fundingRate",
+    "binance_usdm_1m_raw_vault": "<host>/CB16_BINANCE_USDM_1M_RAW_VAULT_RUN",
+    "cb16_brain_assets": "/cb16/brain_assets",
+    "cb16_raw_download_manifest": "/cb16/raw/DOWNLOAD_MANIFEST.json",
+    "e4_t1_curated_1m_5m_1h": "<host>/m3-infra/cb16_e4_t1_work/CB16_E4_T1_DATA_1M_5M_1H_20200101_20221019",
+    "frozen_body_archives": "<host>/m3-infra",
+    "frozen_weights_r10_lineage": "/cb16/frozen"
+  },
+  "read_only_data_missing": [],
+  "repo": "GY-Bai/CB16-R12",
+  "result_command": "cb16.vs-c-joint-confirmation-r3@v1",
+  "result_dir": "/cb16/runner-work/r12/CB16-R12/CB16-R12/.cb16/report/results",
+  "schema": "cb16.dispatch.v1",
+  "science_sandbox": "<host>/.local/bin/cb16-sandbox-runner",
+  "session_affinity": "off",
+  "session_profile": "headless",
+  "session_route": {
+    "action": "legacy-fresh",
+    "declared": "off",
+    "detail": null,
+    "generation": 0,
+    "persisted": false,
+    "session_id": null
+  },
+  "task_file": null,
+  "work_repo": "/cb16/dispatch/worktrees/repo",
+  "workspace_caches": {
+    "PIP_CACHE_DIR": "/cb16/dispatch/worktrees/science__run-465c8c916d0f/.pip-cache",
+    "UV_CACHE_DIR": "/cb16/cache/uv",
+    "UV_PROJECT_ENVIRONMENT": "/cb16/dispatch/worktrees/science__run-465c8c916d0f/.venv"
+  },
+  "worktree": "/cb16/dispatch/worktrees/science__run-465c8c916d0f",
+  "worktree_reused": false
+}

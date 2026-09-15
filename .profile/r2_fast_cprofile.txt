@@ -1,0 +1,112 @@
+ONE_GEN actor_loss ref/fast -0.03648591642877954 -0.03648591642877954 diff 0.0
+ONE_GEN critic_loss ref/fast 0.0027447100459118737 0.0027447100459118737 diff 0.0
+ONE_GEN actor exact True maxdiff 0.0
+ONE_GEN critic exact True maxdiff 0.0
+inner_elapsed_s=1.760656 wall_s=1.773616
+         214408 function calls (207824 primitive calls) in 1.773 seconds
+
+   Ordered by: cumulative time
+   List reduced from 365 to 45 due to restriction <45>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.004    0.004    1.773    1.773 tensor_fastpath_prototype.py:86(run_fast)
+       64    0.016    0.000    0.975    0.015 tensor_fastpath_prototype.py:32(fast_update)
+       64    0.008    0.000    0.739    0.012 tensor_fastpath_prototype.py:21(collect_tensor)
+       64    0.038    0.001    0.458    0.007 vectorized_tasks.py:115(task_a_reward_batch)
+ 1664/320    0.005    0.000    0.452    0.001 module.py:1779(_wrapped_call_impl)
+ 1664/320    0.007    0.000    0.451    0.001 module.py:1787(_call_impl)
+      192    0.024    0.000    0.450    0.002 policy.py:412(forward)
+      256    0.004    0.000    0.420    0.002 container.py:254(forward)
+      128    0.059    0.000    0.393    0.003 vectorized_tasks.py:91(_boundary_batch)
+     3328    0.168    0.000    0.268    0.000 vectorized_tasks.py:75(_candidate_feasible_batch)
+      512    0.001    0.000    0.262    0.001 activation.py:429(forward)
+      576    0.262    0.000    0.262    0.000 {built-in method torch.tanh}
+      128    0.001    0.000    0.258    0.002 _tensor.py:566(backward)
+      128    0.003    0.000    0.257    0.002 __init__.py:255(backward)
+       64    0.001    0.000    0.252    0.004 policy.py:456(log_prob_batch)
+      128    0.002    0.000    0.249    0.002 graph.py:1059(_engine_run_backward)
+      128    0.246    0.002    0.246    0.002 {method 'run_backward' of 'torch._C._EngineBase' objects}
+       64    0.014    0.000    0.234    0.004 vectorized_tasks.py:42(sample_action_batch)
+       64    0.003    0.000    0.230    0.004 policy.py:427(_log_prob_impl)
+       64    0.001    0.000    0.185    0.003 policy.py:469(direction_entropy_batch)
+      768    0.002    0.000    0.143    0.000 linear.py:130(forward)
+      768    0.140    0.000    0.140    0.000 {built-in method torch._C._nn.linear}
+       64    0.001    0.000    0.117    0.002 policy.py:591(forward)
+     9984    0.098    0.000    0.098    0.000 {built-in method torch.where}
+      128    0.003    0.000    0.094    0.001 optimizer.py:528(wrapper)
+     2240    0.086    0.000    0.086    0.000 {built-in method torch.isfinite}
+      128    0.002    0.000    0.082    0.001 optimizer.py:59(_use_grad)
+      128    0.001    0.000    0.079    0.001 adam.py:214(step)
+      128    0.000    0.000    0.070    0.001 optimizer.py:140(maybe_fallback)
+      128    0.001    0.000    0.070    0.001 adam.py:902(adam)
+      128    0.025    0.000    0.065    0.001 adam.py:347(_single_tensor_adam)
+      204    0.001    0.000    0.057    0.000 _compile.py:42(inner)
+      204    0.001    0.000    0.056    0.000 eval_frame.py:1523(_fn)
+      384    0.004    0.000    0.051    0.000 policy.py:170(_require_state_vector)
+     6720    0.050    0.000    0.050    0.000 {built-in method torch.abs}
+      192    0.014    0.000    0.049    0.000 policy.py:283(_require_actor_output)
+       68    0.000    0.000    0.044    0.001 random.py:49(manual_seed)
+       68    0.002    0.000    0.044    0.001 random.py:62(_manual_seed_impl)
+      192    0.005    0.000    0.040    0.000 categorical.py:56(__init__)
+     3520    0.039    0.000    0.039    0.000 {method 'all' of 'torch._C.TensorBase' objects}
+      204    0.001    0.000    0.038    0.000 traceback.py:214(format_stack)
+      448    0.007    0.000    0.035    0.000 distribution.py:46(__init__)
+      768    0.030    0.000    0.030    0.000 {built-in method torch._C._nn.softplus}
+      560    0.028    0.000    0.028    0.000 {built-in method torch.tensor}
+      128    0.002    0.000    0.028    0.000 beta.py:41(__init__)
+
+
+===TOTAL===
+         214408 function calls (207824 primitive calls) in 1.773 seconds
+
+   Ordered by: internal time
+   List reduced from 365 to 45 due to restriction <45>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      576    0.262    0.000    0.262    0.000 {built-in method torch.tanh}
+      128    0.246    0.002    0.246    0.002 {method 'run_backward' of 'torch._C._EngineBase' objects}
+     3328    0.168    0.000    0.268    0.000 vectorized_tasks.py:75(_candidate_feasible_batch)
+      768    0.140    0.000    0.140    0.000 {built-in method torch._C._nn.linear}
+     9984    0.098    0.000    0.098    0.000 {built-in method torch.where}
+     2240    0.086    0.000    0.086    0.000 {built-in method torch.isfinite}
+      128    0.059    0.000    0.393    0.003 vectorized_tasks.py:91(_boundary_batch)
+     6720    0.050    0.000    0.050    0.000 {built-in method torch.abs}
+     3520    0.039    0.000    0.039    0.000 {method 'all' of 'torch._C.TensorBase' objects}
+       64    0.038    0.001    0.458    0.007 vectorized_tasks.py:115(task_a_reward_batch)
+      768    0.030    0.000    0.030    0.000 {built-in method torch._C._nn.softplus}
+      560    0.028    0.000    0.028    0.000 {built-in method torch.tensor}
+      128    0.025    0.000    0.065    0.001 adam.py:347(_single_tensor_adam)
+      192    0.024    0.000    0.450    0.002 policy.py:412(forward)
+     3456    0.018    0.000    0.018    0.000 {built-in method torch.ones_like}
+      192    0.018    0.000    0.018    0.000 {method 'logsumexp' of 'torch._C.TensorBase' objects}
+       64    0.016    0.000    0.975    0.015 tensor_fastpath_prototype.py:32(fast_update)
+      192    0.014    0.000    0.049    0.000 policy.py:283(_require_actor_output)
+       64    0.014    0.000    0.234    0.004 vectorized_tasks.py:42(sample_action_batch)
+       64    0.011    0.000    0.011    0.000 {built-in method torch.multinomial}
+      128    0.010    0.000    0.010    0.000 {method 'softmax' of 'torch._C.TensorBase' objects}
+       64    0.008    0.000    0.739    0.012 tensor_fastpath_prototype.py:21(collect_tensor)
+      768    0.008    0.000    0.008    0.000 {method 'mul_' of 'torch._C.TensorBase' objects}
+ 1664/320    0.007    0.000    0.451    0.001 module.py:1787(_call_impl)
+     1360    0.007    0.000    0.007    0.000 {built-in method posix.stat}
+      448    0.007    0.000    0.035    0.000 distribution.py:46(__init__)
+      320    0.006    0.000    0.006    0.000 {method 'sum' of 'torch._C.TensorBase' objects}
+      768    0.006    0.000    0.006    0.000 {method 'add_' of 'torch._C.TensorBase' objects}
+       64    0.006    0.000    0.006    0.000 {built-in method torch._sample_dirichlet}
+      768    0.006    0.000    0.006    0.000 {method 'addcdiv_' of 'torch._C.TensorBase' objects}
+      768    0.006    0.000    0.006    0.000 {method 'lerp_' of 'torch._C.TensorBase' objects}
+      512    0.006    0.000    0.006    0.000 {method 'reshape' of 'torch._C.TensorBase' objects}
+      256    0.006    0.000    0.006    0.000 {built-in method torch._ops.profiler._record_function_enter_new}
+      128    0.006    0.000    0.006    0.000 {built-in method torch.lgamma}
+      204    0.006    0.000    0.021    0.000 traceback.py:399(_extract_from_extended_frame_gen)
+      768    0.005    0.000    0.005    0.000 {method 'addcmul_' of 'torch._C.TensorBase' objects}
+      192    0.005    0.000    0.040    0.000 categorical.py:56(__init__)
+      384    0.005    0.000    0.005    0.000 constraints.py:437(check)
+      768    0.005    0.000    0.005    0.000 {built-in method torch._is_all_true}
+     1644    0.005    0.000    0.012    0.000 traceback.py:460(format_frame_summary)
+      256    0.005    0.000    0.005    0.000 {built-in method torch.stack}
+ 1664/320    0.005    0.000    0.452    0.001 module.py:1779(_wrapped_call_impl)
+      128    0.004    0.000    0.019    0.000 learner.py:418(_actor_snapshot_intact)
+      496    0.004    0.000    0.004    0.000 {method 'to' of 'torch._C.TensorBase' objects}
+      256    0.004    0.000    0.420    0.002 container.py:254(forward)
+
+

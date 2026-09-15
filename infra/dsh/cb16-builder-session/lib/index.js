@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import z from "@deepseek-ai/schemastery";
 import { installModelSelection } from "@deepseek-ai/dsh-agent";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
@@ -37,6 +39,8 @@ const Config = z.object({
 });
 
 /** Why a continue attempt was abandoned; recorded so a fallback is diagnosable. */
+const SESSION_RESULT_FILE = "SESSION_RESULT.json";
+
 const RESUME_FAILURE = {
   NOT_FOUND: "session-not-found",
   CWD_MISMATCH: "cwd-mismatch",
@@ -239,6 +243,18 @@ async function run(ctx, config, io) {
  * @param payload - the machine-readable turn record.
  */
 function emit(io, config, payload) {
+  // Record the turn as a document as well as a line on stdout. A document has no
+  // quoting or escaping rules, so nothing about how the record travels can
+  // change what it says - and the dispatcher never has to parse the transport.
+  try {
+    const dir = join(process.cwd(), ".cb16");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, SESSION_RESULT_FILE), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  } catch (error) {
+    process.stderr.write(
+      `cb16-session-runner: could not record the turn result: ${error?.message ?? error}\n`,
+    );
+  }
   if (config.outputFormat === "json") {
     io.stdout.write(`${JSON.stringify(payload)}\n`);
   } else {
