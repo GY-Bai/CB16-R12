@@ -67,6 +67,12 @@
       "historical_path": "docs/tasks/R12_VS_D_HISTORICAL_MARKET_CANARY_R0.md",
       "snapshot_commit": "dc81cd4088156af90a91d8786c948509383e19ef",
       "sha256": "bf310bab0599db894e308477f94d87fb9e6c0fb96f522538b2a0c6acc7f3bacb"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_D_EVALUATION_ADAPTER_TRANSFER_R1.md",
+      "historical_path": "docs/tasks/active/R12_VS_D_EVALUATION_ADAPTER_TRANSFER_R1.md",
+      "snapshot_commit": "2f820eab19d9e7688828fa823b87deb827a40058",
+      "sha256": "975d5fd2d0afbbd2ba57ddcdac5763b99e8443ded52157e7abc04c2a17cec057"
     }
   ]
 }
