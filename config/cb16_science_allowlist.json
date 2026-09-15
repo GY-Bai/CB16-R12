@@ -314,6 +314,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-d-bounded-nonlinear-accessibility-r4@v1": {
+      "description": "R12 VS-D R4 bounded nonlinear accessibility diagnostic. Reads only frozen BTCUSDT Jan-Feb 2020; fits fixed 64x64 tanh MLP probes on January with matched shuffled-target controls and compares February reused-development correlation against exact R3 ridge using paired UTC-day bootstrap. March and final holdout forbidden. Emits cb16.result.v2.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.bounded_nonlinear_accessibility_r4"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-d-nonlinear-r4-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-d-nonlinear-r4-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
