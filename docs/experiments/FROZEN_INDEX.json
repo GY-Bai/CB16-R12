@@ -109,6 +109,12 @@
       "historical_path": "docs/tasks/active/R12_VS_D_MARCH_TEMPORAL_ROBUSTNESS_R7.md",
       "snapshot_commit": "25b6ed2af4b6e7b69726fe9a7e177fffc4992f02",
       "sha256": "8613ed0bb92c6a31de3ed9a8682a63bad2e3e99e7f1b4ce95b8d8b30f42bece3"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_D_BOUNDED_RIDGE_REGULARIZATION_ACCESSIBILITY_SCREEN_R8.md",
+      "historical_path": "docs/tasks/active/R12_VS_D_BOUNDED_RIDGE_REGULARIZATION_ACCESSIBILITY_SCREEN_R8.md",
+      "snapshot_commit": "4d7fd045567f2d3d4f770eaed9c51e172143c71a",
+      "sha256": "431e85a5ce3c4b289eab07814db94492b5d1607b913c201cecdadfc82da10c40"
     }
   ]
 }
