@@ -444,6 +444,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-d-linear-action-contrast-diagnostic-r9@v1": {
+      "description": "R12 VS-D R9 linear action-contrast DIAGNOSTIC. Reads only BTCUSDT Jan-Feb 2020; fits exact 64h N0 ridge lambda=1 and matched shuffled-January-target controls, maps frozen scores by sign to unit SHORT/LONG actions, and evaluates zero-cost one-hour action contrast with paired 48h circular moving-block bootstrap. February adaptively reused; March/final holdout forbidden. Emits cb16.result.v2.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.linear_action_contrast_diagnostic_r9"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-d-action-r9-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-d-action-r9-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
