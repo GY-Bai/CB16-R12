@@ -392,6 +392,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-d-march-temporal-robustness-r7@v1": {
+      "description": "R12 VS-D R7 temporal ROBUSTNESS diagnostic. Fits exact 64h N0 ridge lambda=1 and eight shuffled-January-target controls on the frozen January R6 window, then evaluates the unchanged probes on adaptively reused March 2020 with paired 31-day bootstrap. March is not fresh confirmation; final holdout forbidden. Emits cb16.result.v2.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.march_temporal_robustness_r7"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-d-march-r7-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-d-march-r7-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
