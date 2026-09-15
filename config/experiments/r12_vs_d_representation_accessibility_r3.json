@@ -1,0 +1,333 @@
+{
+  "schema": "cb16.experiment.v2",
+  "experiment_id": "r12.vs_d.representation_accessibility_diagnostic.r3",
+  "status": "PREREGISTERED_BEFORE_IMPLEMENTATION",
+  "parent_experiment_ids": [
+    "r12.vs_d.historical_market_information_canary.r0",
+    "r12.vs_d.evaluation_adapter_transfer_diagnostic.r1",
+    "r12.vs_d.objective_balance_entropy_gradient_diagnostic.r2a"
+  ],
+  "tested_object": "Linear accessibility of the frozen VS-D next-hour consequence relation from raw N0 versus FrozenSensory z=32 under one fixed deterministic ridge probe family",
+  "claim_scope": {
+    "data": "BTCUSDT_2020-01_2020-02_reused_development_only",
+    "probe_fit": "2020-01-03T17:00:00Z_through_2020-01-31T23:00:00Z_679_decisions",
+    "probe_validation": "2020-02-01T00:00:00Z_through_2020-02-29T23:00:00Z_696_decisions",
+    "validation_day_blocks": 29,
+    "march_read_forbidden": true,
+    "final_holdout_access_forbidden": true,
+    "target": "next_hour_arithmetic_return_close_over_open_minus_1",
+    "surfaces": [
+      "N0_FLATTENED_64x5",
+      "FROZEN_SENSORY_Z32_SEED12012"
+    ],
+    "probe_family": "train_standardized_closed_form_ridge_lambda_1"
+  },
+  "research_series_policy": {
+    "series_id": "r12.vs_d.historical_development",
+    "parent_results_inspected": true,
+    "reused_training_data": [
+      "BTCUSDT_2020-01"
+    ],
+    "reused_development_data": [
+      "BTCUSDT_2020-02"
+    ],
+    "freshness_status": "DIAGNOSTIC_REUSED_JAN_FEB_NOT_CONFIRMATION",
+    "new_experiment_id_does_not_reset_adaptation_history": true,
+    "march_read_forbidden": true,
+    "final_holdout_access_forbidden": true,
+    "no_hyperparameter_search": true,
+    "if_frozen_sensory_accessible": "a later experiment may investigate post-sensory learner/credit/horizon mechanisms; R3 itself does not identify them",
+    "if_n0_accessible_and_retention_gap_supported": "a later experiment may isolate the sensory transform/compression under a new preregistered identity",
+    "if_accessibility_gates_not_met": "do_not_rescue_R3; do not infer absence of market information; a later scoped diagnostic may test nonlinear accessibility, target/horizon choice, or another representation hypothesis"
+  },
+  "claims": [
+    {
+      "claim_id": "C_N0_LINEAR_ACCESSIBILITY",
+      "tested_object": "flattened 64x5 N0 representation under the fixed R3 ridge probe",
+      "claim_domain": "representation/accessibility",
+      "claim_scope": {
+        "surface": "N0_FLATTENED_64x5",
+        "probe": "fixed_linear_ridge",
+        "validation": "reused_February_development"
+      },
+      "estimand": {
+        "primary": [
+          "February_Pearson_corr_true_probe",
+          "February_true_minus_median_shuffled_probe_corr"
+        ],
+        "unit": "UTC_calendar_day_block",
+        "uncertainty": "paired_29_day_block_bootstrap_4096_replicates"
+      },
+      "authority_scope": [
+        "may support linear accessibility of the specified next-hour return relation from N0 under this fixed probe and reused development split",
+        "may record that this accessibility gate was not met"
+      ],
+      "promotion_scope": [
+        "PROMOTE_N0_ACCESSIBILITY_DIAGNOSTIC_ROUTE"
+      ],
+      "invalid_inferences": [
+        "does_not_qualify_historical_market_information",
+        "does_not_prove_market_information_absent_if_gate_misses",
+        "does_not_establish_nonlinear_inaccessibility",
+        "does_not_establish_economic_profitability",
+        "does_not_authorize_final_holdout"
+      ],
+      "composition_dependencies": [
+        {
+          "type": "validity_dependency",
+          "ref": "causal_N0_and_exact_January_February_chronology"
+        }
+      ]
+    },
+    {
+      "claim_id": "C_FROZEN_SENSORY_LINEAR_ACCESSIBILITY",
+      "tested_object": "FrozenSensory z=32 seed=12012 representation under the fixed R3 ridge probe",
+      "claim_domain": "representation/accessibility",
+      "claim_scope": {
+        "surface": "FROZEN_SENSORY_Z32_SEED12012",
+        "probe": "fixed_linear_ridge",
+        "validation": "reused_February_development"
+      },
+      "estimand": {
+        "primary": [
+          "February_Pearson_corr_true_probe",
+          "February_true_minus_median_shuffled_probe_corr"
+        ],
+        "unit": "UTC_calendar_day_block",
+        "uncertainty": "paired_29_day_block_bootstrap_4096_replicates"
+      },
+      "authority_scope": [
+        "may support linear accessibility of the specified next-hour return relation after the exact frozen sensory transform",
+        "may record that this accessibility gate was not met"
+      ],
+      "promotion_scope": [
+        "PROMOTE_POST_SENSORY_DIAGNOSTIC_ROUTE"
+      ],
+      "invalid_inferences": [
+        "does_not_prove_downstream_learner_is_the_root_cause",
+        "does_not_qualify_historical_market_information",
+        "does_not_establish_economic_profitability",
+        "does_not_authorize_final_holdout"
+      ],
+      "composition_dependencies": [
+        {
+          "type": "validity_dependency",
+          "ref": "FrozenSensory_z32_seed12012_exact_parent_surface"
+        }
+      ]
+    },
+    {
+      "claim_id": "C_SENSORY_RETENTION_GAP",
+      "tested_object": "paired accessibility difference between N0 flattened and FrozenSensory z=32 under the fixed probe family",
+      "claim_domain": "representation/transfer_retention",
+      "claim_scope": {
+        "comparison": "N0_true_probe_corr_minus_FrozenSensory_true_probe_corr",
+        "validation": "reused_February_development",
+        "causal_attribution": false
+      },
+      "estimand": {
+        "primary": "paired February day-block bootstrap lower bound of N0 true-probe correlation minus FrozenSensory true-probe correlation",
+        "unit": "UTC_calendar_day_block"
+      },
+      "authority_scope": [
+        "may support a surface-level retention-gap hypothesis if N0 accessibility is also qualified",
+        "may reject promotion of that retention-gap hypothesis"
+      ],
+      "promotion_scope": [
+        "PROMOTE_SENSORY_RETENTION_GAP_HYPOTHESIS"
+      ],
+      "invalid_inferences": [
+        "does_not_prove_random_projection_or_tanh_uniquely_destroyed_information",
+        "does_not_equalize_effective_capacity_between_320D_and_32D_surfaces",
+        "does_not_prove_sensory_transform_caused_R0_or_R1_gate_miss",
+        "does_not_authorize_replacing_FrozenSensory_inside_R3"
+      ],
+      "composition_dependencies": [
+        {
+          "type": "promotion_prerequisite",
+          "ref": "C_N0_LINEAR_ACCESSIBILITY"
+        },
+        {
+          "type": "validity_dependency",
+          "ref": "same_target_same_split_same_probe_family"
+        }
+      ]
+    }
+  ],
+  "gate_mapping": {
+    "C_N0_LINEAR_ACCESSIBILITY": [
+      "G_N0_ACCESSIBILITY"
+    ],
+    "C_FROZEN_SENSORY_LINEAR_ACCESSIBILITY": [
+      "G_FROZEN_SENSORY_ACCESSIBILITY"
+    ],
+    "C_SENSORY_RETENTION_GAP": [
+      "G_SENSORY_RETENTION_GAP"
+    ]
+  },
+  "allowed_promotion_decisions": [
+    "NO_PROMOTION",
+    "PROMOTE_N0_ACCESSIBILITY_DIAGNOSTIC_ROUTE",
+    "PROMOTE_POST_SENSORY_DIAGNOSTIC_ROUTE",
+    "PROMOTE_SENSORY_RETENTION_GAP_HYPOTHESIS"
+  ],
+  "promotion_policy": {
+    "if_frozen_sensory_accessibility_qualified": "PROMOTE_POST_SENSORY_DIAGNOSTIC_ROUTE",
+    "else_if_n0_accessibility_and_retention_gap_qualified": "PROMOTE_SENSORY_RETENTION_GAP_HYPOTHESIS",
+    "else_if_only_n0_accessibility_qualified": "PROMOTE_N0_ACCESSIBILITY_DIAGNOSTIC_ROUTE",
+    "otherwise": "NO_PROMOTION"
+  },
+  "data": {
+    "source_root": "/cb16/raw/klines_1m/BTCUSDT",
+    "manifest_path": "/cb16/raw/DOWNLOAD_MANIFEST.json",
+    "require_manifest_final_holdout_accessed_false": true,
+    "allowed_archives": [
+      {
+        "name": "BTCUSDT-1m-2020-01.zip",
+        "sha256": "b4e13ea185ba96c413ac9167cfbb6e238eb5eae119a7a77f41f4c61c5e099d03",
+        "expected_rows": 44640
+      },
+      {
+        "name": "BTCUSDT-1m-2020-02.zip",
+        "sha256": "f32b20168ea590cd7d04a2995bc5ec500ea06331c8174f7fd14f29c1078e5ed2",
+        "expected_rows": 41760
+      }
+    ],
+    "forbidden_reads": [
+      "BTCUSDT-1m-2020-03.zip",
+      "any_final_holdout_archive"
+    ],
+    "hourly_aggregation": {
+      "timezone": "UTC",
+      "require_exactly_60_contiguous_1m_rows_per_hour": true,
+      "open": "first_1m_open",
+      "high": "max_1m_high",
+      "low": "min_1m_low",
+      "close": "last_1m_close",
+      "volume": "sum_1m_volume",
+      "expected_hourly_bars": 1440
+    },
+    "context": {
+      "normalization": "N0_ENDPOINT_ANCHORED_V1",
+      "represented_hours": 64,
+      "retained_predecessor_hours": 1,
+      "raw_window_hours": 65
+    },
+    "probe_fit": {
+      "consequence_hour_start_utc": "2020-01-03T17:00:00Z",
+      "consequence_hour_end_utc": "2020-01-31T23:00:00Z",
+      "expected_decisions": 679
+    },
+    "probe_validation": {
+      "consequence_hour_start_utc": "2020-02-01T00:00:00Z",
+      "consequence_hour_end_utc": "2020-02-29T23:00:00Z",
+      "expected_decisions": 696,
+      "expected_day_blocks": 29,
+      "hours_per_day": 24
+    },
+    "causal_rule": "each context ends strictly before its consequence hour; preprocessing parameters are fit on January probe-fit rows only"
+  },
+  "representation": {
+    "n0_surface": {
+      "shape_per_sample": [
+        64,
+        5
+      ],
+      "flattened_width": 320
+    },
+    "frozen_sensory": {
+      "implementation": "cb16_science.vslice.sensory.FrozenSensory",
+      "seed": 12012,
+      "z_dim": 32,
+      "transform": "tanh_fixed_random_projection",
+      "trainable_parameters": 0
+    }
+  },
+  "target": {
+    "name": "next_hour_arithmetic_return",
+    "formula": "close_next / open_next - 1.0",
+    "realized_winner_label": false,
+    "used_for_probe_fit_only_on_January": true,
+    "February_targets_evaluation_only": true
+  },
+  "probe": {
+    "family": "deterministic_closed_form_ridge",
+    "feature_preprocessing": "per_surface_January_mean_and_population_std; drop features with std<=1e-12; apply frozen January transform to February",
+    "target_preprocessing": "center by January target mean; intercept equals January target mean; no target variance normalization",
+    "ridge_lambda": 1.0,
+    "closed_form": "w = solve(X_train.T @ X_train + lambda * I, X_train.T @ (y_train - mean(y_train)))",
+    "validation_refit_forbidden": true,
+    "hyperparameter_search_forbidden": true,
+    "same_probe_family_across_surfaces": true
+  },
+  "negative_controls": {
+    "type": "shuffle_January_training_targets_only",
+    "permutation": "controlled_tasks.no_fixed_point_permutation",
+    "control_seeds": [
+      4401,
+      4402,
+      4403,
+      4404,
+      4405,
+      4406,
+      4407,
+      4408
+    ],
+    "generation_argument": 0,
+    "preserve_training_target_multiset": true,
+    "February_true_targets_unchanged": true,
+    "same_controls_for_both_surfaces": true
+  },
+  "uncertainty_protocol": {
+    "validation_blocks": "29_UTC_calendar_days_x_24_hours",
+    "bootstrap_replicates": 4096,
+    "bootstrap_seed": 53031,
+    "paired_resamples_across_surfaces_and_controls": true,
+    "lower_bound_order_index_zero_based": 204,
+    "correlation": "Pearson",
+    "fail_if_target_or_prediction_variance_is_zero": true
+  },
+  "gates": {
+    "G_N0_ACCESSIBILITY": {
+      "conditions": {
+        "true_probe_corr_bootstrap_lcb_strictly_gt": 0.0,
+        "true_minus_median_shuffle_corr_bootstrap_lcb_strictly_gt": 0.0
+      }
+    },
+    "G_FROZEN_SENSORY_ACCESSIBILITY": {
+      "conditions": {
+        "true_probe_corr_bootstrap_lcb_strictly_gt": 0.0,
+        "true_minus_median_shuffle_corr_bootstrap_lcb_strictly_gt": 0.0
+      }
+    },
+    "G_SENSORY_RETENTION_GAP": {
+      "conditions": {
+        "C_N0_LINEAR_ACCESSIBILITY_must_be_qualified": true,
+        "N0_minus_FrozenSensory_true_corr_bootstrap_lcb_strictly_gt": 0.0
+      }
+    }
+  },
+  "secondary_diagnostics": [
+    "point_Pearson_corr",
+    "RMSE",
+    "sign_accuracy_excluding_exact_zero_targets",
+    "individual_shuffle_control_correlations",
+    "active_feature_count_after_January_standardization",
+    "January_target_mean_std",
+    "February_target_mean_std"
+  ],
+  "implementation_gate": {
+    "full_repository_suite_must_pass_at_exact_commit": true,
+    "result_schema": "cb16.result.v2"
+  },
+  "no_rescue": [
+    "no_probe_lambda_change",
+    "no_feature_selection_after_results",
+    "no_new_control_seeds",
+    "no_split_change",
+    "no_target_change",
+    "no_nonlinear_probe_inside_R3",
+    "no_March_read",
+    "no_final_holdout_read"
+  ]
+}
