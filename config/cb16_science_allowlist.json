@@ -288,6 +288,32 @@
         "RESULT.json",
         "REPORT.md"
       ]
+    },
+    "cb16.vs-d-representation-accessibility-r3@v1": {
+      "description": "R12 VS-D R3 representation-accessibility diagnostic. Reads only frozen BTCUSDT Jan-Feb 2020, fits one fixed deterministic ridge probe family on January and evaluates February reused development on flattened N0 versus exact FrozenSensory z32 with matched shuffled-target controls and paired day-block bootstrap. March and final holdout are forbidden. Emits cb16.result.v2 claim-local authority.",
+      "argv": [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        ".",
+        "--python",
+        "3.12",
+        "python",
+        "-m",
+        "cb16_science.vslice.representation_accessibility_r3"
+      ],
+      "env": {
+        "PYTHONPATH": "science",
+        "UV_PROJECT_ENVIRONMENT": "/tmp/cb16-vs-d-representation-r3-venv",
+        "UV_CACHE_DIR": "/tmp/cb16-vs-d-representation-r3-cache",
+        "UV_LINK_MODE": "copy"
+      },
+      "produces": [
+        "experiment_spec.json",
+        "RESULT.json",
+        "REPORT.md"
+      ]
     }
   }
 }
