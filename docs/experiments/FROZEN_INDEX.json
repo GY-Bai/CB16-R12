@@ -97,6 +97,12 @@
       "historical_path": "docs/tasks/active/R12_VS_D_BOUNDED_HORIZON_ACCESSIBILITY_SCREEN_R5.md",
       "snapshot_commit": "1bcd904c11824277bb3a4a098bb1c6e0ad63c81b",
       "sha256": "8de07a467826f2fdf048d9810888bce234dc582fd2795cdeae917c442d717df4"
+    },
+    {
+      "current_path": "docs/experiments/frozen/R12_VS_D_BOUNDED_CONTEXT_LENGTH_ACCESSIBILITY_SCREEN_R6.md",
+      "historical_path": "docs/tasks/active/R12_VS_D_BOUNDED_CONTEXT_LENGTH_ACCESSIBILITY_SCREEN_R6.md",
+      "snapshot_commit": "3142430c835d45c91cb04188fe2b06cb6a3d7061",
+      "sha256": "d891cb45afad5a83770f188ff9105bb6b0d97a1f1fc059781dd8d9fdc8866f1c"
     }
   ]
 }
