@@ -7,8 +7,8 @@ Files in this directory are the first documentation context for present scientif
 ## Current authority
 
 - `AUTHORITY_INDEX.json` — machine-readable authority classes, default-context policy, and reading order.
-- `R12_EVIDENCE_SCOPE_AND_CLAIM_AUTHORITY.md` — claim scope, PASS/FAIL interpretation, dependency types, promotion authority, research-series and temporal-governance rules.
-- `TASK_REVIEW_PROTOCOL.md` — task construction, immutable scientific execution, review, and evidence handling.
+- `R12_EVIDENCE_SCOPE_AND_CLAIM_AUTHORITY.md` — claim scope, experiment roles, verification vs validation, estimand/inference boundaries, PASS/FAIL interpretation, dependency types, promotion authority, adaptive data exposure, and temporal governance.
+- `TASK_REVIEW_PROTOCOL.md` — task construction, two-stage scientific protocol/result review, immutable execution, diagnostic/screening rules, complexity admission, and evidence handling.
 
 ## Precedence
 

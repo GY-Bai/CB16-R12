@@ -46,16 +46,21 @@ Use the following distinctions explicitly:
 
 CB16's scientific authority is a graph of scoped claims and typed dependencies. The old L0-L6 sequence may remain as a reading aid or execution order, but layer numbers do not automatically create logical implication, evidence inheritance, or promotion authority.
 
-Each claim should identify:
+Each formal experiment should declare one `experiment_role`: `QUALIFICATION`, `FALSIFICATION`, `DIAGNOSTIC`, `SCREENING`, `EXPLORATORY`, `ROBUSTNESS`, or `TRANSFER`. Each claim inside it should identify:
 
 - `claim_id`: stable identifier;
+- `vv_classification`: `VERIFICATION` when the claim asks whether an implementation satisfies a declared contract, `VALIDATION` when it asks whether a verified system has the intended capability in a declared use context, or `NOT_APPLICABLE` when the claim is neither kind (for example, a mechanism-local diagnostic measurement);
 - `tested_object`: component, interface, learner, configuration, integration, or composed system;
 - `claim_domain`: semantics, optimization, controlled behavior, decision value, economics, robustness, generalization, or another declared domain;
 - `claim_scope`: data, asset, time, environment, account semantics, costs, budget, horizon, evaluation adapter, and version boundaries;
-- `estimand`: the quantity actually estimated and its unit of statistical replication;
+- `estimand`: the scientific quantity whose value would answer the declared question;
+- `estimator`: the statistic/procedure used to estimate the estimand;
+- `replication_unit`: the independent or dependence-aware unit used for uncertainty;
+- `validity_prerequisites`: conditions that must hold before the result can adjudicate the claim;
 - `authority_scope`: conclusions the experiment may support;
 - `promotion_scope`: concrete downstream use that may be granted;
-- `invalid_inferences`: conclusions the experiment is not authorized to make.
+- `invalid_inferences`: conclusions the experiment is not authorized to make;
+- `credible_alternatives`: material alternative explanations that the design controls, measures, or explicitly leaves unresolved.
 
 Dependencies must be typed rather than called generically "upstream":
 
@@ -151,10 +156,12 @@ A new experiment ID is necessary for a changed method, but it does not make reus
 Each research series should therefore record:
 
 - parent experiments and observed prior results;
-- what data have already been inspected or reused;
+- a compact data-exposure record: dataset/split identity, the role in which it was seen, prior experiment IDs, and whether research/model-design decisions were adapted after inspecting it;
 - what changed and why that change is hypothesized to matter;
 - preregistered budget and stopping/escalation rules;
-- whether the next result is confirmatory, diagnostic, or exploratory.
+- the next experiment's declared role (`QUALIFICATION`, `FALSIFICATION`, `DIAGNOSTIC`, `SCREENING`, `EXPLORATORY`, `ROBUSTNESS`, or `TRANSFER`).
+
+This record may live inside the experiment spec or research-series metadata. R12 does not require a separate database or service merely to track exposure.
 
 Repeatedly adapting to the same development period can create selection bias even when every run has a new ID. The project must not treat IDs as resetting the evidence history.
 
@@ -192,17 +199,24 @@ For new formal scientific work, `experiment_spec.json` should progressively adop
 ```text
 experiment_id
 parent_experiment_ids
+experiment_role
 tested_object
 claims[]
+vv_classification
 claim_scope
 estimand
+estimator
+replication_unit
+validity_prerequisites
 controls
+credible_alternatives[]
 gate_mapping
 uncertainty_protocol
 authority_scope
 promotion_scope
 invalid_inferences
 composition_dependencies
+data_exposure
 research_series_policy
 ```
 
@@ -211,9 +225,11 @@ research_series_policy
 ```text
 execution_status
 validity_status
+protocol_deviations[]
 gate_results[]
 claim_assessments[]
 prior_evidence_assessment[]
+data_exposure_assessment
 promotion_decision
 provenance
 ```
@@ -226,6 +242,9 @@ Mechanical rules:
 4. Failed controls or validity prerequisites block affected scientific interpretation.
 5. Unknown root cause must remain `attribution_status: UNRESOLVED`.
 6. Changed versions/configurations do not inherit qualification without an explicit transfer assessment.
+7. A `DIAGNOSTIC`, `SCREENING`, or `EXPLORATORY` result does not silently become a qualification or falsification result.
+8. A verification PASS does not establish validation unless the validation claim was separately designed and tested.
+9. Protocol deviations are reported as evidence about validity, not silently repaired in the result narrative.
 
 These fields are a governance target for new experiment schemas. Existing `cb16.result.v1` artifacts are not retroactively invalid because they do not contain them; their interpretation must instead follow this canonical document until structured enforcement is implemented.
 ## 13. Temporal authority and supersession
@@ -281,7 +300,63 @@ For VS-D, the tested object is the frozen N0 + sensory + learner/training progra
 VS-D did not identify a unique failing component or mechanism, did not test all historical relations, and did not adjudicate continuing-account economics, cost survival, final holdout, or the feasibility of the full CB16 design. Component gate observations and favorable point estimates remain evidence in the artifact even though they cannot rescue the frozen aggregate FAIL.
 
 March is development material already inspected by this research series. Future configuration changes evaluated on March must record that adaptive reuse and must not describe March as statistically fresh confirmation.
-## 16. Enforcement status
+
+## 16. Experiment roles and inference authority
+
+Every new formal scientific experiment declares its role before results are observed. The role constrains what kind of conclusion the experiment may support:
+
+| Role | Primary purpose | Typical authority |
+|---|---|---|
+| `QUALIFICATION` | Decide whether a scoped object earns a preregistered capability/use qualification. | Grant or deny the named qualification/promotion only. |
+| `FALSIFICATION` | Deliberately test a proposition with a design capable of producing scoped evidence against it. | Support or weaken the stated proposition; a generic gate miss is not enough. |
+| `DIAGNOSTIC` | Measure a suspected mechanism or localize why a prior configuration behaved as observed. | Mechanism evidence within the diagnostic design; no automatic qualification. |
+| `SCREENING` | Compare several plausible factors/interventions efficiently to decide what deserves a stronger follow-up. | Prioritize hypotheses; usually not confirmatory. |
+| `EXPLORATORY` | Generate hypotheses or characterize an unknown surface. | Hypothesis generation only unless separately preregistered. |
+| `ROBUSTNESS` | Test sensitivity across declared perturbations, regimes, seeds, costs, or implementation choices. | Bound stability within the tested perturbation set. |
+| `TRANSFER` | Test whether earlier evidence remains applicable after a declared change of data, component, composition, or context. | Grant or deny the named evidence transfer. |
+
+A new run identity does not change an experiment's role. A result may be interesting outside its role, but stronger use requires a new appropriately designed experiment.
+
+## 17. Verification and validation are different claims
+
+R12 uses the systems-engineering distinction explicitly:
+
+- **Verification** asks whether the implementation satisfies the declared contract: formulas, invariants, interfaces, determinism, accounting, masks, timing, provenance, and other specified behavior.
+- **Validation** asks whether the verified system has the intended scientific/economic capability in the declared use context: learns the relation, improves the decision, transfers, survives costs, or supports deployment.
+
+Verification is often a prerequisite for validation, but it is not validation evidence by itself. Conversely, an observed validation improvement does not excuse a contract-invalid implementation. `vv_classification` is an orthogonal applicability annotation, not an exhaustive scientific-claim taxonomy: mechanism-local diagnostic, screening, or exploratory claims may be `NOT_APPLICABLE`. Here `VALIDATION` is a systems-engineering classification; it is not the same thing as a dataset role named development/validation.
+
+## 18. Claim argument and credible alternatives
+
+High-consequence or mechanistically ambiguous claims should record the smallest useful argument structure:
+
+```text
+claim
+  -> why the declared evidence would support it
+  -> validity prerequisites
+  -> credible alternative explanations
+  -> control/measurement for each addressed alternative
+  -> alternatives intentionally left unresolved
+```
+
+This is an argument record, not a new graph service. Evidence-file count, green CI, or a verbose report does not strengthen a claim unless the evidence closes a declared part of the argument. Counterevidence and unresolved alternatives remain visible.
+
+## 19. Adaptive data exposure
+
+Development data have an exposure history. Repeated inspection and adaptation can make later results less independent even when code SHA, seed, branch, or experiment ID changes. For any repeatedly used development period, new formal specs should record at least:
+
+```text
+dataset_or_split_id
+roles_seen[]                 # training / development validation / diagnostic / other
+prior_experiment_ids[]
+human_or_model_result_exposure
+adaptations_made_after_exposure[]
+freshness_class             # fresh / previously seen / adaptively reused
+```
+
+This record governs interpretation; it does not ban iterative research. Adaptively reused development data remain useful for diagnosis and engineering, but must not be represented as fresh confirmation or protected-holdout evidence.
+
+## 20. Enforcement status
 
 This document is canonical interpretation/governance now. Not every rule is yet machine-enforced by `experiment_spec.json`, `RESULT.json`, or the dispatcher.
 
